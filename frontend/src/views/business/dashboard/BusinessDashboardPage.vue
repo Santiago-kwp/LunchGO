@@ -1,8 +1,8 @@
 <script setup>
 import { ref } from 'vue';
 import { Filter } from 'lucide-vue-next'; // Bell, User는 Header로 이동
-import BusinessSidebar from '@/views/layout/BusinessSideBar.vue';
-import BusinessHeader from '@/views/layout/BusinessHeader.vue';
+import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
+import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 
 const selectedDate = ref(new Date().toISOString().split('T')[0]);
 

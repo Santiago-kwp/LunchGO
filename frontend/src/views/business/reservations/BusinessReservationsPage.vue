@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
-import BusinessSidebar from '@/views/layout/BusinessSideBar.vue';
-import BusinessHeader from '@/views/layout/BusinessHeader.vue';
+import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
+import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 
 const selectedDate = ref(new Date(2024, 9, 24)); // October 24, 2024
 const currentMonth = ref(new Date(2024, 9, 1));

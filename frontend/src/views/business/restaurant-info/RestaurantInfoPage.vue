@@ -1,8 +1,8 @@
 <script setup>
 import { ref } from 'vue';
 import { RouterLink } from 'vue-router';
-import BusinessSidebar from '@/views/layout/BusinessSideBar.vue';
-import BusinessHeader from '@/views/layout/BusinessHeader.vue';
+import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
+import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 
 const isHolidayOpen = ref(false);
 const isPreOrderSupported = ref(true);

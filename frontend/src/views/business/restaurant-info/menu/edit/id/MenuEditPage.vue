@@ -2,8 +2,8 @@
 import { ref, reactive } from 'vue';
 import { Upload, X } from 'lucide-vue-next'; // User, Bell은 Header로 이동
 import { useRouter, useRoute } from 'vue-router';
-import BusinessSidebar from '@/views/layout/BusinessSideBar.vue';
-import BusinessHeader from '@/views/layout/BusinessHeader.vue';
+import BusinessSidebar from '../../../../../components/layout/BusinessSidebar.vue';
+import BusinessHeader from '../../../../../components/layout/BusinessHeader.vue';
 
 const router = useRouter(); // Vue Router's useRouter
 const route = useRoute(); // Vue Router's useRoute to access route params
