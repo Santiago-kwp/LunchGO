@@ -18,6 +18,7 @@ const reservation = {
     date: '12월 15일 (금)',
     time: '18:00',
     partySize: 4,
+    requestNote: '유아용 의자 부탁드려요', //더미 (나중에 백엔드로 교체)
   },
   menu: [
     { name: 'A코스', quantity: 2, price: 35000 },
@@ -28,8 +29,7 @@ const reservation = {
 const subtotal = computed(() =>
   reservation.menu.reduce((sum, item) => sum + item.price * item.quantity, 0),
 );
-const serviceFee = computed(() => Math.floor(subtotal.value * 0.1));
-const total = computed(() => subtotal.value + serviceFee.value);
+const total = computed(() => subtotal.value); // 총 결제 = 주문금액
 </script>
 
 <template>
@@ -93,6 +93,20 @@ const total = computed(() => subtotal.value + serviceFee.value);
             </div>
           </div>
         </div>
+        <!-- Request Note (Read-only) : 예약 정보 밑에 따로 -->
+        <div class="bg-white px-4 py-5">
+          <h2 class="text-lg font-semibold text-[#1e3a5f] mb-4">요청사항</h2>
+
+          <div class="rounded-2xl border border-[#e9ecef] bg-[#f8f9fa] px-4 py-4">
+            <p class="text-base font-semibold text-[#6c757d] whitespace-pre-line">
+              {{ reservation.booking.requestNote?.trim() ? reservation.booking.requestNote : '-' }}
+            </p>
+          </div>
+
+          <p class="mt-3 text-sm text-[#6c757d] leading-relaxed">
+            요청사항은 매장 참고용이며, 예약 변경은 매장으로 직접 문의해 주세요.
+          </p>
+        </div>
       </div>
 
       <!-- Menu Details -->
@@ -119,10 +133,6 @@ const total = computed(() => subtotal.value + serviceFee.value);
           <div class="flex items-center justify-between text-sm">
             <span class="text-[#6c757d]">주문 금액</span>
             <span class="font-medium text-[#495057]">{{ subtotal.toLocaleString() }}원</span>
-          </div>
-          <div class="flex items-center justify-between text-sm">
-            <span class="text-[#6c757d]">서비스 수수료</span>
-            <span class="font-medium text-[#495057]">{{ serviceFee.toLocaleString() }}원</span>
           </div>
           <div class="h-px bg-[#e9ecef] my-3" />
           <div class="flex items-center justify-between">
