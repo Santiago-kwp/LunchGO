@@ -13,6 +13,7 @@ const restaurantId = route.params.id; // Access the dynamic ID
 const selectedDateIndex = ref(null); // Changed from selectedDate to selectedDateIndex to match React's use of index
 const selectedTime = ref(null);
 const partySize = ref(4);
+const requestNote = ref('');
 
 // Generate dates for the next 30 days
 const dates = computed(() => {
@@ -144,6 +145,20 @@ const selectDate = (idx) => {
         </p>
       </div>
 
+      <!-- Request Note -->
+      <div v-if="canProceed" class="bg-white px-4 py-5 border-t border-[#e9ecef]">
+        <h2 class="text-base font-semibold text-[#1e3a5f] mb-3">요청사항</h2>
+        <textarea
+          v-model="requestNote"
+          rows="4"
+          placeholder="예: 유아용 의자 부탁드려요 등"
+          class="w-full rounded-xl border-2 border-[#dee2e6] px-3 py-3 text-sm text-[#1e3a5f] placeholder:text-[#adb5bd] focus:outline-none focus:border-[#ff6b4a]"
+        />
+        <p class="mt-2 text-xs text-[#6c757d] leading-relaxed">
+        요청사항은 매장의 참고 용이며, 예약내역 변경 사항은 취소 후 재예약 혹은 매장으로 직접 문의 하시길 바랍니다.
+        </p>
+      </div>
+
       <!-- Booking Summary -->
       <div v-if="canProceed" class="mx-4 mt-4">
         <Card class="p-4 border-[#e9ecef] rounded-xl bg-white shadow-card">
@@ -152,6 +167,10 @@ const selectDate = (idx) => {
             <div class="flex justify-between">
               <span class="text-[#6c757d]">식당명</span>
               <span class="text-[#1e3a5f] font-medium">식당명</span>
+            </div>
+            <div class="flex justify-between">
+            <span class="text-[#6c757d]">요청사항</span>
+            <span class="text-[#1e3a5f] font-medium">{{ requestNote?.trim() || '-' }}</span>
             </div>
             <div class="flex justify-between">
               <span class="text-[#6c757d]">예약 날짜</span>

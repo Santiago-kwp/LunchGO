@@ -15,9 +15,28 @@ const isDepositOnly = computed(() => paymentType === 'deposit');
 const selectedPayment = ref(null);
 const agreedToTerms = ref(false);
 const agreedToRefund = ref(false);
+const isTermsModalOpen = ref(false);
+const modalTitle = ref('');
+const modalContent = ref('');
 
 const depositAmount = 10000; // 예약금 1만원
 const totalAmount = computed(() => (isDepositOnly.value ? depositAmount : 176000));
+
+// 이용약관 모달
+const openModal = (type) => {
+  isTermsModalOpen.value = true;
+  if (type === 'terms') {
+    modalTitle.value = '서비스 이용약관';
+    modalContent.value = '약관 내용 준비 중입니다.';
+  } else {
+    modalTitle.value = '취소 및 환불 정책';
+    modalContent.value = '정책 내용 준비 중입니다.';
+  }
+};
+
+const closeModal = () => {
+  isTermsModalOpen.value = false;
+};
 
 // Map Lucide icons to a component object for dynamic rendering
 const iconComponents = {
@@ -33,19 +52,7 @@ const paymentMethods = [
     name: '신용/체크카드',
     iconName: 'CreditCard', // Use string name to reference iconComponents
     description: '국내 모든 카드 사용 가능',
-  },
-  {
-    id: 'mobile',
-    name: '간편결제',
-    iconName: 'Smartphone',
-    description: '카카오페이, 네이버페이 등',
-  },
-  {
-    id: 'transfer',
-    name: '계좌이체',
-    iconName: 'Building2',
-    description: '실시간 계좌이체',
-  },
+  }
 ];
 
 const canProceed = computed(() => selectedPayment.value && agreedToTerms.value && agreedToRefund.value);
@@ -124,37 +131,30 @@ const handlePayment = () => {
       <div class="px-4 py-5 bg-white border-t border-b border-[#e9ecef]">
         <h2 class="text-base font-semibold text-[#1e3a5f] mb-4">약관 동의</h2>
         <div class="space-y-3">
-          <label class="flex items-start gap-3 cursor-pointer group">
+          <label :class="`flex items-start gap-3 cursor-pointer group rounded-xl p-2 -m-2 transition-colors ${agreedToTerms ? 'bg-[#fff5f3]' : ''}`">
             <div class="relative flex-shrink-0 mt-0.5">
-              <input
-                type="checkbox"
-                v-model="agreedToTerms"
-                class="sr-only peer"
-              />
-              <div class="w-5 h-5 rounded border-2 border-[#dee2e6] bg-white peer-checked:gradient-primary peer-checked:border-0 flex items-center justify-center transition-all group-hover:border-[#ff6b4a]">
+              <input type="checkbox" v-model="agreedToTerms" class="sr-only" />
+              <div :class="`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${agreedToTerms ? 'bg-[#ff6b4a] border-[#ff6b4a]' : 'bg-white border-[#dee2e6]'} group-hover:border-[#ff6b4a]`">
                 <Check v-if="agreedToTerms" class="w-3.5 h-3.5 text-white" />
               </div>
             </div>
             <div class="flex-1">
               <p class="text-sm text-[#1e3a5f] font-medium mb-0.5">(필수) 서비스 이용약관 동의</p>
-              <button class="text-xs text-[#6c757d] underline hover:text-[#ff6b4a]">자세히 보기</button>
+              <button type="button" @click.stop="openModal('terms')" class="text-xs text-[#6c757d] underline hover:text-[#ff6b4a]">자세히 보기</button> <!--이용약관 모달 버튼-->
             </div>
           </label>
 
-          <label class="flex items-start gap-3 cursor-pointer group">
+          <label :class="`flex items-start gap-3 cursor-pointer group rounded-xl p-2 -m-2 transition-colors ${agreedToRefund ? 'bg-[#fff5f3]' : ''}`">
             <div class="relative flex-shrink-0 mt-0.5">
-              <input
-                type="checkbox"
-                v-model="agreedToRefund"
-                class="sr-only peer"
-              />
-              <div class="w-5 h-5 rounded border-2 border-[#dee2e6] bg-white peer-checked:gradient-primary peer-checked:border-0 flex items-center justify-center transition-all group-hover:border-[#ff6b4a]">
+              <input type="checkbox" v-model="agreedToRefund" class="sr-only" />
+              <div :class="`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${agreedToRefund ? 'bg-[#ff6b4a] border-[#ff6b4a]' : 'bg-white border-[#dee2e6]'} group-hover:border-[#ff6b4a]`">
                 <Check v-if="agreedToRefund" class="w-3.5 h-3.5 text-white" />
               </div>
             </div>
             <div class="flex-1">
               <p class="text-sm text-[#1e3a5f] font-medium mb-0.5">(필수) 취소 및 환불 정책 동의</p>
-              <button class="text-xs text-[#6c757d] underline hover:text-[#ff6b4a]">자세히 보기</button>
+              <!--이용약관 모달 버튼-->
+              <button type="button" @click.stop="openModal('refund')" class="text-xs text-[#6c757d] underline hover:text-[#ff6b4a]">자세히 보기</button>
             </div>
           </label>
         </div>
@@ -166,19 +166,45 @@ const handlePayment = () => {
           <h3 class="text-sm font-semibold text-[#1e3a5f] mb-2">결제 안내</h3>
           <ul class="space-y-1 text-xs text-[#6c757d] leading-relaxed">
             <template v-if="isDepositOnly">
-              <li>• 예약금 결제 후 즉시 예약이 확정됩니다</li>
-              <li>• 예약금은 이용 완료 확인 시 돌려드립니다</li>
-              <li>• 취소는 방문 1일 전까지 가능하며, 당일 취소 및 노쇼 시 환불 정책에 따라 환불 됩니다</li>
+              <li>• 예약금 결제 후 즉시 예약이 확정됩니다.</li>
+              <li>• 예약금은 이용 완료 확인 시 돌려드립니다.</li>
+              <li>• 취소는 방문 1일 전까지 가능하며, 당일 취소 및 노쇼 시 환불 정책에 따라 환불 됩니다.</li>
+              <li>• 예약 변경 시 취소 후 재예약 해주시길 바랍니다.</li>
+              <li>• 취소 후 재예약시 환불 정책에 따라 환불 됩니다.</li>
             </template>
             <template v-else>
-              <li>• 결제 후 즉시 예약이 확정됩니다</li>
-              <li>• 영업일 기준 3-5일 이내 환불 처리됩니다</li>
-              <li>• 문의사항은 고객센터로 연락 주시기 바랍니다</li>
+              <li>• 결제 후 즉시 예약이 확정됩니다.</li>
+              <li>• 영업일 기준 3-5일 이내 환불 처리됩니다.</li>
+              <li>• 문의사항은 고객센터로 연락 주시기 바랍니다.</li>
             </template>
           </ul>
         </Card>
       </div>
     </main>
+
+    <!-- Terms Modal -->
+  <div v-if="isTermsModalOpen" class="fixed inset-0 z-[999]">
+  <!-- Backdrop -->
+  <div class="absolute inset-0 bg-black/40" @click="closeModal"></div>
+
+  <!-- Modal -->
+    <div class="absolute left-1/2 top-1/2 w-[calc(100%-32px)] max-w-[500px] -translate-x-1/2 -translate-y-1/2">
+      <Card class="p-5 rounded-2xl bg-white border-[#e9ecef] shadow-lg">
+        <div class="flex items-start justify-between gap-3">
+          <h3 class="text-base font-semibold text-[#1e3a5f]">{{ modalTitle }}</h3>
+          <button type="button" class="text-sm text-[#6c757d] hover:text-[#ff6b4a]" @click="closeModal">닫기</button>
+        </div>
+
+        <div class="mt-3 max-h-[60vh] overflow-auto text-sm text-[#495057] leading-relaxed whitespace-pre-line">
+          {{ modalContent }}
+        </div>
+
+        <div class="mt-4">
+          <Button type="button" class="w-full h-11 gradient-primary text-white font-semibold rounded-xl" @click="closeModal">확인</Button>
+        </div>
+      </Card>
+    </div>
+  </div>
 
     <!-- Fixed Bottom Button -->
     <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e9ecef] z-50 shadow-lg">
