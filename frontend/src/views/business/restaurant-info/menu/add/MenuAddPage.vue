@@ -1,54 +1,33 @@
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { Upload, X } from 'lucide-vue-next'; // User, Bell은 Header로 이동
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 
-const router = useRouter(); // Vue Router's useRouter
+// 1. 라우터 및 라우트
+const router = useRouter();
+const route = useRoute();
 
+// 2. 모드 및 페이지 제목
+const isEditMode = computed(() => !!route.params.id);
+const pageTitle = computed(() =>
+  isEditMode.value ? '식당 메뉴 정보 편집' : '식당 메뉴 정보 추가'
+);
+
+// 3. 상태 관련 변수
 const imageFile = ref(null);
 const imageUrl = ref(null);
 const fileInput = ref(null);
-
-const handleFileChange = (e) => {
-  const file = e.target.files[0];
-  if (file) {
-    imageFile.value = file;
-    imageUrl.value = URL.createObjectURL(file);
-  }
-};
-
-const triggerFileInput = () => {
-  fileInput.value.click();
-};
-
-const clearImage = () => {
-  imageFile.value = null;
-  imageUrl.value = null;
-  if (fileInput.value) {
-    fileInput.value.value = ''; // 파일 입력 필드 값 초기화
-  }
-};
-
 const menuData = reactive({
   name: '',
   type: '',
   category: '',
   price: 0,
 });
-
 const selectedAllergens = ref([]);
 
-const toggleAllergen = (allergen) => {
-  const index = selectedAllergens.value.indexOf(allergen);
-  if (index > -1) {
-    selectedAllergens.value.splice(index, 1);
-  } else {
-    selectedAllergens.value.push(allergen);
-  }
-};
-
+// 4. 데이터 변수
 const allergens = ref([
   '견과류',
   '우유',
@@ -65,9 +44,60 @@ const allergens = ref([
   '미나리',
   '당근',
 ]);
-
 const menuTypes = ref(['주메뉴', '서브메뉴', '기타(디저트, 음료)']);
 
+// 5. 함수
+const handleFileChange = (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    imageFile.value = file;
+    imageUrl.value = URL.createObjectURL(file);
+  }
+};
+
+const triggerFileInput = () => {
+  fileInput.value.click();
+};
+
+const clearImage = () => {
+  imageFile.value = null;
+  imageUrl.value = null;
+  if (fileInput.value) {
+    fileInput.value.value = '';
+  }
+};
+
+const toggleAllergen = (allergen) => {
+  const index = selectedAllergens.value.indexOf(allergen);
+  if (index > -1) {
+    selectedAllergens.value.splice(index, 1);
+  } else {
+    selectedAllergens.value.push(allergen);
+  }
+};
+
+// 6. 라이프사이클 훅
+onMounted(() => {
+  if (isEditMode.value) {
+    console.log('Editing menu with ID:', route.params.id);
+    const mockMenuData = {
+      name: '기존 메뉴',
+      type: '주메뉴',
+      price: 25000,
+      imageUrl: '/italian-pasta-dish.png',
+      selectedAllergens: ['밀', '계란'],
+    };
+
+    menuData.name = mockMenuData.name;
+    menuData.type = mockMenuData.type;
+    menuData.price = mockMenuData.price;
+    imageUrl.value = mockMenuData.imageUrl;
+    imageFile.value = new File([], 'mock-image.png');
+    selectedAllergens.value = mockMenuData.selectedAllergens;
+  }
+});
+
+// 7. 저장 함수
 const saveMenu = () => {
   if (!imageFile.value) {
     alert('메뉴 사진을 등록해주세요.');
@@ -90,7 +120,11 @@ const saveMenu = () => {
     return;
   }
 
-  alert('메뉴가 추가되었습니다.');
+  if (isEditMode.value) {
+    alert('메뉴가 수정되었습니다.');
+  } else {
+    alert('메뉴가 추가되었습니다.');
+  }
   router.back();
 };
 </script>
@@ -109,7 +143,7 @@ const saveMenu = () => {
           <!-- Page Title with Close Button -->
           <div class="flex items-center justify-between mb-8">
             <h2 class="text-3xl font-bold text-[#1e3a5f]">
-              식당 메뉴 정보 추가
+              {{ pageTitle }}
             </h2>
             <button
               @click="router.back()"

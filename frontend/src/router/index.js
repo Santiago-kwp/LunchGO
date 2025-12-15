@@ -40,7 +40,7 @@ const router = createRouter({
       name: 'business-restaurant-menu-edit',
       component: () =>
         import(
-          '../views/business/restaurant-info/menu/edit/id/MenuEditPage.vue'
+          '../views/business/restaurant-info/menu/add/MenuAddPage.vue'
         ),
       props: true,
     },
