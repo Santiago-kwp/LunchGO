@@ -35,7 +35,7 @@ const menuData = reactive({
   name: '',
   type: '',
   category: '',
-  price: '',
+  price: 0,
 });
 
 const selectedAllergens = ref([]);
@@ -69,6 +69,27 @@ const allergens = ref([
 const menuTypes = ref(['주메뉴', '서브메뉴', '기타(디저트, 음료)']);
 
 const saveMenu = () => {
+  if (!imageFile.value) {
+    alert('메뉴 사진을 등록해주세요.');
+    return;
+  }
+  if (!menuData.name.trim()) {
+    alert('메뉴 이름을 입력해주세요.');
+    return;
+  }
+  if (!menuData.type) {
+    alert('메뉴 타입을 선택해주세요.');
+    return;
+  }
+  if (
+    menuData.price === null ||
+    menuData.price === undefined ||
+    menuData.price <= 0
+  ) {
+    alert('가격을 올바르게 입력해주세요.');
+    return;
+  }
+
   alert('메뉴가 추가되었습니다.');
   router.back();
 };
@@ -112,7 +133,11 @@ const saveMenu = () => {
                 >
                   <div class="aspect-[2/1] flex items-center justify-center">
                     <div v-if="imageUrl" class="w-full h-full">
-                      <img :src="imageUrl" alt="메뉴 이미지 미리보기" class="w-full h-full object-cover rounded-lg" />
+                      <img
+                        :src="imageUrl"
+                        alt="메뉴 이미지 미리보기"
+                        class="w-full h-full object-cover rounded-lg"
+                      />
                       <button
                         @click.stop="clearImage"
                         class="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
@@ -132,6 +157,7 @@ const saveMenu = () => {
                   @change="handleFileChange"
                   class="hidden"
                   accept="image/*"
+                  required
                 />
               </div>
 
@@ -145,6 +171,7 @@ const saveMenu = () => {
                   placeholder="메뉴이름 입력"
                   v-model="menuData.name"
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
+                  required
                 />
               </div>
 
@@ -156,6 +183,7 @@ const saveMenu = () => {
                 <select
                   v-model="menuData.type"
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
+                  required
                 >
                   <option disabled value="">메뉴 타입 선택</option>
                   <option
@@ -178,6 +206,7 @@ const saveMenu = () => {
                   placeholder="가격 입력"
                   v-model="menuData.price"
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
+                  required
                 />
               </div>
 
