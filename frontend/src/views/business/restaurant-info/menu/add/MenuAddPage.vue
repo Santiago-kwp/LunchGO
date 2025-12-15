@@ -7,6 +7,30 @@ import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 
 const router = useRouter(); // Vue Router's useRouter
 
+const imageFile = ref(null);
+const imageUrl = ref(null);
+const fileInput = ref(null);
+
+const handleFileChange = (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    imageFile.value = file;
+    imageUrl.value = URL.createObjectURL(file);
+  }
+};
+
+const triggerFileInput = () => {
+  fileInput.value.click();
+};
+
+const clearImage = () => {
+  imageFile.value = null;
+  imageUrl.value = null;
+  if (fileInput.value) {
+    fileInput.value.value = ''; // 파일 입력 필드 값 초기화
+  }
+};
+
 const menuData = reactive({
   name: '',
   type: '',
@@ -35,8 +59,14 @@ const allergens = ref([
   '조개류',
   '생선',
   '메밀',
+  '고수',
+  '오이',
+  '파프리카',
+  '미나리',
+  '당근',
 ]);
-const specialAttributes = ref(['알레르기 - 알레르기 유발 or 호불호 강한']);
+
+const menuTypes = ref(['주메뉴', '서브메뉴', '기타(디저트, 음료)']);
 
 const saveMenu = () => {
   alert('메뉴가 추가되었습니다.');
@@ -77,16 +107,32 @@ const saveMenu = () => {
                   >메뉴사진</label
                 >
                 <div
-                  class="border-2 border-dashed border-[#dee2e6] rounded-xl p-12 text-center bg-[#f8f9fa] hover:bg-[#e9ecef] transition-colors cursor-pointer"
+                  @click="triggerFileInput"
+                  class="mb-8 border-2 border-[#e9ecef] rounded-xl overflow-hidden bg-[#f8f9fa] relative cursor-pointer"
                 >
-                  <Upload class="w-12 h-12 text-[#6c757d] mx-auto mb-3" />
-                  <p class="text-sm text-[#6c757d]">이미지</p>
+                  <div class="aspect-[2/1] flex items-center justify-center">
+                    <div v-if="imageUrl" class="w-full h-full">
+                      <img :src="imageUrl" alt="메뉴 이미지 미리보기" class="w-full h-full object-cover rounded-lg" />
+                      <button
+                        @click.stop="clearImage"
+                        class="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                      >
+                        <X class="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div v-else class="text-center">
+                      <Upload class="w-12 h-12 text-[#6c757d] mx-auto mb-3" />
+                      <p class="text-sm text-[#6c757d]">이미지</p>
+                    </div>
+                  </div>
                 </div>
-                <button
-                  class="mt-3 px-6 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-[#f8f9fa] transition-colors"
-                >
-                  파일 업로드
-                </button>
+                <input
+                  type="file"
+                  ref="fileInput"
+                  @change="handleFileChange"
+                  class="hidden"
+                  accept="image/*"
+                />
               </div>
 
               <!-- Menu Name -->
@@ -96,7 +142,7 @@ const saveMenu = () => {
                 >
                 <input
                   type="text"
-                  placeholder="메뉴이름 입력창(텍스트)"
+                  placeholder="메뉴이름 입력"
                   v-model="menuData.name"
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
                 />
@@ -107,12 +153,19 @@ const saveMenu = () => {
                 <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
                   >메뉴타입</label
                 >
-                <input
-                  type="text"
-                  placeholder="콤보세트(메뉴들, 서브메뉴들, 기타)"
+                <select
                   v-model="menuData.type"
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
-                />
+                >
+                  <option disabled value="">메뉴 타입 선택</option>
+                  <option
+                    v-for="typeOption in menuTypes"
+                    :key="typeOption"
+                    :value="typeOption"
+                  >
+                    {{ typeOption }}
+                  </option>
+                </select>
               </div>
 
               <!-- Menu Category -->
@@ -121,58 +174,29 @@ const saveMenu = () => {
                   >가격</label
                 >
                 <input
-                  type="text"
-                  placeholder="가격 입력창"
+                  type="number"
+                  placeholder="가격 입력"
                   v-model="menuData.price"
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
                 />
               </div>
 
-              <!-- Allergen Information -->
               <div>
-                <label class="block text-sm font-semibold text-[#1e3a5f] mb-3"
-                  >주재료</label
-                >
-                <div class="flex flex-wrap gap-3 mb-6">
+                <label class="block text-sm font-semibold text-[#1e3a5f] mb-3">
+                  재료 특이사항
+                </label>
+                <div class="flex flex-wrap gap-3">
                   <button
                     v-for="allergen in allergens"
                     :key="allergen"
                     @click="toggleAllergen(allergen)"
-                    :class="`px-6 py-3 rounded-lg border transition-colors ${
+                    :class="`px-4 py-2 rounded-lg border transition-colors ${
                       selectedAllergens.includes(allergen)
                         ? 'gradient-primary text-white border-transparent'
                         : 'border-[#dee2e6] text-[#1e3a5f] hover:bg-[#f8f9fa]'
                     }`"
                   >
                     {{ allergen }}
-                  </button>
-                  <button
-                    class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
-                  >
-                    ...
-                  </button>
-                </div>
-
-                <label class="block text-sm font-semibold text-[#1e3a5f] mb-3">
-                  특이사항(기타재료 - 알레르기 유발 or 호불호 강함)
-                </label>
-                <div class="flex flex-wrap gap-3">
-                  <button
-                    v-for="attr in specialAttributes"
-                    :key="attr"
-                    @click="toggleAllergen(attr)"
-                    :class="`px-6 py-3 rounded-lg border transition-colors ${
-                      selectedAllergens.includes(attr)
-                        ? 'gradient-primary text-white border-transparent'
-                        : 'border-[#dee2e6] text-[#1e3a5f] hover:bg-[#f8f9fa]'
-                    }`"
-                  >
-                    {{ attr }}
-                  </button>
-                  <button
-                    class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
-                  >
-                    ...
                   </button>
                 </div>
               </div>
@@ -201,5 +225,14 @@ const saveMenu = () => {
 </template>
 
 <style scoped>
-/* No specific styles needed here as Tailwind handles most of it. */
+select {
+  -webkit-appearance: none; /* Safari and Chrome */
+  -moz-appearance: none; /* Firefox */
+  appearance: none; /* Other modern browsers */
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236c757d' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.25em auto;
+  padding-right: 2.5rem; /* 화살표 공간 확보 */
+}
 </style>
