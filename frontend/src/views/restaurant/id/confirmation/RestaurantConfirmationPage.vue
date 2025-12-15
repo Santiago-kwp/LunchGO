@@ -15,6 +15,7 @@ const reservation = {
     date: '2024년 12월 15일 (금)',
     time: '18:00',
     partySize: 4,
+    requestNote: '', //요청사항 (백엔드 연동 시 값 채우기)
   },
   payment: {
     amount: 176000,
@@ -126,6 +127,21 @@ const reservation = {
             </div>
             <span class="text-sm font-semibold text-[#1e3a5f]">{{ reservation.booking.partySize }}명</span>
           </div>
+        </div>
+
+        <!-- Request Note (Read-only) -->
+        <div class="mt-4 pt-4 border-t border-[#e9ecef]">
+          <h3 class="text-sm font-semibold text-[#1e3a5f] mb-2">요청사항</h3>
+
+          <div class="rounded-xl border border-[#e9ecef] bg-[#f8f9fa] px-3 py-3">
+            <p class="text-sm text-[#495057] whitespace-pre-line">
+              {{ reservation.booking.requestNote?.trim() ? reservation.booking.requestNote : '-' }}
+            </p>
+          </div>
+
+          <p class="mt-2 text-xs text-[#6c757d] leading-relaxed">
+            요청사항은 매장 참고용이며, 예약 변경은 매장으로 직접 문의해 주세요.
+          </p>
         </div>
       </div>
 
