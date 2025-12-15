@@ -1,7 +1,9 @@
 <script setup>
 import { ref, reactive } from 'vue';
-import { User, Bell, Upload } from 'lucide-vue-next'; // Import Lucide icons for Vue
-import { RouterLink, useRouter } from 'vue-router'; // Import Vue RouterLink and useRouter
+import { Upload } from 'lucide-vue-next'; // User, Bell은 Header로 이동
+import { RouterLink, useRouter } from 'vue-router';
+import BusinessSidebar from '@/views/layout/BusinessSideBar.vue';
+import BusinessHeader from '@/views/layout/BusinessHeader.vue';
 
 const router = useRouter(); // Vue Router's useRouter
 
@@ -67,79 +69,11 @@ const navigateToRestaurantInfo = () => {
 
 <template>
   <div class="flex h-screen bg-[#f8f9fa]">
-    <!-- Left Sidebar -->
-    <aside class="w-64 bg-white border-r border-[#e9ecef] flex flex-col">
-      <div class="p-6 border-b border-[#e9ecef]">
-        <RouterLink to="/business/dashboard">
-          <img src="/images/lunch-go-whitebg.png" alt="LunchGo" width="150" height="60" class="w-auto h-12" />
-        </RouterLink>
-      </div>
-
-      <nav class="flex-1 p-4">
-        <ul class="space-y-2">
-          <li>
-            <RouterLink
-              to="/business/dashboard"
-              class="block px-4 py-3 text-[#6c757d] hover:bg-[#f8f9fa] rounded-lg transition-colors"
-            >
-              오늘의 예약 현황
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink
-              to="/business/reservations"
-              class="block px-4 py-3 text-[#6c757d] hover:bg-[#f8f9fa] rounded-lg transition-colors"
-            >
-              전체 예약 관리
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink
-              to="/business/restaurant-info"
-              class="block px-4 py-3 text-[#1e3a5f] bg-[#fff5f2] rounded-lg font-semibold"
-            >
-              식당 정보
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink
-              to="/business/staff"
-              class="block px-4 py-3 text-[#6c757d] hover:bg-[#f8f9fa] rounded-lg transition-colors"
-            >
-              임직원 현황
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink
-              to="/business/analytics"
-              class="block px-4 py-3 text-[#6c757d] hover:bg-[#f8f9fa] rounded-lg transition-colors"
-            >
-              대시보드
-            </RouterLink>
-          </li>
-        </ul>
-      </nav>
-    </aside>
+    <BusinessSidebar activeMenu="restaurant-info" />
 
     <!-- Main Content -->
     <div class="flex-1 flex flex-col overflow-hidden">
-      <!-- Top Header -->
-      <header class="bg-white border-b border-[#e9ecef] px-8 py-4 flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <button class="text-[#1e3a5f] hover:text-[#FF6B4A] transition-colors">
-            <Bell class="w-6 h-6" />
-          </button>
-        </div>
-        <div class="flex items-center gap-4">
-          <div class="flex items-center gap-3 px-4 py-2 bg-[#f8f9fa] rounded-lg">
-            <User class="w-5 h-5 text-[#6c757d]" />
-            <span class="text-sm font-medium text-[#1e3a5f]">OOO님 안녕하세요!</span>
-          </div>
-          <button class="px-4 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-[#f8f9fa] transition-colors">
-            로그아웃
-          </button>
-        </div>
-      </header>
+      <BusinessHeader />
 
       <!-- Scrollable Content Area -->
       <main class="flex-1 overflow-y-auto p-8">
@@ -149,12 +83,18 @@ const navigateToRestaurantInfo = () => {
 
           <!-- Restaurant Basic Info Card -->
           <div class="bg-white rounded-xl border border-[#e9ecef] p-8">
-            <h3 class="text-xl font-bold text-[#1e3a5f] mb-6">식당 기본 정보</h3>
+            <h3 class="text-xl font-bold text-[#1e3a5f] mb-6">
+              식당 기본 정보
+            </h3>
 
             <!-- Restaurant Image Upload -->
             <div class="mb-8">
-              <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">식당이미지</label>
-              <div class="border-2 border-dashed border-[#dee2e6] rounded-xl p-8 text-center bg-[#f8f9fa] hover:bg-[#e9ecef] transition-colors cursor-pointer">
+              <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
+                >식당이미지</label
+              >
+              <div
+                class="border-2 border-dashed border-[#dee2e6] rounded-xl p-8 text-center bg-[#f8f9fa] hover:bg-[#e9ecef] transition-colors cursor-pointer"
+              >
                 <Upload class="w-12 h-12 text-[#6c757d] mx-auto mb-3" />
                 <p class="text-sm text-[#6c757d]">이미지를 업로드하세요</p>
               </div>
@@ -165,7 +105,9 @@ const navigateToRestaurantInfo = () => {
               <!-- Restaurant Name & Phone -->
               <div class="grid grid-cols-2 gap-6">
                 <div>
-                  <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">식당명</label>
+                  <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
+                    >식당명</label
+                  >
                   <input
                     type="text"
                     placeholder="식당 이름을 입력하세요"
@@ -174,7 +116,9 @@ const navigateToRestaurantInfo = () => {
                   />
                 </div>
                 <div>
-                  <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">식당전화번호</label>
+                  <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
+                    >식당전화번호</label
+                  >
                   <input
                     type="tel"
                     placeholder="전화번호를 입력하세요"
@@ -186,7 +130,9 @@ const navigateToRestaurantInfo = () => {
 
               <!-- Opening Date -->
               <div>
-                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">개업일</label>
+                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
+                  >개업일</label
+                >
                 <input
                   type="date"
                   v-model="formData.openingDate"
@@ -197,7 +143,9 @@ const navigateToRestaurantInfo = () => {
               <!-- Business Hours -->
               <div class="grid grid-cols-2 gap-6">
                 <div>
-                  <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">영업시작시간</label>
+                  <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
+                    >영업시작시간</label
+                  >
                   <input
                     type="time"
                     v-model="formData.startTime"
@@ -205,7 +153,9 @@ const navigateToRestaurantInfo = () => {
                   />
                 </div>
                 <div>
-                  <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">영업종료시간</label>
+                  <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
+                    >영업종료시간</label
+                  >
                   <input
                     type="time"
                     v-model="formData.endTime"
@@ -216,7 +166,9 @@ const navigateToRestaurantInfo = () => {
 
               <!-- Reservation Capacity -->
               <div>
-                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">예약인원 상한</label>
+                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
+                  >예약인원 상한</label
+                >
                 <input
                   type="number"
                   placeholder="숫자를 입력하세요"
@@ -227,7 +179,9 @@ const navigateToRestaurantInfo = () => {
 
               <!-- Address -->
               <div>
-                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">도로명주소</label>
+                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
+                  >도로명주소</label
+                >
                 <div class="flex gap-3">
                   <input
                     type="text"
@@ -235,14 +189,18 @@ const navigateToRestaurantInfo = () => {
                     v-model="formData.roadAddress"
                     class="flex-1 px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
                   />
-                  <button class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-[#f8f9fa] transition-colors">
+                  <button
+                    class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-[#f8f9fa] transition-colors"
+                  >
                     주소검색
                   </button>
                 </div>
               </div>
 
               <div>
-                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">상세주소</label>
+                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
+                  >상세주소</label
+                >
                 <input
                   type="text"
                   placeholder="상세주소 입력창"
@@ -279,7 +237,9 @@ const navigateToRestaurantInfo = () => {
 
               <!-- Regular Closing Days -->
               <div>
-                <label class="block text-sm font-semibold text-[#1e3a5f] mb-3">정기휴무일(요일) - 체크박스</label>
+                <label class="block text-sm font-semibold text-[#1e3a5f] mb-3"
+                  >정기휴무일(요일) - 체크박스</label
+                >
                 <div class="flex gap-3">
                   <button
                     v-for="day in ['월', '화', '수', '목', '금', '토', '일']"
@@ -294,18 +254,27 @@ const navigateToRestaurantInfo = () => {
                     {{ day }}
                   </button>
                 </div>
-                <button class="mt-3 px-6 py-2 border border-[#dee2e6] rounded-lg text-[#6c757d] text-sm hover:bg-[#f8f9fa] transition-colors">
+                <button
+                  class="mt-3 px-6 py-2 border border-[#dee2e6] rounded-lg text-[#6c757d] text-sm hover:bg-[#f8f9fa] transition-colors"
+                >
                   신택 요일 저장
                 </button>
               </div>
 
               <!-- Restaurant Description -->
               <div>
-                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">식당 사진</label>
-                <button class="mb-3 px-6 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-[#f8f9fa] transition-colors">
+                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
+                  >식당 사진</label
+                >
+                <button
+                  class="mb-3 px-6 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-[#f8f9fa] transition-colors"
+                >
                   파일 업로드
                 </button>
-                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2 mt-4">식당 소개</label>
+                <label
+                  class="block text-sm font-semibold text-[#1e3a5f] mb-2 mt-4"
+                  >식당 소개</label
+                >
                 <textarea
                   placeholder="식당 소개글 입력창(텍스트박스, 선택사항)"
                   v-model="formData.description"
@@ -324,9 +293,14 @@ const navigateToRestaurantInfo = () => {
 
             <!-- Characteristics Tags -->
             <div class="mb-6">
-              <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">식당 특징(테크박스)</h4>
+              <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
+                식당 특징(테크박스)
+              </h4>
               <div class="flex flex-wrap gap-3">
-                <template v-for="(categoryTags, categoryName) in tagCategories" :key="categoryName">
+                <template
+                  v-for="(categoryTags, categoryName) in tagCategories"
+                  :key="categoryName"
+                >
                   <button
                     v-for="tag in categoryTags"
                     :key="tag"
@@ -340,7 +314,9 @@ const navigateToRestaurantInfo = () => {
                     {{ tag }}
                   </button>
                 </template>
-                <button class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors">
+                <button
+                  class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
+                >
                   ...
                 </button>
               </div>
@@ -348,7 +324,9 @@ const navigateToRestaurantInfo = () => {
 
             <!-- Menu Category -->
             <div class="mb-6">
-              <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">제공 가능한 메뉴(체크박스)</h4>
+              <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
+                제공 가능한 메뉴(체크박스)
+              </h4>
               <div class="flex flex-wrap gap-3">
                 <button
                   v-for="category in menuCategories"
@@ -362,7 +340,9 @@ const navigateToRestaurantInfo = () => {
                 >
                   {{ category }}
                 </button>
-                <button class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors">
+                <button
+                  class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
+                >
                   ...
                 </button>
               </div>
@@ -370,7 +350,9 @@ const navigateToRestaurantInfo = () => {
 
             <!-- Specialty Tags -->
             <div class="mb-6">
-              <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">식당 분위기(체크박스)</h4>
+              <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
+                식당 분위기(체크박스)
+              </h4>
               <div class="flex flex-wrap gap-3">
                 <button
                   v-for="tag in specialtyTags"
@@ -384,7 +366,9 @@ const navigateToRestaurantInfo = () => {
                 >
                   {{ tag }}
                 </button>
-                <button class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors">
+                <button
+                  class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
+                >
                   ...
                 </button>
               </div>
@@ -392,7 +376,9 @@ const navigateToRestaurantInfo = () => {
 
             <!-- Allergy Tags -->
             <div>
-              <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">보유 관리식재료(체크박스)</h4>
+              <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
+                보유 관리식재료(체크박스)
+              </h4>
               <div class="flex flex-wrap gap-3">
                 <button
                   v-for="tag in allergyTags"
@@ -406,35 +392,67 @@ const navigateToRestaurantInfo = () => {
                 >
                   {{ tag }}
                 </button>
-                <button class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors">
+                <button
+                  class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
+                >
                   ...
                 </button>
               </div>
             </div>
 
-            <button class="mt-6 px-8 py-3 gradient-primary text-white rounded-lg font-semibold hover:opacity-90 transition-opacity">
+            <button
+              class="mt-6 px-8 py-3 gradient-primary text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
+            >
               저장
             </button>
           </div>
 
           <!-- Menu Management Section -->
           <div class="bg-white rounded-xl border border-[#e9ecef] p-8">
-            <h3 class="text-xl font-bold text-[#1e3a5f] mb-6">식당메뉴 (데이터 시각 5개 메뉴 출력)</h3>
+            <h3 class="text-xl font-bold text-[#1e3a5f] mb-6">
+              식당메뉴 (데이터 시각 5개 메뉴 출력)
+            </h3>
 
             <div class="overflow-x-auto">
               <table class="w-full">
                 <thead class="bg-[#f8f9fa] border-b border-[#dee2e6]">
                   <tr>
-                    <th class="px-4 py-3 text-left text-sm font-semibold text-[#1e3a5f]">메뉴이름</th>
-                    <th class="px-4 py-3 text-left text-sm font-semibold text-[#1e3a5f]">메뉴타입</th>
-                    <th class="px-4 py-3 text-left text-sm font-semibold text-[#1e3a5f]">가격</th>
-                    <th class="px-4 py-3 text-left text-sm font-semibold text-[#1e3a5f]">수량/상태</th>
-                    <th class="px-4 py-3 text-center text-sm font-semibold text-[#1e3a5f]">작업</th>
+                    <th
+                      class="px-4 py-3 text-left text-sm font-semibold text-[#1e3a5f]"
+                    >
+                      메뉴이름
+                    </th>
+                    <th
+                      class="px-4 py-3 text-left text-sm font-semibold text-[#1e3a5f]"
+                    >
+                      메뉴타입
+                    </th>
+                    <th
+                      class="px-4 py-3 text-left text-sm font-semibold text-[#1e3a5f]"
+                    >
+                      가격
+                    </th>
+                    <th
+                      class="px-4 py-3 text-left text-sm font-semibold text-[#1e3a5f]"
+                    >
+                      수량/상태
+                    </th>
+                    <th
+                      class="px-4 py-3 text-center text-sm font-semibold text-[#1e3a5f]"
+                    >
+                      작업
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="index in [1, 2, 3]" :key="index" class="border-b border-[#e9ecef]">
-                    <td class="px-4 py-4 text-sm text-[#1e3a5f]">메뉴명 {{ index }}</td>
+                  <tr
+                    v-for="index in [1, 2, 3]"
+                    :key="index"
+                    class="border-b border-[#e9ecef]"
+                  >
+                    <td class="px-4 py-4 text-sm text-[#1e3a5f]">
+                      메뉴명 {{ index }}
+                    </td>
                     <td class="px-4 py-4 text-sm text-[#6c757d]">메뉴타입</td>
                     <td class="px-4 py-4 text-sm text-[#6c757d]">15,000원</td>
                     <td class="px-4 py-4 text-sm text-[#6c757d]">재고 있음</td>
@@ -446,7 +464,9 @@ const navigateToRestaurantInfo = () => {
                         >
                           수정
                         </RouterLink>
-                        <button class="px-4 py-2 border border-[#dc3545] text-[#dc3545] rounded-lg text-sm hover:bg-[#fff5f5] transition-colors">
+                        <button
+                          class="px-4 py-2 border border-[#dc3545] text-[#dc3545] rounded-lg text-sm hover:bg-[#fff5f5] transition-colors"
+                        >
                           삭제
                         </button>
                       </div>
@@ -458,13 +478,19 @@ const navigateToRestaurantInfo = () => {
 
             <div class="flex items-center justify-between mt-6">
               <div class="flex gap-2">
-                <button class="px-4 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-[#f8f9fa] transition-colors">
+                <button
+                  class="px-4 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-[#f8f9fa] transition-colors"
+                >
                   1
                 </button>
-                <button class="px-4 py-2 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors">
+                <button
+                  class="px-4 py-2 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
+                >
                   2
                 </button>
-                <button class="px-4 py-2 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors">
+                <button
+                  class="px-4 py-2 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
+                >
                   3
                 </button>
               </div>

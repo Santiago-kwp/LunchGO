@@ -1,7 +1,9 @@
 <script setup>
 import { ref, reactive } from 'vue';
-import { User, Bell, Upload, X } from 'lucide-vue-next'; // Import Lucide icons for Vue
-import { RouterLink, useRouter } from 'vue-router'; // Import Vue RouterLink and useRouter
+import { Upload, X } from 'lucide-vue-next'; // User, Bell은 Header로 이동
+import { useRouter } from 'vue-router';
+import BusinessSidebar from '@/views/layout/BusinessSideBar.vue';
+import BusinessHeader from '@/views/layout/BusinessHeader.vue';
 
 const router = useRouter(); // Vue Router's useRouter
 
@@ -44,87 +46,24 @@ const saveMenu = () => {
 
 <template>
   <div class="flex h-screen bg-[#f8f9fa]">
-    <!-- Left Sidebar -->
-    <aside class="w-64 bg-white border-r border-[#e9ecef] flex flex-col">
-      <div class="p-6 border-b border-[#e9ecef]">
-        <RouterLink to="/business/dashboard">
-          <img src="/images/lunch-go-whitebg.png" alt="LunchGo" width="150" height="60" class="w-auto h-12" />
-        </RouterLink>
-      </div>
-
-      <nav class="flex-1 p-4">
-        <ul class="space-y-2">
-          <li>
-            <RouterLink
-              to="/business/dashboard"
-              class="block px-4 py-3 text-[#6c757d] hover:bg-[#f8f9fa] rounded-lg transition-colors"
-            >
-              오늘의 예약 현황
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink
-              to="/business/reservations"
-              class="block px-4 py-3 text-[#6c757d] hover:bg-[#f8f9fa] rounded-lg transition-colors"
-            >
-              전체 예약 관리
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink
-              to="/business/restaurant-info"
-              class="block px-4 py-3 text-[#1e3a5f] bg-[#fff5f2] rounded-lg font-semibold"
-            >
-              식당 정보
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink
-              to="/business/staff"
-              class="block px-4 py-3 text-[#6c757d] hover:bg-[#f8f9fa] rounded-lg transition-colors"
-            >
-              입점원 현황
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink
-              to="/business/analytics"
-              class="block px-4 py-3 text-[#6c757d] hover:bg-[#f8f9fa] rounded-lg transition-colors"
-            >
-              대시보드
-            </RouterLink>
-          </li>
-        </ul>
-      </nav>
-    </aside>
+    <BusinessSidebar activeMenu="restaurant-info" />
 
     <!-- Main Content -->
     <div class="flex-1 flex flex-col overflow-hidden">
-      <!-- Top Header -->
-      <header class="bg-white border-b border-[#e9ecef] px-8 py-4 flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <button class="text-[#1e3a5f] hover:text-[#FF6B4A] transition-colors">
-            <Bell class="w-6 h-6" />
-          </button>
-        </div>
-        <div class="flex items-center gap-4">
-          <div class="flex items-center gap-3 px-4 py-2 bg-[#f8f9fa] rounded-lg">
-            <User class="w-5 h-5 text-[#6c757d]" />
-            <span class="text-sm font-medium text-[#1e3a5f]">OOO님 안녕하세요!</span>
-          </div>
-          <button class="px-4 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-[#f8f9fa] transition-colors">
-            로그아웃
-          </button>
-        </div>
-      </header>
+      <BusinessHeader />
 
       <!-- Scrollable Content Area -->
       <main class="flex-1 overflow-y-auto p-8">
         <div class="max-w-2xl mx-auto">
           <!-- Page Title with Close Button -->
           <div class="flex items-center justify-between mb-8">
-            <h2 class="text-3xl font-bold text-[#1e3a5f]">식당 메뉴 정보 추가</h2>
-            <button @click="router.back()" class="p-2 hover:bg-[#f8f9fa] rounded-lg transition-colors">
+            <h2 class="text-3xl font-bold text-[#1e3a5f]">
+              식당 메뉴 정보 추가
+            </h2>
+            <button
+              @click="router.back()"
+              class="p-2 hover:bg-[#f8f9fa] rounded-lg transition-colors"
+            >
               <X class="w-6 h-6 text-[#6c757d]" />
             </button>
           </div>
@@ -134,19 +73,27 @@ const saveMenu = () => {
             <div class="space-y-6">
               <!-- Menu Image Upload -->
               <div>
-                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">메뉴사진</label>
-                <div class="border-2 border-dashed border-[#dee2e6] rounded-xl p-12 text-center bg-[#f8f9fa] hover:bg-[#e9ecef] transition-colors cursor-pointer">
+                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
+                  >메뉴사진</label
+                >
+                <div
+                  class="border-2 border-dashed border-[#dee2e6] rounded-xl p-12 text-center bg-[#f8f9fa] hover:bg-[#e9ecef] transition-colors cursor-pointer"
+                >
                   <Upload class="w-12 h-12 text-[#6c757d] mx-auto mb-3" />
                   <p class="text-sm text-[#6c757d]">이미지</p>
                 </div>
-                <button class="mt-3 px-6 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-[#f8f9fa] transition-colors">
+                <button
+                  class="mt-3 px-6 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-[#f8f9fa] transition-colors"
+                >
                   파일 업로드
                 </button>
               </div>
 
               <!-- Menu Name -->
               <div>
-                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">메뉴이름</label>
+                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
+                  >메뉴이름</label
+                >
                 <input
                   type="text"
                   placeholder="메뉴이름 입력창(텍스트)"
@@ -157,7 +104,9 @@ const saveMenu = () => {
 
               <!-- Menu Type -->
               <div>
-                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">메뉴타입</label>
+                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
+                  >메뉴타입</label
+                >
                 <input
                   type="text"
                   placeholder="콤보세트(메뉴들, 서브메뉴들, 기타)"
@@ -168,7 +117,9 @@ const saveMenu = () => {
 
               <!-- Menu Category -->
               <div>
-                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">가격</label>
+                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
+                  >가격</label
+                >
                 <input
                   type="text"
                   placeholder="가격 입력창"
@@ -179,7 +130,9 @@ const saveMenu = () => {
 
               <!-- Allergen Information -->
               <div>
-                <label class="block text-sm font-semibold text-[#1e3a5f] mb-3">주재료</label>
+                <label class="block text-sm font-semibold text-[#1e3a5f] mb-3"
+                  >주재료</label
+                >
                 <div class="flex flex-wrap gap-3 mb-6">
                   <button
                     v-for="allergen in allergens"
@@ -193,7 +146,9 @@ const saveMenu = () => {
                   >
                     {{ allergen }}
                   </button>
-                  <button class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors">
+                  <button
+                    class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
+                  >
                     ...
                   </button>
                 </div>
@@ -214,7 +169,9 @@ const saveMenu = () => {
                   >
                     {{ attr }}
                   </button>
-                  <button class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors">
+                  <button
+                    class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
+                  >
                     ...
                   </button>
                 </div>
