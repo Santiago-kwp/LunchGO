@@ -33,14 +33,14 @@ const router = createRouter({
       path: '/business/restaurant-info/menu/add',
       name: 'business-restaurant-menu-add',
       component: () =>
-        import('../views/business/restaurant-info/menu/add/MenuAddPage.vue'),
+        import('../views/business/restaurant-info/menu/MenuEditPage.vue'),
     },
     {
       path: '/business/restaurant-info/menu/edit/:id',
       name: 'business-restaurant-menu-edit',
       component: () =>
         import(
-          '../views/business/restaurant-info/menu/add/MenuAddPage.vue'
+          '../views/business/restaurant-info/menu/MenuEditPage.vue'
         ),
       props: true,
     },
