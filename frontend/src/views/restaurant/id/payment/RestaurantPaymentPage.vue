@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { RouterLink, useRouter, useRoute } from 'vue-router';
 import { ArrowLeft, CreditCard, Smartphone, Building2, Check } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
@@ -21,6 +21,29 @@ const modalContent = ref('');
 
 const depositAmount = 10000; // 예약금 1만원
 const totalAmount = computed(() => (isDepositOnly.value ? depositAmount : 176000));
+
+const bookingId = computed(() => route.query.bookingId || null);
+const bookingSummary = ref({
+  requestNote: '', // 요청사항(read-only 표시용)
+});
+const isBookingLoading = ref(false);
+const fetchBookingSummary = async () => {
+  isBookingLoading.value = true;
+  try {
+    // TODO: 백엔드 연결 시 여기만 실제 API로 교체
+    // ex) const res = await api.get(`/bookings/${bookingId.value}`);
+    // bookingSummary.value.requestNote = res.data.requestNote;
+
+    // 임시 더미(모양 확인용)
+    bookingSummary.value.requestNote = '유아용 의자 부탁드려요';
+  } finally {
+    isBookingLoading.value = false;
+  }
+};
+
+onMounted(() => {
+  fetchBookingSummary();
+});
 
 // 이용약관 모달
 const openModal = (type) => {
@@ -91,6 +114,24 @@ const handlePayment = () => {
             * 예약금은 이용 완료 시 돌려드리며, 노쇼 시 환불되지 않습니다
           </p>
         </div>
+      </div>
+
+      <!-- Request Note (Read-only) -->
+      <div class="bg-white px-4 py-5 border-b border-[#e9ecef]">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-base font-semibold text-[#1e3a5f]">요청사항</h2>
+          <span v-if="isBookingLoading" class="text-xs text-[#6c757d]">불러오는 중...</span>
+        </div>
+
+        <div class="rounded-xl border border-[#e9ecef] bg-[#f8f9fa] px-3 py-3">
+          <p class="text-sm text-[#495057] whitespace-pre-line">
+            {{ bookingSummary.requestNote?.trim() ? bookingSummary.requestNote : '-' }}
+          </p>
+        </div>
+
+        <p class="mt-2 text-xs text-[#6c757d] leading-relaxed">
+          요청사항은 매장 참고용이며, 예약 변경은 매장으로 직접 문의해 주세요.
+        </p>
       </div>
 
       <!-- Payment Method Selection -->
