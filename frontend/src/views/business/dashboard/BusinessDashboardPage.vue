@@ -1,7 +1,8 @@
 <script setup>
 import { ref } from 'vue';
-import { User, Bell, Filter } from 'lucide-vue-next'; // Import Lucide icons for Vue
-import { RouterLink } from 'vue-router'; // Import Vue RouterLink
+import { Filter } from 'lucide-vue-next'; // Bell, User는 Header로 이동
+import BusinessSidebar from '@/views/layout/BusinessSideBar.vue';
+import BusinessHeader from '@/views/layout/BusinessHeader.vue';
 
 const selectedDate = ref(new Date().toISOString().split('T')[0]);
 
@@ -94,97 +95,31 @@ const reservations = ref([
 
 const stats = ref({
   total: reservations.value.length,
-  confirmed: reservations.value.filter(r => r.status === 'confirmed').length,
-  pending: reservations.value.filter(r => r.status === 'pending').length,
-  cancelled: reservations.value.filter(r => r.status === 'cancelled').length,
+  confirmed: reservations.value.filter((r) => r.status === 'confirmed').length,
+  pending: reservations.value.filter((r) => r.status === 'pending').length,
+  cancelled: reservations.value.filter((r) => r.status === 'cancelled').length,
 });
 
 const salesStats = ref({
-  totalSales: reservations.value.filter(r => r.status === 'confirmed').reduce((sum, r) => sum + r.amount, 0),
-  totalReservations: reservations.value.filter(r => r.status === 'confirmed').length,
+  totalSales: reservations.value
+    .filter((r) => r.status === 'confirmed')
+    .reduce((sum, r) => sum + r.amount, 0),
+  totalReservations: reservations.value.filter((r) => r.status === 'confirmed')
+    .length,
   averagePerPerson: 18000, // This value was hardcoded in React, keeping it for now
-  totalGuests: reservations.value.filter(r => r.status === 'confirmed').reduce((sum, r) => sum + r.guests, 0),
+  totalGuests: reservations.value
+    .filter((r) => r.status === 'confirmed')
+    .reduce((sum, r) => sum + r.guests, 0),
 });
 </script>
 
 <template>
   <div class="flex h-screen bg-[#f8f9fa]">
-    <!-- Left Sidebar -->
-    <aside class="w-64 bg-white border-r border-[#e9ecef] flex flex-col">
-      <div class="p-6 border-b border-[#e9ecef]">
-        <RouterLink to="/business/dashboard">
-          <!-- Next.js Image replaced with standard <img> -->
-          <img src="/images/lunch-go-whitebg.png" alt="LunchGo" class="w-auto h-12" width="150" height="60" />
-        </RouterLink>
-      </div>
-
-      <nav class="flex-1 p-4">
-        <ul class="space-y-2">
-          <li>
-            <RouterLink
-              to="/business/dashboard"
-              class="block px-4 py-3 text-white bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] rounded-lg font-semibold"
-            >
-              오늘의 예약 현황
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink
-              to="/business/reservations"
-              class="block px-4 py-3 text-[#1e3a5f] hover:bg-[#f8f9fa] rounded-lg transition-colors"
-            >
-              전체 예약 관리
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink
-              to="/business/restaurant-info"
-              class="block px-4 py-3 text-[#1e3a5f] hover:bg-[#f8f9fa] rounded-lg transition-colors"
-            >
-              식당 정보
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink
-              to="/business/staff"
-              class="block px-4 py-3 text-[#1e3a5f] hover:bg-[#f8f9fa] rounded-lg transition-colors"
-            >
-              임직원 현황
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink
-              to="/business/analytics"
-              class="block px-4 py-3 text-[#1e3a5f] hover:bg-[#f8f9fa] rounded-lg transition-colors"
-            >
-              대시보드
-            </RouterLink>
-          </li>
-        </ul>
-      </nav>
-    </aside>
+    <BusinessSidebar activeMenu="dashboard" />
 
     <!-- Main Content -->
     <div class="flex-1 flex flex-col overflow-hidden">
-      <!-- Top Header -->
-      <header class="bg-white border-b border-[#e9ecef] px-8 py-4 flex items-center justify-between">
-        <div class="flex items-center gap-4">
-          <button class="text-[#1e3a5f] hover:text-[#FF6B4A] transition-colors">
-            <Bell class="w-6 h-6" />
-          </button>
-        </div>
-        <div class="flex items-center gap-4">
-          <div class="flex items-center gap-3 px-4 py-2 bg-[#f8f9fa] rounded-lg">
-            <User class="w-5 h-5 text-[#6c757d]" />
-            <span class="text-sm font-medium text-[#1e3a5f]">OOO님 안녕하세요!</span>
-          </div>
-          <div class="relative">
-            <button class="px-4 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-[#f8f9fa] transition-colors">
-              로그아웃
-            </button>
-          </div>
-        </div>
-      </header>
+      <BusinessHeader />
 
       <!-- Scrollable Content Area -->
       <main class="flex-1 overflow-y-auto p-8">
@@ -199,29 +134,51 @@ const salesStats = ref({
 
           <!-- Stats Cards -->
           <div class="grid grid-cols-4 gap-6">
-            <div class="bg-white rounded-xl border border-[#e9ecef] p-6 text-center">
+            <div
+              class="bg-white rounded-xl border border-[#e9ecef] p-6 text-center"
+            >
               <p class="text-sm text-[#6c757d] mb-2">전체 예약</p>
-              <p class="text-4xl font-bold text-[#1e3a5f]">{{ stats.total }}건</p>
+              <p class="text-4xl font-bold text-[#1e3a5f]">
+                {{ stats.total }}건
+              </p>
             </div>
-            <div class="bg-white rounded-xl border border-[#e9ecef] p-6 text-center">
+            <div
+              class="bg-white rounded-xl border border-[#e9ecef] p-6 text-center"
+            >
               <p class="text-sm text-[#6c757d] mb-2">확정</p>
-              <p class="text-4xl font-bold text-[#1e3a5f]">{{ stats.confirmed }}건</p>
+              <p class="text-4xl font-bold text-[#1e3a5f]">
+                {{ stats.confirmed }}건
+              </p>
             </div>
-            <div class="bg-white rounded-xl border border-[#e9ecef] p-6 text-center">
+            <div
+              class="bg-white rounded-xl border border-[#e9ecef] p-6 text-center"
+            >
               <p class="text-sm text-[#6c757d] mb-2">대기</p>
-              <p class="text-4xl font-bold text-[#1e3a5f]">{{ stats.pending }}건</p>
+              <p class="text-4xl font-bold text-[#1e3a5f]">
+                {{ stats.pending }}건
+              </p>
             </div>
-            <div class="bg-white rounded-xl border border-[#e9ecef] p-6 text-center">
+            <div
+              class="bg-white rounded-xl border border-[#e9ecef] p-6 text-center"
+            >
               <p class="text-sm text-[#6c757d] mb-2">취소</p>
-              <p class="text-4xl font-bold text-[#1e3a5f]">{{ stats.cancelled }}건</p>
+              <p class="text-4xl font-bold text-[#1e3a5f]">
+                {{ stats.cancelled }}건
+              </p>
             </div>
           </div>
 
           <!-- Reservations Table -->
-          <div class="bg-white rounded-xl border border-[#e9ecef] overflow-hidden">
-            <div class="border-b border-[#e9ecef] p-6 flex items-center justify-between bg-[#f8f9fa]">
+          <div
+            class="bg-white rounded-xl border border-[#e9ecef] overflow-hidden"
+          >
+            <div
+              class="border-b border-[#e9ecef] p-6 flex items-center justify-between bg-[#f8f9fa]"
+            >
               <h3 class="text-lg font-bold text-[#1e3a5f]">예약 목록</h3>
-              <button class="flex items-center gap-2 px-4 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-white transition-colors">
+              <button
+                class="flex items-center gap-2 px-4 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-white transition-colors"
+              >
                 <Filter class="w-4 h-4" />
                 <span class="text-sm">필터</span>
               </button>
@@ -231,53 +188,99 @@ const salesStats = ref({
               <table class="w-full">
                 <thead class="bg-[#f8f9fa] border-b border-[#e9ecef]">
                   <tr>
-                    <th class="px-6 py-4 text-left text-sm font-semibold text-[#1e3a5f]">예약자</th>
-                    <th class="px-6 py-4 text-left text-sm font-semibold text-[#1e3a5f]">연락처</th>
-                    <th class="px-6 py-4 text-left text-sm font-semibold text-[#1e3a5f]">예약시간</th>
-                    <th class="px-6 py-4 text-left text-sm font-semibold text-[#1e3a5f]">인원</th>
-                    <th class="px-6 py-4 text-left text-sm font-semibold text-[#1e3a5f]">결제금액</th>
-                    <th class="px-6 py-4 text-left text-sm font-semibold text-[#1e3a5f]">상태</th>
-                    <th class="px-6 py-4 text-left text-sm font-semibold text-[#1e3a5f]">작업</th>
+                    <th
+                      class="px-6 py-4 text-left text-sm font-semibold text-[#1e3a5f]"
+                    >
+                      예약자
+                    </th>
+                    <th
+                      class="px-6 py-4 text-left text-sm font-semibold text-[#1e3a5f]"
+                    >
+                      연락처
+                    </th>
+                    <th
+                      class="px-6 py-4 text-left text-sm font-semibold text-[#1e3a5f]"
+                    >
+                      예약시간
+                    </th>
+                    <th
+                      class="px-6 py-4 text-left text-sm font-semibold text-[#1e3a5f]"
+                    >
+                      인원
+                    </th>
+                    <th
+                      class="px-6 py-4 text-left text-sm font-semibold text-[#1e3a5f]"
+                    >
+                      결제금액
+                    </th>
+                    <th
+                      class="px-6 py-4 text-left text-sm font-semibold text-[#1e3a5f]"
+                    >
+                      상태
+                    </th>
+                    <th
+                      class="px-6 py-4 text-left text-sm font-semibold text-[#1e3a5f]"
+                    >
+                      작업
+                    </th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-[#e9ecef]">
-                  <tr v-for="reservation in reservations" :key="reservation.id" class="hover:bg-[#f8f9fa] transition-colors">
-                    <td class="px-6 py-4 text-sm text-[#1e3a5f]">{{ reservation.name }}</td>
-                    <td class="px-6 py-4 text-sm text-[#6c757d]">{{ reservation.phone }}</td>
+                  <tr
+                    v-for="reservation in reservations"
+                    :key="reservation.id"
+                    class="hover:bg-[#f8f9fa] transition-colors"
+                  >
+                    <td class="px-6 py-4 text-sm text-[#1e3a5f]">
+                      {{ reservation.name }}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-[#6c757d]">
+                      {{ reservation.phone }}
+                    </td>
                     <td class="px-6 py-4 text-sm text-[#1e3a5f]">
                       {{ reservation.date }} {{ reservation.time }}
                     </td>
-                    <td class="px-6 py-4 text-sm text-[#1e3a5f]">{{ reservation.guests }}명</td>
-                    <td class="px-6 py-4 text-sm text-[#1e3a5f]">{{ reservation.amount.toLocaleString() }}원</td>
+                    <td class="px-6 py-4 text-sm text-[#1e3a5f]">
+                      {{ reservation.guests }}명
+                    </td>
+                    <td class="px-6 py-4 text-sm text-[#1e3a5f]">
+                      {{ reservation.amount.toLocaleString() }}원
+                    </td>
                     <td class="px-6 py-4">
                       <span
                         :class="`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
                           reservation.status === 'confirmed'
                             ? 'bg-[#d4edda] text-[#155724]'
                             : reservation.status === 'pending'
-                              ? 'bg-[#fff3cd] text-[#856404]'
-                              : 'bg-[#f8d7da] text-[#721c24]'
+                            ? 'bg-[#fff3cd] text-[#856404]'
+                            : 'bg-[#f8d7da] text-[#721c24]'
                         }`"
                       >
                         {{
                           reservation.status === 'confirmed'
                             ? '확정'
                             : reservation.status === 'pending'
-                              ? '대기'
-                              : '취소'
+                            ? '대기'
+                            : '취소'
                         }}
                       </span>
                     </td>
                     <td class="px-6 py-4">
                       <div class="flex items-center gap-2">
-                        <button class="gradient-primary text-white px-3 py-2 rounded-lg text-xs hover:opacity-90 transition-opacity">
+                        <button
+                          class="gradient-primary text-white px-3 py-2 rounded-lg text-xs hover:opacity-90 transition-opacity"
+                        >
                           상세보기
                         </button>
                         <template v-if="reservation.status === 'pending'">
-                          <button class="bg-[#28a745] text-white px-3 py-2 rounded-lg text-xs hover:opacity-90 transition-opacity">
+                          <button
+                            class="bg-[#28a745] text-white px-3 py-2 rounded-lg text-xs hover:opacity-90 transition-opacity"
+                          >
                             확정
                           </button>
-                          <button class="bg-[#dc3545] text-white px-3 py-2 rounded-lg text-xs hover:opacity-90 transition-opacity">
+                          <button
+                            class="bg-[#dc3545] text-white px-3 py-2 rounded-lg text-xs hover:opacity-90 transition-opacity"
+                          >
                             취소
                           </button>
                         </template>
@@ -291,23 +294,33 @@ const salesStats = ref({
 
           <!-- Daily Sales Stats -->
           <div class="bg-white rounded-xl border border-[#e9ecef] p-6">
-            <h3 class="text-xl font-bold text-[#1e3a5f] mb-6">금일 매출 통계</h3>
+            <h3 class="text-xl font-bold text-[#1e3a5f] mb-6">
+              금일 매출 통계
+            </h3>
             <div class="grid grid-cols-4 gap-6">
               <div class="text-center">
                 <p class="text-sm text-[#6c757d] mb-2">총 매출</p>
-                <p class="text-2xl font-bold gradient-primary-text">{{ salesStats.totalSales.toLocaleString() }}원</p>
+                <p class="text-2xl font-bold gradient-primary-text">
+                  {{ salesStats.totalSales.toLocaleString() }}원
+                </p>
               </div>
               <div class="text-center">
                 <p class="text-sm text-[#6c757d] mb-2">예약 건수</p>
-                <p class="text-2xl font-bold text-[#1e3a5f]">{{ salesStats.totalReservations }}건</p>
+                <p class="text-2xl font-bold text-[#1e3a5f]">
+                  {{ salesStats.totalReservations }}건
+                </p>
               </div>
               <div class="text-center">
                 <p class="text-sm text-[#6c757d] mb-2">1인당 평균</p>
-                <p class="text-2xl font-bold text-[#1e3a5f]">{{ salesStats.averagePerPerson.toLocaleString() }}원</p>
+                <p class="text-2xl font-bold text-[#1e3a5f]">
+                  {{ salesStats.averagePerPerson.toLocaleString() }}원
+                </p>
               </div>
               <div class="text-center">
                 <p class="text-sm text-[#6c757d] mb-2">총 방문 인원</p>
-                <p class="text-2xl font-bold text-[#1e3a5f]">{{ salesStats.totalGuests }}명</p>
+                <p class="text-2xl font-bold text-[#1e3a5f]">
+                  {{ salesStats.totalGuests }}명
+                </p>
               </div>
             </div>
           </div>
