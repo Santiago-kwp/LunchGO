@@ -14,6 +14,7 @@ const step = ref(1);
 
 // 첫번째 모달: 본인인증 관련 상태
 const name = ref('');
+// email 변수는 userType에 따라 '이메일' 또는 '아이디' 값을 담습니다.
 const email = ref('');
 const phone = ref('');
 const isCodeSent = ref(false);
@@ -24,15 +25,16 @@ const isTimeout = ref(false);
 const newPassword = ref('');
 const confirmPassword = ref('');
 
+// owner 여부 판단
+const isOwner = computed(() => props.userType === 'owner');
+
 // 모달이 닫힐 때 모든 상태 초기화
 watch(
   () => props.isVisible,
   (newVal) => {
     if (!newVal) {
-      //모달 닫힐 때 타이머 즉시 정지
       if (timerInterval.value) clearInterval(timerInterval.value);
 
-      // 0.5초 정도 뒤에 초기화하여 닫히는 애니메이션 동안 깜빡임 방지
       setTimeout(() => {
         step.value = 1;
         name.value = '';
@@ -48,18 +50,15 @@ watch(
   }
 );
 
-//휴대폰 번호 자동 포맷팅
+// 휴대폰 번호 자동 포맷팅
 watch(phone, (newVal) => {
-  // 숫자만 남기고 제거
   const cleaned = newVal.replace(/[^0-9]/g, '');
   let formatted = cleaned;
 
-  // 11자리까지만 입력 가능하도록 제한
   if (cleaned.length > 11) {
     formatted = cleaned.slice(0, 11);
   }
 
-  // 포맷팅 로직 apply
   if (cleaned.length > 3 && cleaned.length <= 7) {
     formatted = `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
   } else if (cleaned.length > 7) {
@@ -68,14 +67,13 @@ watch(phone, (newVal) => {
     )}`;
   }
 
-  // 값이 변경되었을 때만 업데이트
   if (newVal !== formatted) {
     phone.value = formatted;
   }
 });
 
-// 타이머 관련 상태 추가
-const timer = ref(180); // 3분 = 180초
+// 타이머 관련 상태
+const timer = ref(180);
 const timerInterval = ref(null);
 
 const formattedTimer = computed(() => {
@@ -87,11 +85,10 @@ const formattedTimer = computed(() => {
 });
 
 const startTimer = () => {
-  // 기존 타이머가 돌고 있다면 정지
   if (timerInterval.value) clearInterval(timerInterval.value);
 
-  timer.value = 180; // 시간 초기화
-  isTimeout.value = false; //타임아웃 false
+  timer.value = 180;
+  isTimeout.value = false;
 
   timerInterval.value = setInterval(() => {
     if (timer.value > 0) {
@@ -99,22 +96,21 @@ const startTimer = () => {
     } else {
       clearInterval(timerInterval.value);
       isTimeout.value = true;
-      //시간 초과 난 경우
       alert('인증번호 입력 시간이 초과되었습니다. 재발송이 필요합니다.');
-      //시간초과 설정
     }
   }, 1000);
 };
 
-// 컴포넌트 해제 시 타이머 정리
 onUnmounted(() => {
   if (timerInterval.value) clearInterval(timerInterval.value);
 });
 
-// handleSendVerifyCode 수정
+// 인증번호 발송 핸들러
 const handleSendVerifyCode = async () => {
+  // 입력값 검증
   if (!email.value) {
-    alert('이메일을 입력해주세요.');
+    const label = isOwner.value ? '아이디' : '이메일';
+    alert(`${label}을(를) 입력해주세요.`);
     return;
   }
   if (!name.value) {
@@ -132,33 +128,28 @@ const handleSendVerifyCode = async () => {
   alert(`인증번호를 발송했습니다: ${phone.value}`);
 
   isCodeSent.value = true;
-  verifyCode.value = ''; // 재전송 시 기존 입력된 인증번호 초기화 (선택사항)
-  startTimer(); // ★ 타이머 시작/재시작 함수 호출
+  verifyCode.value = '';
+  startTimer();
 };
 
 // 통합 폼 제출 핸들러
 const handleSubmit = () => {
   if (step.value === 1) {
-    //인증하기 버튼 누른 경우
     handleVerifyUser();
   } else {
-    //비밀번호 재설정 버튼 누른 경우
     handleResetPassword();
-    //성공시 리다이렉트
   }
 };
 
 const verifyUserFromData = () => {
-  //사용자 정보가 맞지 않는 경우
-
-  //인증번호가 틀린 경우
   return null;
 };
 
-// 1단계: 인증 확인 및 다음 단계로 이동
+// 1단계: 인증 확인
 const handleVerifyUser = () => {
   if (!email.value) {
-    alert('이메일을 입력해주세요.');
+    const label = isOwner.value ? '아이디' : '이메일';
+    alert(`${label}을(를) 입력해주세요.`);
     return;
   }
   if (!name.value) {
@@ -174,14 +165,11 @@ const handleVerifyUser = () => {
     return;
   }
 
-  // 실제 서버 인증 로직 필요(사용자 이메일, 이름 및 인증번호 인증)
-  //인증 실패시
   if (verifyUserFromData() !== null) {
     alert(verifyUserFromData);
     return;
   }
 
-  // 인증 성공 시 다음 단계로 넘어감
   step.value = 2;
 };
 
@@ -209,12 +197,10 @@ const handleResetPassword = () => {
   emit('close');
 };
 
-// 버튼 텍스트 동적 변경
 const submitButtonText = computed(() => {
   return step.value === 1 ? '인증하기' : '비밀번호 변경하기';
 });
 
-// 타이틀 동적 변경
 const modalTitle = computed(() => {
   return step.value === 1 ? '비밀번호 찾기' : '비밀번호 재설정';
 });
@@ -239,7 +225,20 @@ const modalTitle = computed(() => {
 
           <form @submit.prevent="handleSubmit">
             <template v-if="step === 1">
-              <div class="input-group">
+              <div v-if="isOwner" class="input-group">
+                <label for="find-id">아이디</label>
+                <input
+                  id="find-id"
+                  v-model="email"
+                  type="text"
+                  placeholder="아이디를 입력하세요."
+                  minlength="7"
+                  maxlength="15"
+                  required
+                />
+              </div>
+
+              <div v-else class="input-group">
                 <label for="find-email">이메일</label>
                 <input
                   id="find-email"
@@ -490,15 +489,10 @@ const modalTitle = computed(() => {
 .timer-text {
   position: absolute;
   right: 16px;
-  top: 50%; /* input-group 안에 label이 없을 때 기준으로 맞추려면 조정 필요할 수 있음 */
-  /* 현재 구조상 input 바로 뒤에 있어서 위치 조정 필요할 수 있으나 기존 유지 */
-  top: 24px; /* input 높이의 중간 지점 대략적 위치 (label 높이 고려) */
-  transform: translateY(
-    0
-  ); /* 기존 코드 수정: label 때문에 top 50%는 안 맞을 수 있어 조정 */
-  /* 정확히 맞추려면 input-wrapper 등으로 감싸야 하지만 기존 CSS 최대한 유지 */
-  margin-top: 14px; /* 임의 조정 */
-
+  top: 50%;
+  top: 24px;
+  transform: translateY(0);
+  margin-top: 14px;
   font-size: 13px;
   color: #ff6b4a;
   pointer-events: none;

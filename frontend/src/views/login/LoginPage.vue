@@ -6,7 +6,7 @@ import FindIdModal from '@/components/ui/FindIdModal.vue';
 import FindEmailModal from '@/components/ui/FindEmailModal.vue';
 import FindPwdModal from '@/components/ui/FindPwdModal.vue';
 // --- 로직 통합 시작 ---
-type UserType = 'user' | 'employee' | 'business' | 'admin';
+type UserType = 'user' | 'staff' | 'owner' | 'admin';
 // 모달 상태 관리 (아이디/이메일/비밀번호)
 const showFindIdModal = ref(false);
 const showFindEmailModal = ref(false);
@@ -20,13 +20,13 @@ const errorMessage = ref('');
 // 탭 데이터
 const tabs = [
   { id: 'user', label: '사용자' },
-  { id: 'employee', label: '임직원' },
-  { id: 'business', label: '사업자' },
+  { id: 'staff', label: '임직원' },
+  { id: 'owner', label: '사업자' },
   { id: 'admin', label: '관리자' },
 ] as const;
 // 탭에 따른 입력 방식 결정 (사용자, 임직원 = 이메일 / 사업자, 관리자 = 아이디)
 const isEmailLogin = computed(() => {
-  return currentTab.value === 'user' || currentTab.value === 'employee';
+  return currentTab.value === 'user' || currentTab.value === 'staff';
 });
 // 아이디/이메일 찾기 버튼 클릭 핸들러
 const openFindModal = () => {
