@@ -61,7 +61,7 @@ const toggleClosedDay = (day) => {
                   >
                   <input
                     type="text"
-                    value="식당 이름(읽기전용)"
+                    value="식당 이름"
                     readonly
                     class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg bg-[#f8f9fa] text-[#6c757d]"
                   />
@@ -72,7 +72,7 @@ const toggleClosedDay = (day) => {
                   >
                   <input
                     type="text"
-                    value="전화번호(읽기전용)"
+                    value="전화번호"
                     readonly
                     class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg bg-[#f8f9fa] text-[#6c757d]"
                   />
@@ -86,7 +86,7 @@ const toggleClosedDay = (day) => {
                 >
                 <input
                   type="text"
-                  value="개업일(날짜, 읽기전용)"
+                  value="개업일"
                   readonly
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg bg-[#f8f9fa] text-[#6c757d]"
                 />
@@ -100,7 +100,7 @@ const toggleClosedDay = (day) => {
                   >
                   <input
                     type="text"
-                    value="(시간, 읽기전용)"
+                    value="영업시작시간"
                     readonly
                     class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg bg-[#f8f9fa] text-[#6c757d]"
                   />
@@ -111,7 +111,7 @@ const toggleClosedDay = (day) => {
                   >
                   <input
                     type="text"
-                    value="(시간, 읽기전용)"
+                    value="영업종료시간"
                     readonly
                     class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg bg-[#f8f9fa] text-[#6c757d]"
                   />
@@ -124,8 +124,8 @@ const toggleClosedDay = (day) => {
                   >예약인원 상한</label
                 >
                 <input
-                  type="text"
-                  value="(number 타입, 읽기전용)"
+                  type="number"
+                  value="예약인원 상한"
                   readonly
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg bg-[#f8f9fa] text-[#6c757d]"
                 />
@@ -138,7 +138,7 @@ const toggleClosedDay = (day) => {
                 >
                 <input
                   type="text"
-                  value="도로명주소(읽기전용)"
+                  value="도로명주소"
                   readonly
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg bg-[#f8f9fa] text-[#6c757d]"
                 />
@@ -150,7 +150,7 @@ const toggleClosedDay = (day) => {
                 >
                 <input
                   type="text"
-                  value="상세주소(읽기전용)"
+                  value="상세주소"
                   readonly
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg bg-[#f8f9fa] text-[#6c757d]"
                 />
@@ -166,9 +166,7 @@ const toggleClosedDay = (day) => {
                     class="w-5 h-5 rounded border-[#dee2e6]"
                   />
                   <label for="holiday" class="text-sm text-[#1e3a5f]">
-                    공휴일 운영 여부
-                    <br />
-                    <span class="text-xs text-[#6c757d]">(체크박스, 고정)</span>
+                    공휴일 운영
                   </label>
                 </div>
                 <div class="flex items-center gap-3">
@@ -179,9 +177,7 @@ const toggleClosedDay = (day) => {
                     class="w-5 h-5 rounded border-[#dee2e6]"
                   />
                   <label for="preorder" class="text-sm text-[#1e3a5f]">
-                    선주문/선결제 지원 여부
-                    <br />
-                    <span class="text-xs text-[#6c757d]">(체크박스, 고정)</span>
+                    선주문/선결제 가능
                   </label>
                 </div>
               </div>
@@ -189,8 +185,7 @@ const toggleClosedDay = (day) => {
               <!-- Regular Closing Days -->
               <div>
                 <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">
-                  정기휴무일(해당하는 요일만 조회하고 없으면 미출력, 아래는
-                  출력예시)
+                  정기휴무일
                 </label>
                 <div class="flex gap-3">
                   <button
@@ -222,9 +217,7 @@ const toggleClosedDay = (day) => {
 
           <!-- Restaurant Tags -->
           <div class="bg-white rounded-xl border border-[#e9ecef] p-8">
-            <h3 class="text-xl font-bold text-[#1e3a5f] mb-4">
-              식당 태그(현재 조회하는 식당에 관한 검색태그만 표시)
-            </h3>
+            <h3 class="text-xl font-bold text-[#1e3a5f] mb-4">식당 태그</h3>
             <div class="flex flex-wrap gap-3">
               <div
                 v-for="tag in [

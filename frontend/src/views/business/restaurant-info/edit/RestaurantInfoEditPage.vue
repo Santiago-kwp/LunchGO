@@ -219,7 +219,7 @@ const navigateToRestaurantInfo = () => {
                     class="w-5 h-5 rounded border-[#dee2e6]"
                   />
                   <label for="holiday" class="text-sm text-[#1e3a5f]">
-                    공휴일 운영 여부(체크박스)
+                    공휴일 운영
                   </label>
                 </div>
                 <div class="flex items-center gap-3">
@@ -230,7 +230,7 @@ const navigateToRestaurantInfo = () => {
                     class="w-5 h-5 rounded border-[#dee2e6]"
                   />
                   <label for="preorder" class="text-sm text-[#1e3a5f]">
-                    선주문/선결제 지원 여부(체크박스)
+                    선주문/선결제 가능
                   </label>
                 </div>
               </div>
@@ -238,7 +238,7 @@ const navigateToRestaurantInfo = () => {
               <!-- Regular Closing Days -->
               <div>
                 <label class="block text-sm font-semibold text-[#1e3a5f] mb-3"
-                  >정기휴무일(요일) - 체크박스</label
+                  >정기휴무일(요일)</label
                 >
                 <div class="flex gap-3">
                   <button
@@ -257,7 +257,7 @@ const navigateToRestaurantInfo = () => {
                 <button
                   class="mt-3 px-6 py-2 border border-[#dee2e6] rounded-lg text-[#6c757d] text-sm hover:bg-[#f8f9fa] transition-colors"
                 >
-                  신택 요일 저장
+                  선택 요일 저장
                 </button>
               </div>
 
@@ -276,25 +276,23 @@ const navigateToRestaurantInfo = () => {
                   >식당 소개</label
                 >
                 <textarea
-                  placeholder="식당 소개글 입력창(텍스트박스, 선택사항)"
+                  placeholder="식당 소개글 입력창"
                   v-model="formData.description"
                   rows="5"
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A] resize-none"
-                />
+                ></textarea>
               </div>
             </div>
           </div>
 
           <!-- Restaurant Tags -->
           <div class="bg-white rounded-xl border border-[#e9ecef] p-8">
-            <h3 class="text-xl font-bold text-[#1e3a5f] mb-6">
-              식당 태그(선택 가능한 모든 검색태그만 카테고리별로 표시)
-            </h3>
+            <h3 class="text-xl font-bold text-[#1e3a5f] mb-6">식당 태그</h3>
 
             <!-- Characteristics Tags -->
             <div class="mb-6">
               <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
-                식당 특징(테크박스)
+                식당 분위기/편의시설
               </h4>
               <div class="flex flex-wrap gap-3">
                 <template
@@ -314,18 +312,13 @@ const navigateToRestaurantInfo = () => {
                     {{ tag }}
                   </button>
                 </template>
-                <button
-                  class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
-                >
-                  ...
-                </button>
               </div>
             </div>
 
             <!-- Menu Category -->
             <div class="mb-6">
               <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
-                제공 가능한 메뉴(체크박스)
+                식당 종류
               </h4>
               <div class="flex flex-wrap gap-3">
                 <button
@@ -340,18 +333,13 @@ const navigateToRestaurantInfo = () => {
                 >
                   {{ category }}
                 </button>
-                <button
-                  class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
-                >
-                  ...
-                </button>
               </div>
             </div>
 
             <!-- Specialty Tags -->
             <div class="mb-6">
               <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
-                식당 분위기(체크박스)
+                식당 분위기
               </h4>
               <div class="flex flex-wrap gap-3">
                 <button
@@ -366,18 +354,13 @@ const navigateToRestaurantInfo = () => {
                 >
                   {{ tag }}
                 </button>
-                <button
-                  class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
-                >
-                  ...
-                </button>
               </div>
             </div>
 
             <!-- Allergy Tags -->
             <div>
               <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
-                보유 관리식재료(체크박스)
+                사용 식재료
               </h4>
               <div class="flex flex-wrap gap-3">
                 <button
@@ -392,11 +375,6 @@ const navigateToRestaurantInfo = () => {
                 >
                   {{ tag }}
                 </button>
-                <button
-                  class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
-                >
-                  ...
-                </button>
               </div>
             </div>
 
@@ -409,9 +387,7 @@ const navigateToRestaurantInfo = () => {
 
           <!-- Menu Management Section -->
           <div class="bg-white rounded-xl border border-[#e9ecef] p-8">
-            <h3 class="text-xl font-bold text-[#1e3a5f] mb-6">
-              식당메뉴 (데이터 시각 5개 메뉴 출력)
-            </h3>
+            <h3 class="text-xl font-bold text-[#1e3a5f] mb-6">식당메뉴</h3>
 
             <div class="overflow-x-auto">
               <table class="w-full">
@@ -433,11 +409,6 @@ const navigateToRestaurantInfo = () => {
                       가격
                     </th>
                     <th
-                      class="px-4 py-3 text-left text-sm font-semibold text-[#1e3a5f]"
-                    >
-                      수량/상태
-                    </th>
-                    <th
                       class="px-4 py-3 text-center text-sm font-semibold text-[#1e3a5f]"
                     >
                       작업
@@ -455,7 +426,6 @@ const navigateToRestaurantInfo = () => {
                     </td>
                     <td class="px-4 py-4 text-sm text-[#6c757d]">메뉴타입</td>
                     <td class="px-4 py-4 text-sm text-[#6c757d]">15,000원</td>
-                    <td class="px-4 py-4 text-sm text-[#6c757d]">재고 있음</td>
                     <td class="px-4 py-4 text-center">
                       <div class="flex justify-center gap-2">
                         <RouterLink
@@ -476,6 +446,7 @@ const navigateToRestaurantInfo = () => {
               </table>
             </div>
 
+            <!-- 페이지네이션 적용 위치 -->
             <div class="flex items-center justify-between mt-6">
               <div class="flex gap-2">
                 <button
