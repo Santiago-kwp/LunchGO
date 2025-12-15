@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router'; // Import useRoute to get dynamic params
 import {
   ArrowLeft,
@@ -11,21 +11,35 @@ import {
   ChevronRight,
   ChevronLeft,
   X,
+  Plus,
+  Minus,
 } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
+import { loadKakaoMaps } from '@/utils/kakao';
+import { restaurants as restaurantData, getRestaurantById } from '@/data/restaurants';
 
 const route = useRoute();
 const restaurantId = route.params.id || '1'; // Default to '1' if id is not available
+const restaurantInfo = ref(getRestaurantById(restaurantId) || restaurantData[0]);
 
 const currentImageIndex = ref(0);
 
-const restaurantImages = ref([
+const defaultGallery = [
   { url: '/modern-korean-restaurant-interior.jpg', alt: '식당 메인 이미지' },
   { url: '/elegant-dining-room-setup.jpg', alt: '식당 내부 전경' },
   { url: '/korean-course-meal-plating.jpg', alt: '대표 메뉴 이미지' },
   { url: '/restaurant-private-room-atmosphere.jpg', alt: '식당 분위기' },
-]);
+];
+
+const restaurantImages = ref(
+  restaurantInfo.value?.gallery?.length
+    ? restaurantInfo.value.gallery.map((url, index) => ({
+        url,
+        alt: `${restaurantInfo.value?.name || '식당'} 이미지 ${index + 1}`,
+      }))
+    : defaultGallery,
+);
 
 const handlePrevImage = () => {
   currentImageIndex.value =
@@ -41,7 +55,7 @@ const handleNextImage = () => {
       : currentImageIndex.value + 1;
 };
 
-const representativeMenus = ref([
+const defaultMenus = [
   {
     name: 'A코스',
     price: '35,000원',
@@ -60,7 +74,46 @@ const representativeMenus = ref([
     description: '단품',
     image: '/italian-pasta-dish.png',
   },
-]);
+];
+
+const representativeMenus = ref(
+  restaurantInfo.value?.menus?.length ? restaurantInfo.value.menus : defaultMenus,
+);
+
+const highlightTags = computed(() => {
+  if (!restaurantInfo.value?.topTags?.length) return '';
+  return restaurantInfo.value.topTags
+    .slice(0, 2)
+    .map((tag) => tag.name)
+    .join(', ');
+});
+
+const restaurantName = computed(() => restaurantInfo.value?.name || '식당명');
+
+const ratingDisplay = computed(() => {
+  const rating = restaurantInfo.value?.rating;
+  if (typeof rating === 'number') {
+    return rating.toFixed(1);
+  }
+  return '0.0';
+});
+
+const reviewCountDisplay = computed(() => restaurantInfo.value?.reviews ?? 0);
+const addressDisplay = computed(() => restaurantInfo.value?.address || '주소 정보가 곧 업데이트됩니다.');
+const phoneDisplay = computed(() => restaurantInfo.value?.phone || '문의처 준비중');
+const hoursDisplay = computed(
+  () => restaurantInfo.value?.hours || '영업시간 정보가 곧 업데이트됩니다.',
+);
+const capacityDisplay = computed(() => restaurantInfo.value?.capacity || '최소 4인 ~ 최대 12인');
+const taglineDisplay = computed(
+  () => restaurantInfo.value?.tagline || '대표 태그 정보가 곧 업데이트됩니다.',
+);
+
+const detailMapContainer = ref(null);
+let detailMapInstance = null;
+let detailMarker = null;
+const detailMapDistanceKm = ref(2);
+const detailDistanceRange = { min: 1, max: 5 };
 
 const representativeReviews = ref([
   {
@@ -205,13 +258,76 @@ const setupDragScroll = (element) => {
   });
 };
 
-// 컴포넌트 마운트 후 드래그 스크롤 설정
-import { onMounted } from 'vue';
+const initializeDetailMap = async () => {
+  if (!detailMapContainer.value || !restaurantInfo.value?.coords) return;
+  try {
+    const kakaoMaps = await loadKakaoMaps();
+    const center = new kakaoMaps.LatLng(
+      restaurantInfo.value.coords.lat,
+      restaurantInfo.value.coords.lng,
+    );
+
+    detailMapInstance = new kakaoMaps.Map(detailMapContainer.value, {
+      center,
+      level: detailLevelForDistance(detailMapDistanceKm.value),
+    });
+
+    detailMarker = new kakaoMaps.Marker({
+      position: center,
+      title: restaurantName.value,
+    });
+
+    detailMarker.setMap(detailMapInstance);
+    applyDetailMapZoom();
+  } catch (error) {
+    console.error('식당 위치 지도를 불러오지 못했습니다.', error);
+  }
+};
+
+const detailLevelForDistance = (distance) => {
+  const mapping = {
+    1: 3,
+    2: 4,
+    3: 5,
+    4: 6,
+    5: 7,
+  };
+  return mapping[distance] ?? 4;
+};
+
+const applyDetailMapZoom = () => {
+  if (!detailMapInstance) return;
+  detailMapInstance.setLevel(detailLevelForDistance(detailMapDistanceKm.value), {
+    animate: { duration: 300 },
+  });
+};
+
+const changeDetailMapDistance = (delta) => {
+  detailMapDistanceKm.value = Math.min(
+    detailDistanceRange.max,
+    Math.max(detailDistanceRange.min, detailMapDistanceKm.value + delta)
+  );
+};
+
+// 컴포넌트 마운트 후 드래그 스크롤 및 지도 설정
 onMounted(() => {
   const scrollContainers = document.querySelectorAll('.review-image-scroll');
   scrollContainers.forEach((container) => {
     setupDragScroll(container);
   });
+  initializeDetailMap();
+});
+
+onBeforeUnmount(() => {
+  if (detailMarker) {
+    detailMarker.setMap(null);
+  }
+  detailMarker = null;
+  detailMapInstance = null;
+});
+
+watch(detailMapDistanceKm, () => {
+  applyDetailMapZoom();
 });
 </script>
 
@@ -275,15 +391,19 @@ onMounted(() => {
       <div class="bg-white px-4 py-5 border-b border-[#e9ecef]">
         <div class="flex items-start justify-between mb-3">
           <div class="flex-1">
-            <h2 class="text-xl font-bold text-[#1e3a5f] mb-2">식당명</h2>
+            <h2 class="text-xl font-bold text-[#1e3a5f] mb-2">
+              {{ restaurantName }}
+            </h2>
             <div class="flex items-center gap-1 mb-2">
               <Star class="w-4 h-4 fill-[#ffc107] text-[#ffc107]" />
-              <span class="text-base font-semibold text-[#1e3a5f]">4.8</span>
-              <span class="text-sm text-[#6c757d]">(245개 리뷰)</span>
+              <span class="text-base font-semibold text-[#1e3a5f]">{{ ratingDisplay }}</span>
+              <span class="text-sm text-[#6c757d]">({{ reviewCountDisplay }}개 리뷰)</span>
             </div>
             <p class="text-sm text-[#6c757d] mb-3 leading-relaxed">
-              1순위 태그명, 2순위 태그명 (Ex. 회식 분위기 최고, 술 사실이
-              풍부해요)
+              {{ taglineDisplay }}
+            </p>
+            <p v-if="highlightTags" class="text-xs text-[#adb5bd] mb-3 leading-relaxed">
+              대표 태그: {{ highlightTags }}
             </p>
           </div>
         </div>
@@ -291,27 +411,51 @@ onMounted(() => {
         <div class="space-y-2.5">
           <div class="flex items-start gap-2 text-sm">
             <MapPin class="w-4 h-4 text-[#6c757d] mt-0.5 flex-shrink-0" />
-            <span class="text-[#495057] leading-relaxed"
-              >서울시 강남구 테헤란로 123</span
-            >
+            <span class="text-[#495057] leading-relaxed">{{ addressDisplay }}</span>
           </div>
           <div class="flex items-start gap-2 text-sm">
             <Clock class="w-4 h-4 text-[#6c757d] mt-0.5 flex-shrink-0" />
-            <span class="text-[#495057] leading-relaxed"
-              >영업시간: 11:00 - 22:00 (라스트오더 21:00)</span
-            >
+            <span class="text-[#495057] leading-relaxed">{{ hoursDisplay }}</span>
           </div>
           <div class="flex items-start gap-2 text-sm">
             <Phone class="w-4 h-4 text-[#6c757d] mt-0.5 flex-shrink-0" />
-            <span class="text-[#495057] leading-relaxed">02-1234-5678</span>
+            <span class="text-[#495057] leading-relaxed">{{ phoneDisplay }}</span>
           </div>
           <div class="flex items-start gap-2 text-sm">
             <Users class="w-4 h-4 text-[#6c757d] mt-0.5 flex-shrink-0" />
-            <span class="text-[#495057] leading-relaxed"
-              >최소 4인 ~ 최대 12인</span
-            >
+            <span class="text-[#495057] leading-relaxed">{{ capacityDisplay }}</span>
           </div>
         </div>
+      </div>
+
+      <div class="px-4 py-5 bg-white border-b border-[#e9ecef]">
+        <h3 class="text-lg font-semibold text-[#1e3a5f] mb-3">위치 안내</h3>
+        <div class="relative w-full h-56 rounded-xl border border-[#e9ecef] overflow-hidden">
+          <div ref="detailMapContainer" class="absolute inset-0" />
+          <div class="absolute top-3 right-3 z-10 flex flex-col items-center gap-2 pointer-events-auto">
+            <button
+              @click="changeDetailMapDistance(-1)"
+              class="w-7 h-7 rounded-sm bg-white shadow-card flex items-center justify-center text-[#1e3a5f] hover:bg-[#f8f9fa]"
+            >
+              <Plus class="w-3.5 h-3.5" />
+            </button>
+            <div class="h-16 w-[5px] bg-white/80 rounded relative shadow-card overflow-hidden">
+              <div
+                class="absolute top-0 left-0 right-0 bg-[#ff6b4a] transition-all"
+                :style="{
+                  height: `${((detailDistanceRange.max - detailMapDistanceKm) / (detailDistanceRange.max - detailDistanceRange.min)) * 100}%`,
+                }"
+              ></div>
+            </div>
+            <button
+              @click="changeDetailMapDistance(1)"
+              class="w-7 h-7 rounded-sm bg-white shadow-card flex items-center justify-center text-[#1e3a5f] hover:bg-[#f8f9fa]"
+            >
+              <Minus class="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+        <p class="text-xs text-[#6c757d] mt-2">{{ addressDisplay }}</p>
       </div>
 
       <!-- Representative Menus -->
@@ -319,7 +463,7 @@ onMounted(() => {
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-[#1e3a5f]">대표 메뉴</h3>
           <RouterLink
-            :to="`/restaurant/${restaurantId}/menus`"
+            :to="{ name: 'restaurant-menus', params: { id: restaurantId } }"
             class="flex items-center gap-1 text-sm text-[#ff6b4a] font-medium hover:text-[#ff8570] transition-colors"
           >
             메뉴 전체보기
@@ -359,7 +503,7 @@ onMounted(() => {
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-[#1e3a5f]">리뷰</h3>
           <RouterLink
-            :to="`/restaurant/${restaurantId}/reviews`"
+            :to="{ name: 'restaurant-reviews', params: { id: restaurantId } }"
             class="flex items-center gap-1 text-sm text-[#ff6b4a] font-medium hover:text-[#ff8570] transition-colors"
           >
             리뷰 전체보기

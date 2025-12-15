@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import {
   MapPin,
   Calendar,
@@ -11,10 +11,14 @@ import {
   Minus,
   Plus,
   SlidersHorizontal,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-vue-next'; // Import Lucide icons for Vue
 import Button from '@/components/ui/Button.vue'; // Import our custom Button component
 import Card from '@/components/ui/Card.vue';
 import { RouterLink } from 'vue-router'; // Import Vue RouterLink
+import { loadKakaoMaps } from '@/utils/kakao';
+import { restaurants as restaurantData } from '@/data/restaurants';
 
 // State management (React's useState -> Vue's ref)
 const isFilterOpen = ref(false);
@@ -30,6 +34,206 @@ const searchTags = ref([]);
 const avoidIngredients = ref([]);
 const searchDistance = ref('');
 const budget = ref(500000);
+
+const restaurants = restaurantData;
+
+const mapContainer = ref(null);
+const mapInstance = ref(null);
+const mapMarkers = [];
+const defaultMapCenter =
+  restaurants[0]?.coords || {
+    lat: 37.394374,
+    lng: 127.110636,
+  };
+const currentLocation = ref('경기도 성남시 분당구 판교동');
+const mapDistanceKm = ref(2);
+const distanceRange = { min: 1, max: 5 };
+
+const isCalendarOpen = ref(false);
+const calendarMonth = ref(new Date());
+const weekdayLabels = ['일', '월', '화', '수', '목', '금', '토'];
+const selectedMapRestaurant = ref(null);
+
+const perPersonBudget = computed(() => {
+  if (budget.value <= 0 || !searchPartySize.value) {
+    return 0;
+  }
+  return Math.floor(budget.value / searchPartySize.value);
+});
+
+const perPersonBudgetDisplay = computed(() => {
+  if (!perPersonBudget.value) {
+    return '0원';
+  }
+  return `${perPersonBudget.value.toLocaleString()}원`;
+});
+
+const formattedSearchDate = computed(() => {
+  if (!searchDate.value) {
+    return '날짜를 선택하세요';
+  }
+  const date = new Date(searchDate.value);
+  if (Number.isNaN(date.getTime())) {
+    return '날짜를 선택하세요';
+  }
+  return date.toLocaleDateString('ko-KR', {
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short',
+  });
+});
+
+const formattedCalendarMonth = computed(() => {
+  return calendarMonth.value.toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+  });
+});
+
+const calendarDays = computed(() => {
+  const year = calendarMonth.value.getFullYear();
+  const month = calendarMonth.value.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+  const days = [];
+
+  for (let i = 0; i < firstDay; i++) {
+    days.push(null);
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    days.push(day);
+  }
+
+  while (days.length < totalCells) {
+    days.push(null);
+  }
+
+  return days;
+});
+
+const formatDateValue = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const toggleCalendar = () => {
+  if (!isCalendarOpen.value) {
+    calendarMonth.value = searchDate.value ? new Date(searchDate.value) : new Date();
+  }
+  isCalendarOpen.value = !isCalendarOpen.value;
+};
+
+const selectCalendarDay = (day) => {
+  if (!day) return;
+
+  const selected = new Date(calendarMonth.value.getFullYear(), calendarMonth.value.getMonth(), day);
+  searchDate.value = formatDateValue(selected);
+  isCalendarOpen.value = false;
+};
+
+const previousCalendarMonth = () => {
+  calendarMonth.value = new Date(calendarMonth.value.getFullYear(), calendarMonth.value.getMonth() - 1, 1);
+};
+
+const nextCalendarMonth = () => {
+  calendarMonth.value = new Date(calendarMonth.value.getFullYear(), calendarMonth.value.getMonth() + 1, 1);
+};
+
+const isCalendarSelectedDay = (day) => {
+  if (!day || !searchDate.value) return false;
+  const selectedDate = new Date(searchDate.value);
+  return (
+    selectedDate.getFullYear() === calendarMonth.value.getFullYear() &&
+    selectedDate.getMonth() === calendarMonth.value.getMonth() &&
+    selectedDate.getDate() === day
+  );
+};
+
+watch(searchDate, (value) => {
+  if (!value) return;
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) {
+    calendarMonth.value = new Date(parsed.getFullYear(), parsed.getMonth(), 1);
+  }
+});
+
+const renderMapMarkers = (kakaoMaps) => {
+  if (!mapInstance.value) return;
+
+  mapMarkers.forEach((marker) => marker.setMap(null));
+  mapMarkers.length = 0;
+
+  restaurants.forEach((restaurant) => {
+    if (!restaurant.coords) return;
+
+    const marker = new kakaoMaps.Marker({
+      position: new kakaoMaps.LatLng(restaurant.coords.lat, restaurant.coords.lng),
+      title: restaurant.name,
+    });
+
+    marker.setMap(mapInstance.value);
+    kakaoMaps.event.addListener(marker, 'click', () => {
+      selectedMapRestaurant.value = restaurant;
+    });
+    mapMarkers.push(marker);
+  });
+};
+
+const levelForDistance = (distance) => {
+  const mapping = {
+    1: 3,
+    2: 4,
+    3: 5,
+    4: 6,
+    5: 7,
+  };
+  return mapping[distance] ?? 4;
+};
+
+const applyHomeMapZoom = () => {
+  if (!mapInstance.value) return;
+  mapInstance.value.setLevel(levelForDistance(mapDistanceKm.value), { animate: { duration: 300 } });
+};
+
+const changeMapDistance = (delta) => {
+  const next = Math.min(distanceRange.max, Math.max(distanceRange.min, mapDistanceKm.value + delta));
+  mapDistanceKm.value = next;
+};
+
+const initializeMap = async () => {
+  if (!mapContainer.value) return;
+  try {
+    const kakaoMaps = await loadKakaoMaps();
+    const center = new kakaoMaps.LatLng(defaultMapCenter.lat, defaultMapCenter.lng);
+    mapInstance.value = new kakaoMaps.Map(mapContainer.value, {
+      center,
+      level: levelForDistance(mapDistanceKm.value),
+    });
+
+    renderMapMarkers(kakaoMaps);
+    applyHomeMapZoom();
+  } catch (error) {
+    console.error('카카오 지도 초기화에 실패했습니다.', error);
+  }
+};
+
+onMounted(() => {
+  initializeMap();
+});
+
+onBeforeUnmount(() => {
+  mapMarkers.forEach((marker) => marker.setMap(null));
+  mapMarkers.length = 0;
+  mapInstance.value = null;
+});
+
+watch(mapDistanceKm, () => {
+  applyHomeMapZoom();
+});
 
 // Static data (constants)
 const categories = ['한식', '중식', '일식', '양식'];
@@ -93,11 +297,10 @@ const applyFilters = () => {
 };
 
 const toggleSearchCategory = (category) => {
-  const index = searchCategories.value.indexOf(category);
-  if (index > -1) {
-    searchCategories.value.splice(index, 1);
+  if (searchCategories.value.includes(category)) {
+    searchCategories.value = [];
   } else {
-    searchCategories.value.push(category);
+    searchCategories.value = [category];
   }
 };
 
@@ -128,85 +331,16 @@ const resetSearch = () => {
   avoidIngredients.value = [];
   searchDistance.value = '';
   budget.value = 500000;
+  isCalendarOpen.value = false;
+  calendarMonth.value = new Date();
 };
 
 const applySearch = () => {
   isSearchOpen.value = false;
+  isCalendarOpen.value = false;
   // 검색 적용 로직 (Vue version)
 };
 
-const restaurants = [
-  {
-    id: 1,
-    name: '식당명',
-    category: '한식',
-    rating: 4.8,
-    reviews: 245,
-    topTags: [
-      { name: '단체석이 넓어요', count: 89 },
-      { name: '대화하기 좋아요', count: 67 },
-    ],
-    price: '18,000원(1인당) · 4인 ~ 12인',
-    badgeColor: 'bg-emerald-500',
-    image: '/modern-korean-restaurant-interior.jpg',
-  },
-  {
-    id: 2,
-    name: '식당명',
-    category: '중식',
-    rating: 4.8,
-    reviews: 245,
-    topTags: [
-      { name: '음식이 빨리 나와요', count: 102 },
-      { name: '양이 푸짐해요', count: 78 },
-    ],
-    price: '18,000원(1인당) · 4인 ~ 12인',
-    badgeColor: 'bg-emerald-600',
-    image: '/chinese-restaurant-food.jpg',
-  },
-  {
-    id: 3,
-    name: '식당명',
-    category: '양식',
-    rating: 4.8,
-    reviews: 245,
-    topTags: [
-      { name: '룸이 있어 프라이빗해요', count: 95 },
-      { name: '법카 쓰기 좋은 가격대에요', count: 71 },
-    ],
-    price: '18,000원(1인당) · 4인 ~ 12인',
-    badgeColor: 'bg-amber-600',
-    image: '/italian-restaurant-dining.jpg',
-  },
-  {
-    id: 4,
-    name: '식당명',
-    category: '일식',
-    rating: 4.7,
-    reviews: 189,
-    topTags: [
-      { name: '호불호 없는 맛이에요', count: 82 },
-      { name: '주차가 편해요', count: 56 },
-    ],
-    price: '22,000원(1인당) · 4인 ~ 12인',
-    badgeColor: 'bg-rose-500',
-    image: '/japanese-restaurant.png',
-  },
-  {
-    id: 5,
-    name: '식당명',
-    category: '한식',
-    rating: 4.9,
-    reviews: 312,
-    topTags: [
-      { name: '특별한 메뉴가 있어요', count: 108 },
-      { name: '사장님이 친절해요', count: 94 },
-    ],
-    price: '25,000원(1인당) · 4인 ~ 12인',
-    badgeColor: 'bg-emerald-500',
-    image: '/korean-fine-dining.jpg',
-  },
-];
 </script>
 
 <template>
@@ -239,40 +373,40 @@ const restaurants = [
         <div class="flex items-center gap-2">
           <MapPin class="w-5 h-5 text-[#ff6b4a]" />
           <div>
-            <h2 class="text-base font-semibold text-[#1e3a5f]">강남구 삼성동</h2>
+            <h2 class="text-base font-semibold text-[#1e3a5f]">{{ currentLocation }}</h2>
             <p class="text-xs text-[#6c757d]">현재 위치 기준</p>
           </div>
         </div>
       </div>
 
-      <div class="relative bg-gradient-to-br from-blue-200 to-blue-300 h-64">
-        <div class="absolute inset-0">
-          <div class="relative w-full h-full">
+      <div class="relative h-64">
+        <div ref="mapContainer" class="w-full h-full" />
+        <div class="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+        <div class="absolute top-4 right-4 z-10 pointer-events-auto flex flex-col items-center gap-2">
+          <button
+            @click="changeMapDistance(-1)"
+            class="w-8 h-8 rounded-sm bg-white shadow-card flex items-center justify-center text-[#1e3a5f] hover:bg-[#f8f9fa]"
+          >
+            <Plus class="w-4 h-4" />
+          </button>
+          <div class="h-20 w-[6px] bg-white/80 rounded relative shadow-card overflow-hidden">
             <div
-              v-for="(pos, i) in [
-                { left: '20%', top: '25%' },
-                { left: '45%', top: '35%' },
-                { left: '70%', top: '30%' },
-                { left: '30%', top: '55%' },
-                { left: '60%', top: '50%' },
-                { left: '75%', top: '65%' },
-              ]"
-              :key="i"
-              class="absolute"
-              :style="{ left: pos.left, top: pos.top }"
-            >
-              <MapPin class="w-7 h-7 fill-blue-600 text-white drop-shadow-lg" />
-            </div>
-
-            <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-              <div class="relative">
-                <div class="absolute inset-0 bg-blue-500 rounded-full w-12 h-12 animate-ping opacity-30" />
-                <div class="relative bg-white rounded-full p-2.5 shadow-lg">
-                  <Navigation class="w-5 h-5 text-blue-600" />
-                </div>
-              </div>
-            </div>
+              class="absolute top-0 left-0 right-0 bg-[#ff6b4a] transition-all"
+              :style="{
+                height: `${((distanceRange.max - mapDistanceKm) / (distanceRange.max - distanceRange.min)) * 100}%`,
+              }"
+            ></div>
           </div>
+          <button
+            @click="changeMapDistance(1)"
+            class="w-8 h-8 rounded-sm bg-white shadow-card flex items-center justify-center text-[#1e3a5f] hover:bg-[#f8f9fa]"
+          >
+            <Minus class="w-4 h-4" />
+          </button>
+        </div>
+        <div class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-card flex items-center gap-2 text-sm text-[#1e3a5f]">
+          <MapPin class="w-4 h-4 text-[#ff6b4a]" />
+          <span>{{ currentLocation }} 주변 회식 맛집</span>
         </div>
       </div>
 
@@ -315,10 +449,8 @@ const restaurants = [
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 mb-1">
                     <h4 class="font-semibold text-[#1e3a5f] text-sm">{{ restaurant.name }}</h4>
-                    <span :class="`${restaurant.badgeColor} text-white text-xs font-medium px-2 py-0.5 rounded`">
-                      {{ restaurant.category }}
-                    </span>
                   </div>
+                  <p class="text-xs text-[#6c757d] mb-1 truncate">{{ restaurant.address }}</p>
                   <div class="flex items-center gap-1 mb-1.5">
                     <Star class="w-3.5 h-3.5 fill-[#ffc107] text-[#ffc107]" />
                     <span class="text-sm font-medium text-[#1e3a5f]">{{ restaurant.rating }}</span>
@@ -337,6 +469,53 @@ const restaurants = [
                 </div>
               </div>
             </Card>
+          </RouterLink>
+        </div>
+      </div>
+
+      <div v-if="selectedMapRestaurant" class="fixed bottom-20 left-0 right-0 z-[60] px-4">
+        <div class="max-w-[500px] mx-auto">
+          <RouterLink
+            :to="`/restaurant/${selectedMapRestaurant.id}`"
+            class="block bg-white border border-[#e9ecef] shadow-card rounded-2xl p-4"
+            @click="closeMapRestaurantModal"
+          >
+            <div class="flex gap-3">
+              <img
+                :src="selectedMapRestaurant.image || '/placeholder.svg'"
+                :alt="selectedMapRestaurant.name"
+                class="w-20 h-20 rounded-xl object-cover flex-shrink-0"
+              />
+              <div class="flex-1 min-w-0">
+                <div class="flex items-start justify-between gap-2 mb-1">
+                  <div>
+                    <p class="text-sm font-semibold text-[#1e3a5f]">
+                      {{ selectedMapRestaurant.name }}
+                    </p>
+                    <p class="text-xs text-[#6c757d] truncate">
+                      {{ selectedMapRestaurant.address }}
+                    </p>
+                  </div>
+                  <button
+                    @click.stop.prevent="closeMapRestaurantModal"
+                    class="text-[#adb5bd] hover:text-[#495057]"
+                  >
+                    <X class="w-4 h-4" />
+                  </button>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-[#6c757d]">
+                  <span class="flex items-center gap-1 text-[#1e3a5f] font-semibold">
+                    <Star class="w-3.5 h-3.5 fill-[#ffc107] text-[#ffc107]" />
+                    {{ selectedMapRestaurant.rating }}
+                  </span>
+                  <span>리뷰 {{ selectedMapRestaurant.reviews }}개</span>
+                  <span>{{ selectedMapRestaurant.category }}</span>
+                </div>
+                <p class="text-sm font-semibold text-[#1e3a5f] mt-2">
+                  {{ selectedMapRestaurant.price }}
+                </p>
+              </div>
+            </div>
           </RouterLink>
         </div>
       </div>
@@ -459,11 +638,56 @@ const restaurants = [
           <!-- Reservation Date -->
           <div>
             <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">예약 날짜</h4>
-            <input
-              type="date"
-              v-model="searchDate"
-              class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg text-sm text-[#495057] focus:outline-none focus:ring-2 focus:ring-[#ff6b4a] focus:border-transparent"
-            />
+            <div class="relative">
+              <button
+                type="button"
+                @click="toggleCalendar"
+                class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg text-sm flex items-center justify-between text-left text-[#495057] focus:outline-none focus:ring-2 focus:ring-[#ff6b4a] focus:border-transparent"
+              >
+                <span :class="searchDate ? 'text-[#1e3a5f]' : 'text-[#adb5bd]'">{{ formattedSearchDate }}</span>
+                <Calendar class="w-5 h-5 text-[#ff6b4a]" />
+              </button>
+
+              <div
+                v-if="isCalendarOpen"
+                class="absolute right-0 top-full mt-2 w-72 bg-white border border-[#e9ecef] rounded-xl shadow-card z-20"
+              >
+                <div class="flex items-center justify-between px-4 py-3 border-b border-[#e9ecef]">
+                  <button
+                    @click.stop="previousCalendarMonth"
+                    class="p-1 rounded-full hover:bg-[#f8f9fa] transition-colors"
+                  >
+                    <ChevronLeft class="w-4 h-4 text-[#495057]" />
+                  </button>
+                  <span class="text-sm font-semibold text-[#1e3a5f]">{{ formattedCalendarMonth }}</span>
+                  <button @click.stop="nextCalendarMonth" class="p-1 rounded-full hover:bg-[#f8f9fa] transition-colors">
+                    <ChevronRight class="w-4 h-4 text-[#495057]" />
+                  </button>
+                </div>
+                <div class="px-4 py-3">
+                  <div class="grid grid-cols-7 text-center text-xs text-[#6c757d] mb-2">
+                    <span v-for="dayName in weekdayLabels" :key="dayName" class="py-1">{{ dayName }}</span>
+                  </div>
+                  <div class="grid grid-cols-7 gap-1">
+                    <button
+                      v-for="(day, index) in calendarDays"
+                      :key="index"
+                      :disabled="!day"
+                      @click.stop="selectCalendarDay(day)"
+                      :class="[
+                        'w-9 h-9 rounded-full text-sm transition-colors',
+                        !day ? 'cursor-default opacity-0' : '',
+                        day && isCalendarSelectedDay(day)
+                          ? 'bg-[#ff6b4a] text-white font-semibold'
+                          : 'text-[#495057] hover:bg-[#f1f3f5]',
+                      ]"
+                    >
+                      {{ day }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Time Slot Selection -->
@@ -550,6 +774,13 @@ const restaurants = [
                 <span>0원</span>
                 <span>50만원 이상</span>
               </div>
+              <div
+                v-if="perPersonBudget"
+                class="mt-2 p-3 bg-[#f8f9fa] border border-[#e9ecef] rounded-lg text-center text-sm text-[#495057]"
+              >
+                <p>1인당 예상 금액</p>
+                <p class="text-xl font-semibold text-[#1e3a5f]">{{ perPersonBudgetDisplay }}</p>
+              </div>
             </div>
           </div>
 
@@ -631,3 +862,6 @@ const restaurants = [
 <style scoped>
 /* Scoped styles can be added here if needed, but Tailwind handles most of it. */
 </style>
+const closeMapRestaurantModal = () => {
+  selectedMapRestaurant.value = null;
+};
