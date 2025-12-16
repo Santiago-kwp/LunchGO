@@ -14,7 +14,13 @@ defineProps({
   <aside class="w-64 bg-white border-r border-[#e9ecef] flex flex-col">
     <div class="p-6 border-b border-[#e9ecef]">
       <RouterLink to="/business/dashboard">
-        <img src="/images/lunch-go-whitebg.png" alt="LunchGo" class="w-auto h-12" width="150" height="60" />
+        <img
+          src="/images/lunch-go-whitebg.png"
+          alt="LunchGo"
+          class="w-auto h-12"
+          width="150"
+          height="60"
+        />
       </RouterLink>
     </div>
 
@@ -70,6 +76,19 @@ defineProps({
             ]"
           >
             임직원 현황
+          </RouterLink>
+        </li>
+        <li>
+          <RouterLink
+            to="/business/reviews"
+            :class="[
+              'block px-4 py-3 rounded-lg transition-colors',
+              activeMenu === 'reviews'
+                ? 'text-white bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] font-semibold'
+                : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
+            ]"
+          >
+            리뷰 관리
           </RouterLink>
         </li>
         <li>

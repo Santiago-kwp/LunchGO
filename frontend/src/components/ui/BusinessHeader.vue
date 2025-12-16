@@ -1,12 +1,19 @@
 <script setup>
 import { User, Bell, LogOut } from 'lucide-vue-next';
+import { RouterLink } from 'vue-router';
 </script>
 
 <template>
   <header
     class="bg-white border-b border-[#e9ecef] px-8 py-4 flex items-center justify-between"
   >
-    <h1 class="text-2xl font-bold text-[#1E3A5F]">LunchGo</h1>
+    <RouterLink to="/business/dashboard">
+      <h1
+        class="text-2xl font-bold text-[#1E3A5F] hover:text-[#FF6B4A] transition-colors cursor-pointer"
+      >
+        LunchGo
+      </h1>
+    </RouterLink>
     <div class="flex items-center gap-4">
       <button class="text-[#1e3a5f] hover:text-[#FF6B4A] transition-colors">
         <Bell class="w-6 h-6" />
