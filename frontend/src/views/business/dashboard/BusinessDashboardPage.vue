@@ -1,10 +1,15 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { Filter } from 'lucide-vue-next'; // Bell, User는 Header로 이동
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 
 const selectedDate = ref(new Date().toISOString().split('T')[0]);
+
+//필터 상태
+const filterOpen = ref(false);
+const statusFilter = ref('all'); // all | confirmed | pending | cancelled | refunded
+
 
 const reservations = ref([
   {
@@ -93,6 +98,12 @@ const reservations = ref([
   },
 ]);
 
+//필터 적용된 예약 리스트
+const filteredReservations = computed(() => {
+  if (statusFilter.value === 'all') return reservations.value;
+  return reservations.value.filter((r) => r.status === statusFilter.value);
+});
+
 const stats = ref({
   total: reservations.value.length,
   confirmed: reservations.value.filter((r) => r.status === 'confirmed').length,
@@ -170,21 +181,29 @@ const salesStats = ref({
 
           <!-- Reservations Table -->
           <div
-            class="bg-white rounded-xl border border-[#e9ecef] overflow-hidden"
+            class="bg-white rounded-xl border border-[#e9ecef] overflow-visible"
           >
             <div
               class="border-b border-[#e9ecef] p-6 flex items-center justify-between bg-[#f8f9fa]"
             >
               <h3 class="text-lg font-bold text-[#1e3a5f]">예약 목록</h3>
-              <button
-                class="flex items-center gap-2 px-4 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-white transition-colors"
-              >
+              <div class="relative">
+              <button @click="filterOpen = !filterOpen" class="flex items-center gap-2 px-4 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-white transition-colors">
                 <Filter class="w-4 h-4" />
                 <span class="text-sm">필터</span>
               </button>
-            </div>
 
-            <div class="overflow-x-auto">
+              <!-- 드롭다운 -->
+              <div v-if="filterOpen" class="absolute right-0 mt-2 w-40 bg-white border border-[#e9ecef] rounded-lg shadow-md z-20 overflow-hidden">
+                <button class="w-full text-left px-4 py-2 text-sm hover:bg-[#f8f9fa]" @click="statusFilter='confirmed'; filterOpen=false">확정</button>
+                <button class="w-full text-left px-4 py-2 text-sm hover:bg-[#f8f9fa]" @click="statusFilter='pending'; filterOpen=false">대기</button>
+                <button class="w-full text-left px-4 py-2 text-sm hover:bg-[#f8f9fa]" @click="statusFilter='cancelled'; filterOpen=false">취소</button>
+                <button class="w-full text-left px-4 py-2 text-sm hover:bg-[#f8f9fa]" @click="statusFilter='refunded'; filterOpen=false">환불</button>
+                <button class="w-full text-left px-4 py-2 text-sm hover:bg-[#f8f9fa]" @click="statusFilter='all'; filterOpen=false">전체</button>
+              </div>
+            </div>
+            </div>
+            <div class="overflow-x-auto miu-h-[240px]">
               <table class="w-full">
                 <thead class="bg-[#f8f9fa] border-b border-[#e9ecef]">
                   <tr>
@@ -226,65 +245,73 @@ const salesStats = ref({
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-[#e9ecef]">
-                  <tr
-                    v-for="reservation in reservations"
-                    :key="reservation.id"
-                    class="hover:bg-[#f8f9fa] transition-colors"
-                  >
-                    <td class="px-6 py-4 text-sm text-[#1e3a5f]">
-                      {{ reservation.name }}
-                    </td>
-                    <td class="px-6 py-4 text-sm text-[#6c757d]">
-                      {{ reservation.phone }}
-                    </td>
-                    <td class="px-6 py-4 text-sm text-[#1e3a5f]">
-                      {{ reservation.date }} {{ reservation.time }}
-                    </td>
-                    <td class="px-6 py-4 text-sm text-[#1e3a5f]">
-                      {{ reservation.guests }}명
-                    </td>
-                    <td class="px-6 py-4 text-sm text-[#1e3a5f]">
-                      {{ reservation.amount.toLocaleString() }}원
-                    </td>
-                    <td class="px-6 py-4">
-                      <span
-                        :class="`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
-                          reservation.status === 'confirmed'
-                            ? 'bg-[#d4edda] text-[#155724]'
-                            : reservation.status === 'pending'
-                            ? 'bg-[#fff3cd] text-[#856404]'
-                            : 'bg-[#f8d7da] text-[#721c24]'
-                        }`"
-                      >
-                        {{
-                          reservation.status === 'confirmed'
-                            ? '확정'
-                            : reservation.status === 'pending'
-                            ? '대기'
-                            : '취소'
-                        }}
-                      </span>
-                    </td>
-                    <td class="px-6 py-4">
-                      <div class="flex items-center gap-2">
-                        <button
-                          class="gradient-primary text-white px-3 py-2 rounded-lg text-xs hover:opacity-90 transition-opacity"
+                  <template v-if="filteredReservations.length">
+                    <tr
+                      v-for="reservation in filteredReservations"
+                      :key="reservation.id"
+                      class="hover:bg-[#f8f9fa] transition-colors"
+                    >
+                      <td class="px-6 py-4 text-sm text-[#1e3a5f]">
+                        {{ reservation.name }}
+                      </td>
+                      <td class="px-6 py-4 text-sm text-[#6c757d]">
+                        {{ reservation.phone }}
+                      </td>
+                      <td class="px-6 py-4 text-sm text-[#1e3a5f]">
+                        {{ reservation.date }} {{ reservation.time }}
+                      </td>
+                      <td class="px-6 py-4 text-sm text-[#1e3a5f]">
+                        {{ reservation.guests }}명
+                      </td>
+                      <td class="px-6 py-4 text-sm text-[#1e3a5f]">
+                        {{ reservation.amount.toLocaleString() }}원
+                      </td>
+                      <td class="px-6 py-4">
+                        <span
+                          :class="`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
+                            reservation.status === 'confirmed'
+                              ? 'bg-[#d4edda] text-[#155724]'
+                              : reservation.status === 'pending'
+                              ? 'bg-[#fff3cd] text-[#856404]'
+                              : 'bg-[#f8d7da] text-[#721c24]'
+                          }`"
                         >
-                          상세보기
-                        </button>
-                        <template v-if="reservation.status === 'pending'">
+                          {{
+                            reservation.status === 'confirmed'
+                              ? '확정'
+                              : reservation.status === 'pending'
+                              ? '대기'
+                              : '취소'
+                          }}
+                        </span>
+                      </td>
+                      <td class="px-6 py-4">
+                        <div class="flex items-center gap-2">
                           <button
-                            class="bg-[#28a745] text-white px-3 py-2 rounded-lg text-xs hover:opacity-90 transition-opacity"
+                            class="gradient-primary text-white px-3 py-2 rounded-lg text-xs hover:opacity-90 transition-opacity"
                           >
-                            확정
+                            상세보기
                           </button>
-                          <button
-                            class="bg-[#dc3545] text-white px-3 py-2 rounded-lg text-xs hover:opacity-90 transition-opacity"
-                          >
-                            취소
-                          </button>
-                        </template>
-                      </div>
+                          <template v-if="reservation.status === 'pending'">
+                            <button
+                              class="bg-[#28a745] text-white px-3 py-2 rounded-lg text-xs hover:opacity-90 transition-opacity"
+                            >
+                              확정
+                            </button>
+                            <button
+                              class="bg-[#dc3545] text-white px-3 py-2 rounded-lg text-xs hover:opacity-90 transition-opacity"
+                            >
+                              취소
+                            </button>
+                          </template>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+
+                  <tr v-else>
+                    <td colspan="7" class="px-6 py-10 text-center text-sm text-[#6c757d]">
+                      해당 상태의 예약이 없습니다.
                     </td>
                   </tr>
                 </tbody>
