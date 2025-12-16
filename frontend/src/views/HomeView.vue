@@ -3,7 +3,6 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import {
   MapPin,
   Calendar,
-  Navigation,
   User,
   Star,
   X,
@@ -13,11 +12,12 @@ import {
   SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
+  Home,
 } from 'lucide-vue-next'; // Import Lucide icons for Vue
 import Button from '@/components/ui/Button.vue'; // Import our custom Button component
 import Card from '@/components/ui/Card.vue';
 import { RouterLink } from 'vue-router'; // Import Vue RouterLink
-import { loadKakaoMaps } from '@/utils/kakao';
+import { loadKakaoMaps, geocodeAddress } from '@/utils/kakao';
 import { restaurants as restaurantData } from '@/data/restaurants';
 
 // State management (React's useState -> Vue's ref)
@@ -36,6 +36,7 @@ const searchDistance = ref('');
 const budget = ref(500000);
 
 const restaurants = restaurantData;
+const restaurantGeocodeCache = new Map();
 
 const mapContainer = ref(null);
 const mapInstance = ref(null);
@@ -46,8 +47,24 @@ const defaultMapCenter =
     lng: 127.110636,
   };
 const currentLocation = ref('경기도 성남시 분당구 판교동');
-const mapDistanceKm = ref(2);
-const distanceRange = { min: 1, max: 5 };
+const mapDistanceSteps = Object.freeze([
+  { label: '250m', level: 3 },
+  { label: '500m', level: 4 },
+  { label: '1km', level: 5 },
+  { label: '2km', level: 6 },
+  { label: '3km', level: 7 },
+  { label: '5km', level: 8 },
+]);
+const mapDistanceStepIndex = ref(mapDistanceSteps.length - 1);
+const currentDistanceLabel = computed(() => mapDistanceSteps[mapDistanceStepIndex.value].label);
+const distanceSliderFill = computed(() => {
+  if (mapDistanceSteps.length <= 1) return 0;
+  return (
+    ((mapDistanceSteps.length - 1 - mapDistanceStepIndex.value) /
+      (mapDistanceSteps.length - 1)) *
+    100
+  );
+});
 
 const isCalendarOpen = ref(false);
 const calendarMonth = ref(new Date());
@@ -161,17 +178,43 @@ watch(searchDate, (value) => {
   }
 });
 
-const renderMapMarkers = (kakaoMaps) => {
+const resolveRestaurantCoords = async (restaurant) => {
+  if (restaurant.coords?.lat && restaurant.coords?.lng) {
+    return restaurant.coords;
+  }
+
+  const cacheKey = restaurant.address?.trim() || restaurant.name;
+  if (!cacheKey) {
+    return null;
+  }
+
+  if (restaurantGeocodeCache.has(cacheKey)) {
+    return restaurantGeocodeCache.get(cacheKey);
+  }
+
+  try {
+    const coords = await geocodeAddress(restaurant.address);
+    restaurantGeocodeCache.set(cacheKey, coords);
+    restaurant.coords = coords;
+    return coords;
+  } catch (error) {
+    console.error('주소 지오코딩 실패:', cacheKey, error);
+    return null;
+  }
+};
+
+const renderMapMarkers = async (kakaoMaps) => {
   if (!mapInstance.value) return;
 
   mapMarkers.forEach((marker) => marker.setMap(null));
   mapMarkers.length = 0;
 
-  restaurants.forEach((restaurant) => {
-    if (!restaurant.coords) return;
+  for (const restaurant of restaurants) {
+    const coords = await resolveRestaurantCoords(restaurant);
+    if (!coords) continue;
 
     const marker = new kakaoMaps.Marker({
-      position: new kakaoMaps.LatLng(restaurant.coords.lat, restaurant.coords.lng),
+      position: new kakaoMaps.LatLng(coords.lat, coords.lng),
       title: restaurant.name,
     });
 
@@ -180,28 +223,38 @@ const renderMapMarkers = (kakaoMaps) => {
       selectedMapRestaurant.value = restaurant;
     });
     mapMarkers.push(marker);
-  });
+  }
 };
 
-const levelForDistance = (distance) => {
-  const mapping = {
-    1: 3,
-    2: 4,
-    3: 5,
-    4: 6,
-    5: 7,
-  };
-  return mapping[distance] ?? 4;
+const levelForDistance = (stepIndex) => {
+  const step = mapDistanceSteps[stepIndex] ?? mapDistanceSteps[0];
+  return step.level;
 };
 
 const applyHomeMapZoom = () => {
   if (!mapInstance.value) return;
-  mapInstance.value.setLevel(levelForDistance(mapDistanceKm.value), { animate: { duration: 300 } });
+  mapInstance.value.setLevel(levelForDistance(mapDistanceStepIndex.value), {
+    animate: { duration: 300 },
+  });
 };
 
 const changeMapDistance = (delta) => {
-  const next = Math.min(distanceRange.max, Math.max(distanceRange.min, mapDistanceKm.value + delta));
-  mapDistanceKm.value = next;
+  const next = Math.min(
+    mapDistanceSteps.length - 1,
+    Math.max(0, mapDistanceStepIndex.value + delta),
+  );
+  mapDistanceStepIndex.value = next;
+};
+
+const resetMapToHome = () => {
+  if (!mapInstance.value) return;
+  const kakaoMaps = window?.kakao?.maps;
+  if (!kakaoMaps?.LatLng) return;
+
+  const targetCenter = new kakaoMaps.LatLng(defaultMapCenter.lat, defaultMapCenter.lng);
+  mapInstance.value.panTo(targetCenter);
+  mapDistanceStepIndex.value = mapDistanceSteps.length - 1;
+  applyHomeMapZoom();
 };
 
 const initializeMap = async () => {
@@ -211,10 +264,10 @@ const initializeMap = async () => {
     const center = new kakaoMaps.LatLng(defaultMapCenter.lat, defaultMapCenter.lng);
     mapInstance.value = new kakaoMaps.Map(mapContainer.value, {
       center,
-      level: levelForDistance(mapDistanceKm.value),
+      level: levelForDistance(mapDistanceStepIndex.value),
     });
 
-    renderMapMarkers(kakaoMaps);
+    await renderMapMarkers(kakaoMaps);
     applyHomeMapZoom();
   } catch (error) {
     console.error('카카오 지도 초기화에 실패했습니다.', error);
@@ -231,7 +284,7 @@ onBeforeUnmount(() => {
   mapInstance.value = null;
 });
 
-watch(mapDistanceKm, () => {
+watch(mapDistanceStepIndex, () => {
   applyHomeMapZoom();
 });
 
@@ -246,7 +299,7 @@ const priceRanges = [
   '2만원~3만원',
   '3만원 이상',
 ];
-const distances = ['1km 이내', '2km 이내', '3km 이내'];
+const distances = ['1km 이내', '2km 이내', '3km 이내', '5km 이내'];
 const sortOptions = ['추천순', '거리순', '평점순', '가격순'];
 const restaurantTags = [
   '조용한',
@@ -341,6 +394,10 @@ const applySearch = () => {
   // 검색 적용 로직 (Vue version)
 };
 
+const closeMapRestaurantModal = () => {
+  selectedMapRestaurant.value = null;
+};
+
 </script>
 
 <template>
@@ -392,9 +449,7 @@ const applySearch = () => {
           <div class="h-20 w-[6px] bg-white/80 rounded relative shadow-card overflow-hidden">
             <div
               class="absolute top-0 left-0 right-0 bg-[#ff6b4a] transition-all"
-              :style="{
-                height: `${((distanceRange.max - mapDistanceKm) / (distanceRange.max - distanceRange.min)) * 100}%`,
-              }"
+              :style="{ height: `${distanceSliderFill}%` }"
             ></div>
           </div>
           <button
@@ -404,9 +459,9 @@ const applySearch = () => {
             <Minus class="w-4 h-4" />
           </button>
         </div>
-        <div class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-card flex items-center gap-2 text-sm text-[#1e3a5f]">
+        <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-card flex items-center gap-2 text-sm text-[#1e3a5f]">
           <MapPin class="w-4 h-4 text-[#ff6b4a]" />
-          <span>{{ currentLocation }} 주변 회식 맛집</span>
+          <span>{{ currentLocation }} · {{ currentDistanceLabel }} 반경</span>
         </div>
       </div>
 
@@ -544,9 +599,15 @@ const applySearch = () => {
           <Calendar class="w-6 h-6" />
         </RouterLink>
 
-        <button class="flex items-center justify-center -mt-4">
-          <div class="w-10 h-10 rounded-full gradient-primary flex items-center justify-center shadow-button-hover">
-            <Navigation class="w-5 h-5 text-white" />
+        <button
+          type="button"
+          class="flex items-center justify-center -mt-4"
+          @click="resetMapToHome"
+          aria-label="홈으로 이동"
+        >
+          <div class="w-12 h-12 rounded-full gradient-primary flex items-center justify-center shadow-button-hover border-4 border-white">
+            <Home class="w-5 h-5 text-white" />
+            <span class="sr-only">홈으로 이동</span>
           </div>
         </button>
 
@@ -859,9 +920,9 @@ const applySearch = () => {
   </div>
 </template>
 
-<style scoped>
-/* Scoped styles can be added here if needed, but Tailwind handles most of it. */
+<style>
+.wrap_btn_zoom,
+.wrap_scale {
+  display: none !important;
+}
 </style>
-const closeMapRestaurantModal = () => {
-  selectedMapRestaurant.value = null;
-};
