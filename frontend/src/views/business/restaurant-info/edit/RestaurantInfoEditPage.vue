@@ -4,6 +4,7 @@ import { Upload, X } from 'lucide-vue-next';
 import { RouterLink, useRouter, useRoute } from 'vue-router';
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
+import Pagination from '@/components/ui/Pagination.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -36,6 +37,40 @@ const restaurantFileInput = ref(null);
 
 const closedDays = ref([]);
 const selectedTags = ref([]);
+
+// --- Menu Management State ---
+const allMenus = ref(
+  Array.from({ length: 25 }, (_, i) => ({
+    id: i + 1,
+    name: `더미 메뉴 ${i + 1}`,
+    type:
+      i % 3 === 0
+        ? '주메뉴'
+        : i % 3 === 1
+        ? '서브메뉴'
+        : '기타(디저트, 음료)',
+    price: `${(10 + i).toFixed(3)}원`,
+  }))
+);
+const currentPage = ref(1);
+const itemsPerPage = ref(5);
+
+const totalPages = computed(() =>
+  Math.ceil(allMenus.value.length / itemsPerPage.value)
+);
+
+const paginatedMenus = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value;
+  const end = start + itemsPerPage.value;
+  return allMenus.value.slice(start, end);
+});
+
+const changePage = (page) => {
+  if (page < 1 || page > totalPages.value) return;
+  currentPage.value = page;
+};
+
+// --- End of Menu Management State ---
 
 const handleRestaurantFileChange = (e) => {
   const file = e.target.files[0];
@@ -472,48 +507,48 @@ const saveRestaurant = async () => {
                 <thead class="bg-[#f8f9fa] border-b border-[#dee2e6]">
                   <tr>
                     <th
-                      class="px-4 py-3 text-left text-sm font-semibold text-[#1e3a5f]"
+                      class="px-12 py-3 text-left text-sm font-semibold text-[#1e3a5f]"
                     >
                       메뉴이름
                     </th>
                     <th
-                      class="px-4 py-3 text-left text-sm font-semibold text-[#1e3a5f]"
+                      class="px-12 py-3 text-left text-sm font-semibold text-[#1e3a5f]"
                     >
                       메뉴타입
                     </th>
                     <th
-                      class="px-4 py-3 text-left text-sm font-semibold text-[#1e3a5f]"
+                      class="px-12 py-3 text-left text-sm font-semibold text-[#1e3a5f]"
                     >
                       가격
                     </th>
                     <th
-                      class="px-4 py-3 text-center text-sm font-semibold text-[#1e3a5f]"
+                      class="px-4 py-3 text-left text-sm font-semibold text-[#1e3a5f]"
                     >
-                      작업
+                      수정/삭제
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr
-                    v-for="index in [1, 2, 3]"
-                    :key="index"
+                    v-for="menu in paginatedMenus"
+                    :key="menu.id"
                     class="border-b border-[#e9ecef]"
                   >
-                    <td class="px-4 py-4 text-sm text-[#1e3a5f]">
-                      메뉴명 {{ index }}
+                    <td class="px-12 py-4 text-sm text-[#1e3a5f]">
+                      {{ menu.name }}
                     </td>
-                    <td class="px-4 py-4 text-sm text-[#6c757d]">메뉴타입</td>
-                    <td class="px-4 py-4 text-sm text-[#6c757d]">15,000원</td>
-                    <td class="px-4 py-4 text-center">
-                      <div class="flex justify-center gap-2">
+                    <td class="px-12 py-4 text-sm text-[#6c757d]">{{ menu.type }}</td>
+                    <td class="px-12 py-4 text-sm text-[#6c757d]">{{ menu.price }}</td>
+                    <td class="px-4 py-4 text-left">
+                      <div class="flex justify-start gap-2">
                         <RouterLink
-                          :to="`/business/restaurant-info/menu/edit/${index}`"
-                          class="px-4 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] text-sm hover:bg-[#f8f9fa] transition-colors"
+                          :to="`/business/restaurant-info/menu/edit/${menu.id}`"
+                          class="px-3 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] text-sm hover:bg-[#f8f9fa] transition-colors"
                         >
                           수정
                         </RouterLink>
                         <button
-                          class="px-4 py-2 border border-[#dc3545] text-[#dc3545] rounded-lg text-sm hover:bg-[#fff5f5] transition-colors"
+                          class="px-3 py-2 border border-[#dc3545] text-[#dc3545] rounded-lg text-sm hover:bg-[#fff5f5] transition-colors"
                         >
                           삭제
                         </button>
@@ -526,23 +561,11 @@ const saveRestaurant = async () => {
 
             <!-- 페이지네이션 적용 위치 -->
             <div class="flex items-center justify-between mt-6">
-              <div class="flex gap-2">
-                <button
-                  class="px-4 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-[#f8f9fa] transition-colors"
-                >
-                  1
-                </button>
-                <button
-                  class="px-4 py-2 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
-                >
-                  2
-                </button>
-                <button
-                  class="px-4 py-2 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
-                >
-                  3
-                </button>
-              </div>
+              <Pagination
+                :current-page="currentPage"
+                :total-pages="totalPages"
+                @change-page="changePage"
+              />
 
               <RouterLink
                 to="/business/restaurant-info/menu/add"
