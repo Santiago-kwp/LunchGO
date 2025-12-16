@@ -8,6 +8,10 @@ import Card from '@/components/ui/Card.vue';
 const route = useRoute();
 const router = useRouter();
 const restaurantId = route.params.id || '1';
+const reviewId = route.params.reviewId; // 수정 모드일 때 리뷰 ID
+
+// 작성 모드 vs 수정 모드 판단
+const isEditMode = computed(() => !!reviewId);
 
 // 단계 관리 (1: 태그 선택, 2: 리뷰 작성)
 const currentStep = ref(1);
@@ -17,6 +21,10 @@ const isReceiptModalOpen = ref(false);
 
 // 사진 업로드 모달
 const isPhotoModalOpen = ref(false);
+
+// 리뷰 등록 완료 모달
+const isReviewCompleteModalOpen = ref(false);
+const submittedReviewId = ref(null); // 등록된 리뷰 ID (API 응답에서 받아옴)
 
 // 방문 정보
 const visitInfo = ref({
@@ -95,13 +103,125 @@ const tagCategories = ref([
 const reviewPhotos = ref([]);
 const reviewText = ref('');
 
+// Mock 기존 리뷰 데이터 (API에서 가져올 데이터)
+const existingReviews = {
+  'review-1': {
+    id: 'review-1',
+    restaurantId: 1,
+    restaurantName: '식당명',
+    visitNumber: 2,
+    receipt: {
+      date: '2024년 11월 15일 (금)',
+      partySize: 8,
+      totalAmount: 111000,
+      uploaded: true,
+      items: [
+        { name: '메뉴명1', quantity: 1, price: 18000 },
+        { name: '메뉴명2', quantity: 2, price: 9000 },
+        { name: '메뉴명3', quantity: 3, price: 11000 },
+      ],
+    },
+    selectedTags: [
+      '인테리어가 세련돼요', // space 카테고리
+      '재료가 신선해요', // taste 카테고리
+      '직원들이 적극적으로 도와줘요', // service 카테고리
+    ],
+    photos: [
+      {
+        id: 1,
+        url: '/korean-appetizer-main-dessert.jpg',
+        file: null,
+      },
+      {
+        id: 2,
+        url: '/premium-course-meal-with-wine.jpg',
+        file: null,
+      },
+    ],
+    text: '회식하기 정말 좋았어요. 음식도 맛있고 분위기도 최고였습니다! 특히 룸이 프라이빗해서 회사 동료들과 편하게 대화할 수 있었고, 음식 양도 정말 푸짐해서 배불리 먹었습니다.',
+  },
+  'review-2': {
+    id: 'review-2',
+    restaurantId: 1,
+    restaurantName: '식당명',
+    visitNumber: 3,
+    receipt: {
+      date: '2024년 11월 10일 (금)',
+      partySize: 2,
+      totalAmount: 42000,
+      uploaded: false,
+      items: [
+        { name: '까르보나라', quantity: 1, price: 18000 },
+        { name: '알리오올리오', quantity: 1, price: 16000 },
+        { name: '타파스', quantity: 2, price: 4000 },
+      ],
+    },
+    selectedTags: ['가격 대비 만족스러워요', '청결 관리가 잘 돼요'],
+    photos: [
+      {
+        id: 3,
+        url: '/italian-pasta-dish.png',
+        file: null,
+      },
+    ],
+    text: '가격 대비 훌륭한 퀄리티입니다. 다음에 또 방문할게요.',
+  },
+  'review-3': {
+    id: 'review-3',
+    restaurantId: 2,
+    restaurantName: '맛있는집',
+    visitNumber: 1,
+    receipt: {
+      date: '2024년 11월 10일 (금)',
+      partySize: 2,
+      totalAmount: 42000,
+      uploaded: true,
+      items: [
+        { name: '까르보나라', quantity: 1, price: 18000 },
+        { name: '알리오올리오', quantity: 1, price: 16000 },
+        { name: '타파스', quantity: 2, price: 4000 },
+      ],
+    },
+    selectedTags: ['메뉴 설명을 잘 해줘요', '시그니처 메뉴가 있어요'],
+    images: [],
+    text: '',
+  },
+};
+
+// 수정 모드일 때 기존 리뷰 데이터 로드
+const loadExistingReview = () => {
+  if (isEditMode.value && reviewId) {
+    const existingReview = existingReviews[reviewId];
+    if (existingReview) {
+      // 방문 정보 로드
+      visitInfo.value.restaurantName = existingReview.restaurantName;
+      visitInfo.value.visitNumber = existingReview.visitNumber;
+
+      // 영수증 정보 로드
+      receipt.value = { ...existingReview.receipt };
+
+      // 선택된 태그 로드
+      selectedTags.value = [...existingReview.selectedTags];
+
+      // 사진 로드
+      reviewPhotos.value = existingReview.photos.map((photo) => ({ ...photo }));
+
+      // 리뷰 텍스트 로드
+      reviewText.value = existingReview.text;
+
+      // 수정 모드에서는 바로 Step 2로 이동 (또는 Step 1부터 시작)
+      // currentStep.value = 2; // 필요시 주석 해제
+    }
+  }
+};
+
 // 태그 선택/해제
 const toggleTag = (tag) => {
   const index = selectedTags.value.indexOf(tag);
   if (index > -1) {
     selectedTags.value.splice(index, 1);
   } else {
-    if (selectedTags.value.length < 5) {
+    if (selectedTags.value.length < 7) {
       selectedTags.value.push(tag);
     }
   }
@@ -165,15 +285,58 @@ const goToPreviousStep = () => {
   }
 };
 
-// 리뷰 등록
+// 리뷰 등록 또는 수정
 const submitReview = () => {
-  // 실제 구현 시 API 호출
-  console.log('리뷰 등록:', {
-    tags: selectedTags.value,
-    photos: reviewPhotos.value,
-    text: reviewText.value,
-  });
-  router.push(`/restaurant/${restaurantId}/reviews`);
+  if (isEditMode.value) {
+    // 수정 모드: API 호출하여 리뷰 업데이트
+    console.log('리뷰 수정:', {
+      reviewId: reviewId,
+      tags: selectedTags.value,
+      photos: reviewPhotos.value,
+      text: reviewText.value,
+    });
+    // TODO: PUT /api/reviews/:reviewId
+
+    // 수정 완료 후 리뷰 상세 페이지로 이동
+    router.push(`/restaurant/${restaurantId}/reviews/${reviewId}`);
+  } else {
+    // 작성 모드: API 호출하여 새 리뷰 등록
+    console.log('리뷰 등록:', {
+      tags: selectedTags.value,
+      photos: reviewPhotos.value,
+      text: reviewText.value,
+    });
+    // TODO: POST /api/restaurants/:id/reviews
+
+    // API 응답으로 받은 리뷰 ID 설정 (실제 구현 시 API 응답 사용)
+    submittedReviewId.value = Date.now(); // 임시 ID (실제로는 API 응답의 reviewId 사용)
+
+    // 리뷰 등록 완료 모달 열기
+    isReviewCompleteModalOpen.value = true;
+  }
+};
+
+// 리뷰 등록 완료 모달 닫기
+const closeReviewCompleteModal = () => {
+  isReviewCompleteModalOpen.value = false;
+};
+
+// 내 리뷰 보러가기
+const goToMyReview = () => {
+  closeReviewCompleteModal();
+  router.push(`/restaurant/${restaurantId}/reviews/${submittedReviewId.value}`);
+};
+
+// 지난 예약 페이지로 가기
+const goToMyReservations = () => {
+  closeReviewCompleteModal();
+  router.push({ path: '/my-reservations', query: { tab: 'past' } });
+};
+
+// 홈으로 가기
+const goToHome = () => {
+  closeReviewCompleteModal();
+  router.push('/');
 };
 
 // 영수증 업로드 모달 열기
@@ -233,6 +396,7 @@ const setupDragScroll = () => {
 
 onMounted(() => {
   setupDragScroll();
+  loadExistingReview(); // 수정 모드일 때 기존 리뷰 데이터 로드
 });
 </script>
 
@@ -241,9 +405,12 @@ onMounted(() => {
     <!-- 헤더 -->
     <header class="sticky top-0 z-50 bg-white border-b border-[#e9ecef]">
       <div
-        class="max-w-[500px] mx-auto px-4 h-14 flex items-center justify-end"
+        class="max-w-[500px] mx-auto px-4 h-14 flex items-center justify-between"
       >
-        <button @click="router.push(`/restaurant/${restaurantId}/reviews`)">
+        <h1 class="font-semibold text-[#1e3a5f] text-base">
+          {{ isEditMode ? '리뷰 수정' : '리뷰 작성' }}
+        </h1>
+        <button @click="isEditMode ? router.back() : goToMyReservations()">
           <X class="w-6 h-6 text-[#1e3a5f]" />
         </button>
       </div>
@@ -336,7 +503,7 @@ onMounted(() => {
           </p>
           <p class="text-sm font-semibold text-[#1e3a5f] text-center mb-4">
             어떤 점이 좋았나요?<br />
-            이 곳에 어울리는 키워드를 골라주세요. (1개 ~ 5개)
+            이 곳에 어울리는 키워드를 골라주세요. (1개 ~ 7개)
           </p>
 
           <!-- 태그 카테고리 (가로 스크롤, 카테고리별 세로 배치) -->
@@ -564,6 +731,61 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- 리뷰 등록 완료 모달 -->
+    <div
+      v-if="isReviewCompleteModalOpen"
+      class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      @click="closeReviewCompleteModal"
+    >
+      <div class="bg-white rounded-2xl p-6 max-w-md w-full" @click.stop>
+        <div class="text-center mb-6">
+          <div
+            class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4"
+          >
+            <svg
+              class="w-8 h-8 text-green-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 13l4 4L19 7"
+              ></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-bold text-[#1e3a5f] mb-2">리뷰 등록 완료!</h3>
+          <p class="text-sm text-[#6c757d]">
+            소중한 리뷰 감사합니다.<br />
+            다른 이용자들에게 큰 도움이 될 거예요.
+          </p>
+        </div>
+
+        <div class="space-y-2">
+          <button
+            @click="goToMyReview"
+            class="w-full py-3 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+          >
+            내 리뷰 보러가기
+          </button>
+          <button
+            @click="goToMyReservations"
+            class="w-full py-3 bg-white border-2 border-[#dee2e6] text-[#495057] rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            지난 예약 페이지로 가기
+          </button>
+          <button
+            @click="goToHome"
+            class="w-full py-3 bg-white border border-[#dee2e6] text-[#6c757d] rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            홈으로 가기
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Step 1: 우측 하단 다음 버튼 -->
     <button
       v-if="currentStep === 1"
@@ -601,7 +823,7 @@ onMounted(() => {
               : 'bg-gray-200 text-gray-400 cursor-not-allowed',
           ]"
         >
-          등록
+          {{ isEditMode ? '수정 완료' : '등록' }}
         </button>
       </div>
     </div>

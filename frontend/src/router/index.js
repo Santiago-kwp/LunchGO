@@ -47,9 +47,7 @@ const router = createRouter({
       path: '/business/restaurant-info/menu/edit/:id',
       name: 'business-restaurant-menu-edit',
       component: () =>
-        import(
-          '../views/business/restaurant-info/menu/MenuEditPage.vue'
-        ),
+        import('../views/business/restaurant-info/menu/MenuEditPage.vue'),
       props: true,
     },
     {
@@ -83,6 +81,11 @@ const router = createRouter({
       path: '/mypage/favorites',
       name: 'mypage-favorites',
       component: () => import('../views/mypage/favorites/FavoritesPage.vue'),
+    },
+    {
+      path: '/mypage/reviews',
+      name: 'mypage-reviews',
+      component: () => import('../views/mypage/reviews/ReviewsPage.vue'),
     },
     {
       path: '/mypage',
@@ -151,6 +154,20 @@ const router = createRouter({
       props: true,
     },
     {
+      path: '/restaurant/:id/reviews/write',
+      name: 'write-review',
+      component: () =>
+        import('../views/restaurant/id/reviews/WriteReviewPage.vue'),
+      props: true,
+    },
+    {
+      path: '/restaurant/:id/reviews/:reviewId/edit',
+      name: 'edit-review',
+      component: () =>
+        import('../views/restaurant/id/reviews/WriteReviewPage.vue'),
+      props: true,
+    },
+    {
       path: '/restaurant/:id/reviews/:reviewId',
       name: 'review-detail',
       component: () =>
@@ -162,13 +179,6 @@ const router = createRouter({
       name: 'restaurant-reviews',
       component: () =>
         import('../views/restaurant/id/reviews/RestaurantReviewsPage.vue'),
-      props: true,
-    },
-    {
-      path: '/restaurant/:id/reviews/write',
-      name: 'write-review',
-      component: () =>
-        import('../views/restaurant/id/reviews/WriteReviewPage.vue'),
       props: true,
     },
     {

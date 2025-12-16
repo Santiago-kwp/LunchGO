@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import {
   Calendar,
   Clock,
@@ -7,13 +7,26 @@ import {
   MapPin,
   ArrowLeft,
   Star,
+  MoreVertical,
+  Edit,
+  Trash2,
 } from 'lucide-vue-next';
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 
+const route = useRoute();
+const router = useRouter();
+
 // 탭 상태 관리
 const activeTab = ref('upcoming'); // 'upcoming' 또는 'past'
+
+// 컴포넌트 마운트 시 URL 쿼리로 탭 설정
+onMounted(() => {
+  if (route.query.tab === 'past') {
+    activeTab.value = 'past';
+  }
+});
 
 // 즐겨찾기 목록 (식당 ID 배열)
 const favorites = ref([1]); // 예시: 식당 ID 1은 이미 즐겨찾기됨
@@ -91,6 +104,19 @@ const allReservations = ref([
     },
     reservationStatus: 'completed', // 'completed', 'refund_pending', 'refunded'
     status: 'past',
+    // 리뷰 정보 (리뷰를 작성한 경우)
+    review: {
+      id: 'review-1',
+      rating: 5,
+      content:
+        '회식하기 정말 좋았어요. 음식도 맛있고 분위기도 최고였습니다! 특히 룸이 프라이빗해서 회사 동료들과 편하게 대화할 수 있었습니다.',
+      tags: [
+        '인테리어가 세련돼요',
+        '재료가 신선해요',
+        '직원들이 적극적으로 도와줘요',
+      ],
+      createdAt: '2024.11.16',
+    },
   },
   {
     id: 4,
@@ -112,6 +138,7 @@ const allReservations = ref([
     },
     reservationStatus: 'refund_pending', // 'completed', 'refund_pending', 'refunded'
     status: 'past',
+    review: null, // 리뷰 없음
   },
   {
     id: 5,
@@ -133,6 +160,13 @@ const allReservations = ref([
     },
     reservationStatus: 'refunded', // 'completed', 'refund_pending', 'refunded'
     status: 'past',
+    review: {
+      id: 'review-2',
+      rating: 4,
+      content: '가격 대비 훌륭한 퀄리티입니다. 다음에 또 방문할게요.',
+      tags: ['법카 쓰기 좋은 가격대에요', '주차가 편해요'],
+      createdAt: '2024.11.11',
+    },
   },
 ]);
 
@@ -201,6 +235,44 @@ const upcomingReservations = computed(() =>
 const pastReservations = computed(() =>
   allReservations.value.filter((r) => r.status === 'past')
 );
+
+// 리뷰 메뉴 드롭다운 상태
+const activeReviewMenu = ref(null);
+
+// 리뷰 메뉴 토글
+const toggleReviewMenu = (reservationId) => {
+  if (activeReviewMenu.value === reservationId) {
+    activeReviewMenu.value = null;
+  } else {
+    activeReviewMenu.value = reservationId;
+  }
+};
+
+// 리뷰 수정
+const handleEditReview = (reservation) => {
+  console.log('리뷰 수정:', reservation.review.id);
+  activeReviewMenu.value = null;
+  // 리뷰 수정 페이지로 이동
+  router.push(
+    `/restaurant/${reservation.restaurant.id}/reviews/${reservation.review.id}/edit`
+  );
+};
+
+// 리뷰 삭제
+const handleDeleteReview = (reservation) => {
+  if (confirm('리뷰를 삭제하시겠습니까?')) {
+    console.log('리뷰 삭제:', reservation.review.id);
+    // TODO: API 호출하여 리뷰 삭제
+    reservation.review = null; // 임시로 리뷰 제거
+  }
+  activeReviewMenu.value = null;
+};
+
+// 리뷰 텍스트 축약 (50자 제한)
+const truncateReviewText = (text, maxLength = 50) => {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
+};
 </script>
 
 <template>
@@ -448,8 +520,12 @@ const pastReservations = computed(() =>
                   </Button>
                 </RouterLink>
               </div>
+
+              <!-- 리뷰 작성 버튼 또는 리뷰 프리뷰 카드 -->
               <div class="mt-2">
+                <!-- 리뷰가 없는 경우: 리뷰 쓰기 버튼 -->
                 <RouterLink
+                  v-if="!reservation.review"
                   :to="`/restaurant/${reservation.restaurant.id}/reviews/write`"
                   class="block"
                 >
@@ -460,6 +536,84 @@ const pastReservations = computed(() =>
                     리뷰 쓰기
                   </Button>
                 </RouterLink>
+
+                <!-- 리뷰가 있는 경우: 리뷰 프리뷰 카드 -->
+                <div v-else class="relative">
+                  <RouterLink
+                    :to="`/mypage/reviews?highlight=${reservation.review.id}`"
+                    class="block p-3 bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-lg hover:shadow-md transition-all"
+                  >
+                    <!-- 별점 -->
+                    <div class="flex items-center gap-1 mb-2">
+                      <Star
+                        v-for="(_, i) in Array.from({
+                          length: reservation.review.rating,
+                        })"
+                        :key="i"
+                        class="w-4 h-4 fill-orange-400 text-orange-400"
+                      />
+                      <span class="text-xs text-gray-500 ml-1">
+                        {{ reservation.review.createdAt }}
+                      </span>
+                    </div>
+
+                    <!-- 리뷰 내용 미리보기 -->
+                    <p class="text-sm text-gray-700 mb-2 line-clamp-2">
+                      {{ truncateReviewText(reservation.review.content) }}
+                    </p>
+
+                    <!-- 태그 미리보기 (최대 2개) -->
+                    <div class="flex flex-wrap gap-1">
+                      <span
+                        v-for="(tag, idx) in reservation.review.tags.slice(
+                          0,
+                          2
+                        )"
+                        :key="idx"
+                        class="inline-block px-2 py-0.5 text-xs rounded-full bg-gradient-to-r from-orange-400 to-pink-400 text-white"
+                      >
+                        {{ tag }}
+                      </span>
+                      <span
+                        v-if="reservation.review.tags.length > 2"
+                        class="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-200 text-gray-600"
+                      >
+                        +{{ reservation.review.tags.length - 2 }}
+                      </span>
+                    </div>
+                  </RouterLink>
+
+                  <!-- 햄버거 메뉴 버튼 -->
+                  <div class="absolute top-2 right-2">
+                    <button
+                      @click.prevent="toggleReviewMenu(reservation.id)"
+                      class="w-8 h-8 flex items-center justify-center rounded-full bg-white/80 hover:bg-white shadow-sm transition-colors"
+                    >
+                      <MoreVertical class="w-4 h-4 text-gray-600" />
+                    </button>
+
+                    <!-- 드롭다운 메뉴 -->
+                    <div
+                      v-if="activeReviewMenu === reservation.id"
+                      class="absolute top-10 right-0 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[120px] z-10"
+                    >
+                      <button
+                        @click="handleEditReview(reservation)"
+                        class="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <Edit class="w-4 h-4" />
+                        수정
+                      </button>
+                      <button
+                        @click="handleDeleteReview(reservation)"
+                        class="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 class="w-4 h-4" />
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </Card>
