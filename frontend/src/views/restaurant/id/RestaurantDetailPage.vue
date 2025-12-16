@@ -271,6 +271,7 @@ const initializeDetailMap = async () => {
       center,
       level: detailLevelForDistance(detailMapDistanceKm.value),
     });
+    detailMapInstance.setZoomable(false);
 
     detailMarker = new kakaoMaps.Marker({
       position: center,

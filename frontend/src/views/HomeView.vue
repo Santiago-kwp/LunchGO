@@ -36,6 +36,18 @@ const searchDistance = ref('');
 const budget = ref(500000);
 
 const restaurants = restaurantData;
+const restaurantsPerPage = 10;
+const currentPage = ref(1);
+const totalPages = computed(() => Math.max(1, Math.ceil(restaurants.length / restaurantsPerPage)));
+const paginatedRestaurants = computed(() => {
+  const start = (currentPage.value - 1) * restaurantsPerPage;
+  return restaurants.slice(start, start + restaurantsPerPage);
+});
+const pageNumbers = computed(() =>
+  Array.from({ length: totalPages.value }, (_, index) => index + 1),
+);
+const canGoPrevious = computed(() => currentPage.value > 1);
+const canGoNext = computed(() => currentPage.value < totalPages.value);
 const restaurantGeocodeCache = new Map();
 
 const mapContainer = ref(null);
@@ -178,6 +190,30 @@ watch(searchDate, (value) => {
   }
 });
 
+watch(totalPages, (newTotal) => {
+  if (currentPage.value > newTotal) {
+    currentPage.value = newTotal;
+  }
+});
+
+const goToPage = (page) => {
+  if (page < 1 || page > totalPages.value) return;
+  currentPage.value = page;
+  if (typeof window !== 'undefined') {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+};
+
+const goToPreviousPage = () => {
+  if (!canGoPrevious.value) return;
+  goToPage(currentPage.value - 1);
+};
+
+const goToNextPage = () => {
+  if (!canGoNext.value) return;
+  goToPage(currentPage.value + 1);
+};
+
 const resolveRestaurantCoords = async (restaurant) => {
   if (restaurant.coords?.lat && restaurant.coords?.lng) {
     return restaurant.coords;
@@ -266,6 +302,7 @@ const initializeMap = async () => {
       center,
       level: levelForDistance(mapDistanceStepIndex.value),
     });
+    mapInstance.value.setZoomable(false);
 
     await renderMapMarkers(kakaoMaps);
     applyHomeMapZoom();
@@ -490,7 +527,11 @@ const closeMapRestaurantModal = () => {
         </div>
 
         <div class="space-y-3">
-          <RouterLink v-for="restaurant in restaurants" :key="restaurant.id" :to="`/restaurant/${restaurant.id}`">
+          <RouterLink
+            v-for="restaurant in paginatedRestaurants"
+            :key="restaurant.id"
+            :to="`/restaurant/${restaurant.id}`"
+          >
             <Card class="overflow-hidden border-[#e9ecef] rounded-xl bg-white shadow-card hover:shadow-lg transition-shadow cursor-pointer">
               <div class="flex gap-3 p-2">
                 <div class="relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden">
@@ -525,6 +566,44 @@ const closeMapRestaurantModal = () => {
               </div>
             </Card>
           </RouterLink>
+        </div>
+
+        <div v-if="totalPages > 1" class="mt-6">
+          <nav class="flex flex-wrap items-center justify-center gap-2 text-sm" aria-label="페이지네이션">
+            <button
+              type="button"
+              class="min-w-[56px] h-9 px-4 rounded-2xl border border-[#e9ecef] bg-white text-[#495057] font-medium transition-colors disabled:text-[#c7cdd3] disabled:border-[#f1f3f5] disabled:cursor-not-allowed"
+              :disabled="!canGoPrevious"
+              @click="goToPreviousPage"
+            >
+              이전
+            </button>
+
+            <button
+              v-for="page in pageNumbers"
+              :key="page"
+              type="button"
+              @click="goToPage(page)"
+              :aria-current="page === currentPage ? 'page' : undefined"
+              :class="[
+                'min-w-[36px] h-9 px-3 rounded-2xl border font-medium transition-colors',
+                page === currentPage
+                  ? 'bg-gradient-to-r from-[#ff6b4a] via-[#ff805f] to-[#ff987d] text-white border-transparent shadow-button-hover'
+                  : 'bg-white text-[#495057] border-[#e9ecef] hover:text-[#ff6b4a] hover:border-[#ff6b4a]',
+              ]"
+            >
+              {{ page }}
+            </button>
+
+            <button
+              type="button"
+              class="min-w-[56px] h-9 px-4 rounded-2xl border border-[#e9ecef] bg-white text-[#495057] font-medium transition-colors disabled:text-[#c7cdd3] disabled:border-[#f1f3f5] disabled:cursor-not-allowed"
+              :disabled="!canGoNext"
+              @click="goToNextPage"
+            >
+              다음
+            </button>
+          </nav>
         </div>
       </div>
 
