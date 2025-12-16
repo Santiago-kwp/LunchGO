@@ -1,6 +1,6 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue';
-import { Upload, X } from 'lucide-vue-next'; // User, Bell은 Header로 이동
+import { Upload, X } from 'lucide-vue-next';
 import { useRouter, useRoute } from 'vue-router';
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
@@ -16,35 +16,26 @@ const pageTitle = computed(() =>
 );
 
 // 3. 상태 관련 변수
-const imageFile = ref(null);
-const imageUrl = ref(null);
+const imageFile = ref(null); // 실제 이미지 파일 객체
+const imageUrl = ref(null); // 이미지 미리보기 URL
 const fileInput = ref(null);
 const menuData = reactive({
   name: '',
-  type: '',
-  category: '',
+  category: '', // DB의 'category' ('MAIN', 'SUB', 'OTHER')
   price: 0,
 });
-const selectedAllergens = ref([]);
+// 선택된 재료 태그 (객체 배열)
+const selectedIngredientTags = ref([]);
 
 // 4. 데이터 변수
-const allergens = ref([
-  '견과류',
-  '우유',
-  '계란',
-  '밀',
-  '대두',
-  '갑각류',
-  '조개류',
-  '생선',
-  '메밀',
-  '고수',
-  '오이',
-  '파프리카',
-  '미나리',
-  '당근',
+// DB의 'tag' 테이블 (category='INGREDIENT')에서 가져올 재료 태그 목록
+const allIngredientTags = ref([]);
+// DB의 'menu' 테이블 'category' 컬럼과 매핑
+const menuTypes = ref([
+  { value: 'MAIN', text: '주메뉴' },
+  { value: 'SUB', text: '서브메뉴' },
+  { value: 'OTHER', text: '기타(디저트, 음료)' },
 ]);
-const menuTypes = ref(['주메뉴', '서브메뉴', '기타(디저트, 음료)']);
 
 // 5. 함수
 const handleFileChange = (e) => {
@@ -67,33 +58,71 @@ const clearImage = () => {
   }
 };
 
-const toggleAllergen = (allergen) => {
-  const index = selectedAllergens.value.indexOf(allergen);
+const toggleIngredientTag = (tag) => {
+  const index = selectedIngredientTags.value.findIndex(t => t.tagId === tag.tagId);
   if (index > -1) {
-    selectedAllergens.value.splice(index, 1);
+    selectedIngredientTags.value.splice(index, 1);
   } else {
-    selectedAllergens.value.push(allergen);
+    selectedIngredientTags.value.push(tag);
   }
 };
 
+const isTagSelected = (tag) => {
+  return selectedIngredientTags.value.some(t => t.tagId === tag.tagId);
+}
+
 // 6. 라이프사이클 훅
 onMounted(() => {
+  // --- Mock API Fetch (DTO는 camelCase 사용) ---
+  // 실제로는 여기서 API를 호출하여 데이터를 가져옵니다.
+
+  // 1. (모든 메뉴 공통) 재료 태그 목록 가져오기 (원래는 페이지 진입 시 항상 실행)
+  // GET /api/tags?category=INGREDIENT
+  const mockAllIngredientTags = [
+    { tagId: 1, content: '견과류' },
+    { tagId: 2, content: '우유' },
+    { tagId: 3, content: '계란' },
+    { tagId: 4, content: '밀' },
+    { tagId: 5, content: '대두' },
+    { tagId: 6, content: '갑각류' },
+    { tagId: 7, content: '조개류' },
+    { tagId: 8, content: '생선' },
+    { tagId: 9, content: '메밀' },
+    { tagId: 10, content: '고수' },
+    { tagId: 11, content: '오이' },
+    { tagId: 12, content: '파프리카' },
+    { tagId: 13, content: '미나리' },
+    { tagId: 14, content: '당근' },
+  ];
+  allIngredientTags.value = mockAllIngredientTags;
+
+  // 2. (수정 모드일 경우) 기존 메뉴 정보 가져오기
   if (isEditMode.value) {
     console.log('Editing menu with ID:', route.params.id);
-    const mockMenuData = {
+    
+    // GET /api/menus/{route.params.id}
+    const mockMenuDataFromApi = {
       name: '기존 메뉴',
-      type: '주메뉴',
+      category: 'MAIN', // DB ENUM 값
       price: 25000,
-      imageUrl: '/italian-pasta-dish.png',
-      selectedAllergens: ['밀', '계란'],
+      imageUrl: '/italian-pasta-dish.png', // menu_image 테이블 -> DTO
+      tags: [ // menu_tag_map과 tag 테이블 join 결과 -> DTO
+        { tagId: 4, content: '밀' },
+        { tagId: 3, content: '계란' },
+      ],
     };
 
-    menuData.name = mockMenuData.name;
-    menuData.type = mockMenuData.type;
-    menuData.price = mockMenuData.price;
-    imageUrl.value = mockMenuData.imageUrl;
-    imageFile.value = new File([], 'mock-image.png');
-    selectedAllergens.value = mockMenuData.selectedAllergens;
+    // 상태에 데이터 채우기
+    menuData.name = mockMenuDataFromApi.name;
+    menuData.category = mockMenuDataFromApi.category;
+    menuData.price = mockMenuDataFromApi.price;
+    imageUrl.value = mockMenuDataFromApi.imageUrl;
+    selectedIngredientTags.value = mockMenuDataFromApi.tags;
+    
+    // 실제 파일이 아니므로, 업로드된 것처럼 모의 파일 객체를 만듦
+    if (mockMenuDataFromApi.imageUrl) {
+        imageFile.value = new File([], 'mock-image.png'); 
+    }
   }
 });
 
@@ -107,7 +136,7 @@ const saveMenu = () => {
     alert('메뉴 이름을 입력해주세요.');
     return;
   }
-  if (!menuData.type) {
+  if (!menuData.category) {
     alert('메뉴 타입을 선택해주세요.');
     return;
   }
@@ -119,6 +148,16 @@ const saveMenu = () => {
     alert('가격을 올바르게 입력해주세요.');
     return;
   }
+  
+  // --- Mock API Call (DTO는 camelCase 사용) ---
+  // 실제로는 여기서 API로 데이터를 전송합니다.
+  const payload = {
+    ...menuData,
+    // imageFile.value는 별도로 FormData로 전송
+    selectedTagIds: selectedIngredientTags.value.map(tag => tag.tagId),
+  };
+  console.log('Saving menu data:', payload);
+
 
   if (isEditMode.value) {
     alert('메뉴가 수정되었습니다.');
@@ -215,22 +254,22 @@ const saveMenu = () => {
                   >메뉴타입</label
                 >
                 <select
-                  v-model="menuData.type"
+                  v-model="menuData.category"
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
                   required
                 >
                   <option disabled value="">메뉴 타입 선택</option>
                   <option
                     v-for="typeOption in menuTypes"
-                    :key="typeOption"
-                    :value="typeOption"
+                    :key="typeOption.value"
+                    :value="typeOption.value"
                   >
-                    {{ typeOption }}
+                    {{ typeOption.text }}
                   </option>
                 </select>
               </div>
 
-              <!-- Menu Category -->
+              <!-- Menu Price -->
               <div>
                 <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
                   >가격</label
@@ -244,22 +283,23 @@ const saveMenu = () => {
                 />
               </div>
 
+              <!-- Ingredient Tags -->
               <div>
                 <label class="block text-sm font-semibold text-[#1e3a5f] mb-3">
                   재료 특이사항
                 </label>
                 <div class="flex flex-wrap gap-3">
                   <button
-                    v-for="allergen in allergens"
-                    :key="allergen"
-                    @click="toggleAllergen(allergen)"
+                    v-for="tag in allIngredientTags"
+                    :key="tag.tagId"
+                    @click="toggleIngredientTag(tag)"
                     :class="`px-4 py-2 rounded-lg border transition-colors ${
-                      selectedAllergens.includes(allergen)
+                      isTagSelected(tag)
                         ? 'gradient-primary text-white border-transparent'
                         : 'border-[#dee2e6] text-[#1e3a5f] hover:bg-[#f8f9fa]'
                     }`"
                   >
-                    {{ allergen }}
+                    {{ tag.content }}
                   </button>
                 </div>
               </div>
