@@ -157,6 +157,13 @@ const router = createRouter({
       props: true,
     },
     {
+      path: '/restaurant/:id/reviews/write',
+      name: 'write-review',
+      component: () =>
+        import('../views/restaurant/id/reviews/WriteReviewPage.vue'),
+      props: true,
+    },
+    {
       path: '/signup',
       name: 'signup',
       component: () => import('../views/signup/SignupPage.vue'),

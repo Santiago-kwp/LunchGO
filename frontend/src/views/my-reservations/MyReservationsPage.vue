@@ -450,7 +450,7 @@ const pastReservations = computed(() =>
               </div>
               <div class="mt-2">
                 <RouterLink
-                  :to="`/restaurant/${reservation.restaurant.id}/reviews`"
+                  :to="`/restaurant/${reservation.restaurant.id}/reviews/write`"
                   class="block"
                 >
                   <Button
