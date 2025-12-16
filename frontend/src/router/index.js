@@ -62,6 +62,12 @@ const router = createRouter({
       component: () => import('../views/business/staff/BusinessStaffPage.vue'),
     },
     {
+      path: '/business/reviews',
+      name: 'business-reviews',
+      component: () =>
+        import('../views/business/reviews/BusinessReviewsPage.vue'),
+    },
+    {
       path: '/intro',
       name: 'intro',
       component: () => import('../views/intro/ServiceIntroPage.vue'),

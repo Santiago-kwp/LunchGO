@@ -1,7 +1,14 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
-import { ArrowLeft, Star, ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
+import {
+  ArrowLeft,
+  Star,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  MessageSquare,
+} from 'lucide-vue-next';
 import Card from '@/components/ui/Card.vue';
 
 const route = useRoute();
@@ -43,6 +50,25 @@ const reviews = [
         { name: '메뉴명3', quantity: 3, price: 11000 },
       ],
     },
+    // 댓글 (사장님/관리자가 작성)
+    comments: [
+      {
+        id: 'comment-1',
+        authorType: 'owner', // 'owner' (사장님) 또는 'admin' (관리자)
+        authorName: '식당명',
+        content:
+          '소중한 리뷰 감사합니다! 저희 식당을 방문해주셔서 감사드리며, 더욱 노력하는 모습 보여드리겠습니다. 다음에도 좋은 추억 만들어드릴 수 있도록 최선을 다하겠습니다.',
+        createdAt: '2024.01.16 14:30',
+      },
+      {
+        id: 'comment-2',
+        authorType: 'owner',
+        authorName: '식당명',
+        content:
+          '추가로, 다음 방문 시 웰컴 드링크를 서비스로 제공해드리겠습니다. 예약 시 리뷰 고객님이라고 말씀해주세요!',
+        createdAt: '2024.01.16 15:45',
+      },
+    ],
   },
   {
     id: '2',
@@ -65,6 +91,15 @@ const reviews = [
       totalAmount: 65000,
       menuItems: [{ name: 'B코스', quantity: 4, price: 16250 }],
     },
+    comments: [
+      {
+        id: 'comment-3',
+        authorType: 'owner',
+        authorName: '식당명',
+        content: '리뷰 감사합니다! 친절한 서비스로 보답하겠습니다.',
+        createdAt: '2024.01.11 10:20',
+      },
+    ],
   },
   {
     id: '3',
@@ -91,6 +126,24 @@ const reviews = [
         { name: '타파스', quantity: 2, price: 4000 },
       ],
     },
+    comments: [
+      {
+        id: 'comment-4',
+        authorType: 'admin',
+        authorName: '런치고 관리자',
+        content:
+          '안녕하세요, 런치고 관리자입니다. 좋은 리뷰 감사드립니다. 더욱 나은 서비스를 제공할 수 있도록 노력하겠습니다.',
+        createdAt: '2024.01.06 09:15',
+      },
+      {
+        id: 'comment-5',
+        authorType: 'owner',
+        authorName: '식당명',
+        content:
+          '파스타 맛있게 드셨다니 기쁩니다. 다음에는 코스 메뉴도 꼭 맛보시길 추천드립니다!',
+        createdAt: '2024.01.07 16:00',
+      },
+    ],
   },
   {
     id: '9',
@@ -107,8 +160,14 @@ const reviews = [
     detailedContent:
       '이 리뷰는 약관 위반으로 블라인드 처리되었습니다. 런치고는 건전한 리뷰 문화를 위해 노력하고 있습니다.',
     visitInfo: null,
+    comments: [], // 블라인드 리뷰는 댓글 없음
   },
 ];
+
+// 댓글 개수 계산
+const commentCount = computed(() => {
+  return review.value?.comments?.length || 0;
+});
 
 const review = computed(() => {
   return reviews.find((r) => r.id === reviewId) || reviews[0];
@@ -184,9 +243,9 @@ const setupDragScroll = (element) => {
   });
 };
 
-// 뒤로 가기 전용 함수
-const goBack = () => {
-  router.back(); // 또는 router.go(-1) 사용 가능
+// 이전 단계로 이동
+const goToPreviousStep = () => {
+  router.back();
 };
 
 // 컴포넌트 마운트 후 드래그 스크롤 설정
@@ -203,16 +262,9 @@ onMounted(() => {
     <!-- Header -->
     <header class="sticky top-0 z-50 bg-white border-b border-[#e9ecef]">
       <div class="max-w-[500px] mx-auto px-4 h-14 flex items-center">
-        <button
-          @click="router.back()"
-          class="mr-3"
-          aria-label="이전 페이지로 돌아가기"
-        >
+        <Button @click="goToPreviousStep()" class="mr-3">
           <ArrowLeft class="w-6 h-6 text-[#1e3a5f]" />
-        </button>
-        <!-- <RouterLink :to="`/restaurant/${restaurantId}/reviews`" class="mr-3">
-          <ArrowLeft class="w-6 h-6 text-[#1e3a5f]" />
-        </RouterLink> -->
+        </Button>
         <h1 class="font-semibold text-[#1e3a5f] text-base">리뷰 상세</h1>
       </div>
     </header>
@@ -365,9 +417,63 @@ onMounted(() => {
 
           <!-- Review Content -->
           <div
-            class="text-sm text-[#495057] leading-relaxed whitespace-pre-line"
+            class="text-sm text-[#495057] leading-relaxed whitespace-pre-line mb-4"
           >
             {{ review.detailedContent || review.content }}
+          </div>
+
+          <!-- 댓글 섹션 (사장님/관리자만 작성 가능) -->
+          <div
+            v-if="
+              !review.isBlinded && review.comments && review.comments.length > 0
+            "
+            class="mt-6 pt-6 border-t-2 border-[#e9ecef]"
+          >
+            <!-- 댓글 헤더 -->
+            <div class="flex items-center gap-2 mb-4">
+              <MessageSquare class="w-5 h-5 text-[#1e3a5f]" />
+              <h3 class="text-base font-semibold text-[#1e3a5f]">
+                사장님 댓글
+              </h3>
+              <span class="text-sm text-[#6c757d]">({{ commentCount }})</span>
+            </div>
+
+            <!-- 댓글 목록 -->
+            <div class="space-y-4">
+              <div
+                v-for="comment in review.comments"
+                :key="comment.id"
+                class="bg-[#f8f9fa] rounded-lg p-4"
+              >
+                <!-- 댓글 작성자 정보 -->
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-2">
+                    <!-- 사장님/관리자 뱃지 -->
+                    <span
+                      :class="[
+                        'px-2.5 py-1 rounded-full text-xs font-semibold',
+                        comment.authorType === 'owner'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-purple-100 text-purple-700',
+                      ]"
+                    >
+                      {{ comment.authorType === 'owner' ? '사장님' : '관리자' }}
+                    </span>
+                    <span class="font-medium text-[#1e3a5f] text-sm">
+                      {{ comment.authorName }}
+                    </span>
+                  </div>
+                  <span class="text-xs text-[#6c757d]">
+                    {{ comment.createdAt }}
+                  </span>
+                </div>
+
+                <!-- 댓글 내용 -->
+                <p class="text-sm text-[#495057] leading-relaxed">
+                  {{ comment.content }}
+                </p>
+              </div>
+            </div>
           </div>
         </Card>
       </div>
