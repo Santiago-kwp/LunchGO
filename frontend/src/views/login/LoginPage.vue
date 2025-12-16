@@ -14,7 +14,7 @@ type UserType = 'user' | 'staff' | 'owner' | 'admin';
 const showFindIdModal = ref(false);
 const showFindEmailModal = ref(false);
 const showFindPwdModal = ref(false);
-const showDormantModal = ref(true);
+const showDormantModal = ref(false);
 
 const currentTab = ref<UserType>('user');
 const email = ref('');
@@ -153,6 +153,7 @@ const handleDormantUnlocked = () => {
               type="password"
               class="input-field"
               placeholder="비밀번호를 입력하세요"
+              maxlength="20"
               required
             />
           </div>

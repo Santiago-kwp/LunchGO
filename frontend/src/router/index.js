@@ -190,20 +190,26 @@ const router = createRouter({
     {
       path: '/signup',
       name: 'signup',
-      component: () => import('../views/signup/SignupPage.vue'),
+      component: () => import('../views/signup/SignupChoicePage.vue'),
     },
-        //사업자 - 오늘의 예약 현황 (상세보기)
+    {
+      path: '/signup/user',
+      name: 'signup-user',
+      component: () => import('../views/signup/UserSignupPage.vue'),
+    },
+    //사업자 - 오늘의 예약 현황 (상세보기)
     {
       path: '/business/reservations/:id',
       name: 'reservation-detail',
-      component: () => import('@/views/business/reservations/ReservationDetailPage.vue')
+      component: () =>
+        import('@/views/business/reservations/ReservationDetailPage.vue'),
     },
     // Wildcard route for 404 - make sure this is the last route
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       redirect: '/', // Redirect to home for any unmatched routes
-    }
+    },
   ],
 });
 
