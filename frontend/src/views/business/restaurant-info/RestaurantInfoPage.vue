@@ -237,16 +237,15 @@ const restaurant = {
           </div>
 
           <!-- View All Menus Button -->
-          <RouterLink
-            :to="`/restaurant/${restaurant.id}/menus`"
-            class="w-full gradient-primary text-white py-4 rounded-xl text-lg font-semibold hover:opacity-90 transition-opacity block text-center"
+          <button
+            class="w-full gradient-primary text-white py-4 rounded-xl text-lg font-semibold hover:opacity-90 transition-opacity"
           >
             식당메뉴 전체보기
-          </RouterLink>
+          </button>
 
           <!-- Edit Button -->
           <div class="flex justify-end">
-            <RouterLink to="/business/restaurant-info/edit">
+            <RouterLink :to="`/business/restaurant-info/edit/${restaurant.id}`">
               <button
                 class="px-8 py-3 border-2 border-[#FF6B4A] text-[#FF6B4A] rounded-xl font-semibold hover:bg-[#fff5f2] transition-colors"
               >

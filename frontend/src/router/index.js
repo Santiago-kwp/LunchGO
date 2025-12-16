@@ -22,7 +22,15 @@ const router = createRouter({
         import('../views/business/reservations/BusinessReservationsPage.vue'),
     },
     {
-      path: '/business/restaurant-info/edit',
+      path: '/business/restaurant-info/add',
+      name: 'business-restaurant-info-add',
+      component: () =>
+        import(
+          '../views/business/restaurant-info/edit/RestaurantInfoEditPage.vue'
+        ),
+    },
+    {
+      path: '/business/restaurant-info/edit/:id',
       name: 'business-restaurant-info-edit',
       component: () =>
         import(

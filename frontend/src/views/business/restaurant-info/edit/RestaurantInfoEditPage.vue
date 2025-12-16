@@ -1,11 +1,20 @@
 <script setup>
-import { ref, reactive } from 'vue';
-import { Upload } from 'lucide-vue-next'; // User, Bell은 Header로 이동
-import { RouterLink, useRouter } from 'vue-router';
+import { ref, reactive, onMounted, computed } from 'vue';
+import { Upload, X } from 'lucide-vue-next';
+import { RouterLink, useRouter, useRoute } from 'vue-router';
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 
-const router = useRouter(); // Vue Router's useRouter
+const router = useRouter();
+const route = useRoute();
+
+const isEditMode = computed(() => !!route.params.id);
+const pageTitle = computed(() =>
+  isEditMode.value ? '식당 정보 수정' : '식당 정보 등록'
+);
+const submitButtonText = computed(() =>
+  isEditMode.value ? '수정하기' : '등록하기'
+);
 
 const formData = reactive({
   name: '',
@@ -21,8 +30,40 @@ const formData = reactive({
   description: '',
 });
 
+const restaurantImageFile = ref(null);
+const restaurantImageUrl = ref(null);
+const restaurantFileInput = ref(null);
+
 const closedDays = ref([]);
 const selectedTags = ref([]);
+
+const handleRestaurantFileChange = (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    restaurantImageFile.value = file;
+    restaurantImageUrl.value = URL.createObjectURL(file);
+  }
+};
+
+const triggerRestaurantFileInput = () => {
+  restaurantFileInput.value.click();
+};
+
+const clearRestaurantImage = () => {
+  restaurantImageFile.value = null;
+  restaurantImageUrl.value = null;
+  if (restaurantFileInput.value) {
+    restaurantFileInput.value.value = '';
+  }
+};
+
+const openPostcodeSearch = () => {
+  new window.daum.Postcode({
+    oncomplete: (data) => {
+      formData.roadAddress = data.roadAddress;
+    },
+  }).open();
+};
 
 const toggleClosedDay = (day) => {
   const index = closedDays.value.indexOf(day);
@@ -34,36 +75,131 @@ const toggleClosedDay = (day) => {
 };
 
 const toggleTag = (tag) => {
+  const restaurantTypeTags = tagCategories.value['식당종류'] || [];
+  const isRestaurantTypeTag = restaurantTypeTags.includes(tag);
   const index = selectedTags.value.indexOf(tag);
-  if (index > -1) {
-    selectedTags.value.splice(index, 1);
+
+  if (isRestaurantTypeTag) {
+    selectedTags.value = selectedTags.value.filter(
+      (selected) => !restaurantTypeTags.includes(selected)
+    );
+    if (index === -1) {
+      selectedTags.value.push(tag);
+    }
   } else {
-    selectedTags.value.push(tag);
+    if (index > -1) {
+      selectedTags.value.splice(index, 1);
+    } else {
+      selectedTags.value.push(tag);
+    }
   }
 };
 
-const tagCategories = ref({
-  특징: ['조용한', '깔끔한', '이국적/이색적'],
-  편의: ['노키즈존', '주차장 제공', '셀프바', '칸막이', '룸'],
-  규모: ['단체'],
+const tagCategories = ref({});
+
+const fetchTags = async () => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve([
+        { id: 1, name: '한식', category: '식당종류' },
+        { id: 2, name: '중식', category: '식당종류' },
+        { id: 3, name: '일식', category: '식당종류' },
+        { id: 4, name: '양식', category: '식당종류' },
+        { id: 5, name: '셀프바', category: '테이블 옵션' },
+        { id: 6, name: '룸', category: '테이블 옵션' },
+        { id: 7, name: '칸막이', category: '테이블 옵션' },
+        { id: 8, name: '조용한', category: '식당 분위기' },
+        { id: 9, name: '깔끔한', category: '식당 분위기' },
+        { id: 10, name: '이국적/이색적', category: '식당 분위기' },
+        { id: 11, name: '노키즈존', category: '편의사항' },
+        { id: 12, name: '주차장 제공', category: '편의사항' },
+        { id: 13, name: '와이파이', category: '편의사항' },
+      ]);
+    }, 100);
+  });
+};
+
+const fetchRestaurantData = async (id) => {
+  console.log(`Fetching data for restaurant ID: ${id}`);
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({
+        name: '런치고 한정식 (수정)',
+        phone: '02-9876-5432',
+        openingDate: '2022-10-20',
+        startTime: '11:00',
+        endTime: '21:00',
+        capacity: 75,
+        roadAddress: '서울특별시 종로구 종로 1',
+        detailAddress: '5층',
+        holidayOpen: true,
+        preOrderSupported: false,
+        description: '수정된 식당 소개입니다. 더욱 맛있어졌습니다.',
+        imageUrl: '/korean-course-meal-plating.jpg',
+        closedDays: ['일'],
+        tags: ['한식', '조용한', '주차장 제공'],
+      });
+    }, 500);
+  });
+};
+
+onMounted(async () => {
+  // 1. 태그 목록 불러오기
+  const tagsFromApi = await fetchTags();
+  const groupedTags = tagsFromApi.reduce((acc, tag) => {
+    if (!acc[tag.category]) {
+      acc[tag.category] = [];
+    }
+    acc[tag.category].push(tag.name);
+    return acc;
+  }, {});
+  tagCategories.value = groupedTags;
+
+  // 2. 수정 모드인 경우, 식당 데이터 불러와서 폼에 채우기
+  if (isEditMode.value) {
+    const restaurantData = await fetchRestaurantData(route.params.id);
+    formData.name = restaurantData.name;
+    formData.phone = restaurantData.phone;
+    formData.openingDate = restaurantData.openingDate;
+    formData.startTime = restaurantData.startTime;
+    formData.endTime = restaurantData.endTime;
+    formData.capacity = restaurantData.capacity;
+    formData.roadAddress = restaurantData.roadAddress;
+    formData.detailAddress = restaurantData.detailAddress;
+    formData.holidayOpen = restaurantData.holidayOpen;
+    formData.preOrderSupported = restaurantData.preOrderSupported;
+    formData.description = restaurantData.description;
+    restaurantImageUrl.value = restaurantData.imageUrl;
+    closedDays.value = restaurantData.closedDays;
+    selectedTags.value = restaurantData.tags;
+  }
 });
 
-const menuCategories = ref(['한식', '중식', '일식', '양식']);
-const specialtyTags = ref(['점심', '저녁', '야식']);
-const allergyTags = ref([
-  '견과류',
-  '우유',
-  '계란',
-  '밀',
-  '대두',
-  '갑각류',
-  '조개류',
-  '생선',
-  '메밀',
-]);
+const saveRestaurant = async () => {
+  // 실제 저장 로직
+  const dataToSubmit = {
+    ...formData,
+    closedDays: closedDays.value,
+    tags: selectedTags.value,
+    // restaurantImageFile.value // 이미지 파일도 함께 전송
+  };
 
-const navigateToRestaurantInfo = () => {
-  router.push('/business/restaurant-info');
+  try {
+    if (isEditMode.value) {
+      // 수정 API 호출
+      console.log('Updating restaurant:', route.params.id, dataToSubmit);
+      // await api.updateRestaurant(route.params.id, dataToSubmit);
+    } else {
+      // 등록 API 호출
+      console.log('Creating new restaurant:', dataToSubmit);
+      // await api.createRestaurant(dataToSubmit);
+    }
+    alert('저장되었습니다.');
+    router.push('/business/restaurant-info');
+  } catch (error) {
+    console.error('저장 실패:', error);
+    alert('저장에 실패했습니다.');
+  }
 };
 </script>
 
@@ -79,7 +215,7 @@ const navigateToRestaurantInfo = () => {
       <main class="flex-1 overflow-y-auto p-8">
         <div class="max-w-4xl mx-auto space-y-8">
           <!-- Page Title -->
-          <h2 class="text-3xl font-bold text-[#1e3a5f]">식당 정보 등록</h2>
+          <h2 class="text-3xl font-bold text-[#1e3a5f]">{{ pageTitle }}</h2>
 
           <!-- Restaurant Basic Info Card -->
           <div class="bg-white rounded-xl border border-[#e9ecef] p-8">
@@ -93,11 +229,36 @@ const navigateToRestaurantInfo = () => {
                 >식당이미지</label
               >
               <div
-                class="border-2 border-dashed border-[#dee2e6] rounded-xl p-8 text-center bg-[#f8f9fa] hover:bg-[#e9ecef] transition-colors cursor-pointer"
+                @click="triggerRestaurantFileInput"
+                class="border-2 border-[#e9ecef] rounded-xl overflow-hidden bg-[#f8f9fa] relative cursor-pointer"
               >
-                <Upload class="w-12 h-12 text-[#6c757d] mx-auto mb-3" />
-                <p class="text-sm text-[#6c757d]">이미지를 업로드하세요</p>
+                <div class="aspect-[2/1] flex items-center justify-center">
+                  <div v-if="restaurantImageUrl" class="w-full h-full">
+                    <img
+                      :src="restaurantImageUrl"
+                      alt="식당 이미지 미리보기"
+                      class="w-full h-full object-cover rounded-lg"
+                    />
+                    <button
+                      @click.stop="clearRestaurantImage"
+                      class="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                    >
+                      <X class="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div v-else class="text-center">
+                    <Upload class="w-12 h-12 text-[#6c757d] mx-auto mb-3" />
+                    <p class="text-sm text-[#6c757d]">이미지를 업로드하세요</p>
+                  </div>
+                </div>
               </div>
+              <input
+                type="file"
+                ref="restaurantFileInput"
+                @change="handleRestaurantFileChange"
+                class="hidden"
+                accept="image/*"
+              />
             </div>
 
             <!-- Form Fields -->
@@ -121,7 +282,7 @@ const navigateToRestaurantInfo = () => {
                   >
                   <input
                     type="tel"
-                    placeholder="전화번호를 입력하세요"
+                    placeholder="식당 전화번호를 입력하세요(예시: XXX-XXXX-XXXX)"
                     v-model="formData.phone"
                     class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
                   />
@@ -185,11 +346,14 @@ const navigateToRestaurantInfo = () => {
                 <div class="flex gap-3">
                   <input
                     type="text"
-                    placeholder="도로명주소 입력창"
+                    placeholder="우측 '주소검색' 버튼을 클릭하세요"
                     v-model="formData.roadAddress"
-                    class="flex-1 px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
+                    readonly
+                    class="flex-1 px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A] bg-[#f8f9fa]"
                   />
                   <button
+                    @click="openPostcodeSearch"
+                    type="button"
                     class="px-6 py-3 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-[#f8f9fa] transition-colors"
                   >
                     주소검색
@@ -203,7 +367,7 @@ const navigateToRestaurantInfo = () => {
                 >
                 <input
                   type="text"
-                  placeholder="상세주소 입력창"
+                  placeholder="상세주소 입력"
                   v-model="formData.detailAddress"
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
                 />
@@ -237,15 +401,12 @@ const navigateToRestaurantInfo = () => {
 
               <!-- Regular Closing Days -->
               <div>
-                <label class="block text-sm font-semibold text-[#1e3a5f] mb-3"
-                  >정기휴무일(요일)</label
-                >
-                <div class="flex gap-3">
+                <div class="flex flex-wrap gap-3">
                   <button
                     v-for="day in ['월', '화', '수', '목', '금', '토', '일']"
                     :key="day"
                     @click="toggleClosedDay(day)"
-                    :class="`px-6 py-3 rounded-lg border transition-colors ${
+                    :class="`px-4 py-2 rounded-lg border transition-colors ${
                       closedDays.includes(day)
                         ? 'gradient-primary text-white border-transparent'
                         : 'border-[#dee2e6] text-[#1e3a5f] hover:bg-[#f8f9fa]'
@@ -254,23 +415,10 @@ const navigateToRestaurantInfo = () => {
                     {{ day }}
                   </button>
                 </div>
-                <button
-                  class="mt-3 px-6 py-2 border border-[#dee2e6] rounded-lg text-[#6c757d] text-sm hover:bg-[#f8f9fa] transition-colors"
-                >
-                  선택 요일 저장
-                </button>
               </div>
 
               <!-- Restaurant Description -->
               <div>
-                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
-                  >식당 사진</label
-                >
-                <button
-                  class="mb-3 px-6 py-2 border border-[#dee2e6] rounded-lg text-[#1e3a5f] hover:bg-[#f8f9fa] transition-colors"
-                >
-                  파일 업로드
-                </button>
                 <label
                   class="block text-sm font-semibold text-[#1e3a5f] mb-2 mt-4"
                   >식당 소개</label
@@ -290,99 +438,29 @@ const navigateToRestaurantInfo = () => {
             <h3 class="text-xl font-bold text-[#1e3a5f] mb-6">식당 태그</h3>
 
             <!-- Characteristics Tags -->
-            <div class="mb-6">
-              <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
-                식당 분위기/편의시설
-              </h4>
-              <div class="flex flex-wrap gap-3">
-                <template
-                  v-for="(categoryTags, categoryName) in tagCategories"
-                  :key="categoryName"
-                >
-                  <button
-                    v-for="tag in categoryTags"
-                    :key="tag"
-                    @click="toggleTag(tag)"
-                    :class="`px-6 py-3 rounded-lg border transition-colors ${
-                      selectedTags.includes(tag)
-                        ? 'gradient-primary text-white border-transparent'
-                        : 'border-[#dee2e6] text-[#1e3a5f] hover:bg-[#f8f9fa]'
-                    }`"
-                  >
-                    {{ tag }}
-                  </button>
-                </template>
-              </div>
-            </div>
-
-            <!-- Menu Category -->
-            <div class="mb-6">
-              <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
-                식당 종류
-              </h4>
-              <div class="flex flex-wrap gap-3">
-                <button
-                  v-for="category in menuCategories"
-                  :key="category"
-                  @click="toggleTag(category)"
-                  :class="`px-6 py-3 rounded-lg border transition-colors ${
-                    selectedTags.includes(category)
-                      ? 'gradient-primary text-white border-transparent'
-                      : 'border-[#dee2e6] text-[#1e3a5f] hover:bg-[#f8f9fa]'
-                  }`"
-                >
-                  {{ category }}
-                </button>
-              </div>
-            </div>
-
-            <!-- Specialty Tags -->
-            <div class="mb-6">
-              <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
-                식당 분위기
-              </h4>
-              <div class="flex flex-wrap gap-3">
-                <button
-                  v-for="tag in specialtyTags"
-                  :key="tag"
-                  @click="toggleTag(tag)"
-                  :class="`px-6 py-3 rounded-lg border transition-colors ${
-                    selectedTags.includes(tag)
-                      ? 'gradient-primary text-white border-transparent'
-                      : 'border-[#dee2e6] text-[#1e3a5f] hover:bg-[#f8f9fa]'
-                  }`"
-                >
-                  {{ tag }}
-                </button>
-              </div>
-            </div>
-
-            <!-- Allergy Tags -->
-            <div>
-              <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
-                사용 식재료
-              </h4>
-              <div class="flex flex-wrap gap-3">
-                <button
-                  v-for="tag in allergyTags"
-                  :key="tag"
-                  @click="toggleTag(tag)"
-                  :class="`px-6 py-3 rounded-lg border transition-colors ${
-                    selectedTags.includes(tag)
-                      ? 'gradient-primary text-white border-transparent'
-                      : 'border-[#dee2e6] text-[#1e3a5f] hover:bg-[#f8f9fa]'
-                  }`"
-                >
-                  {{ tag }}
-                </button>
-              </div>
-            </div>
-
-            <button
-              class="mt-6 px-8 py-3 gradient-primary text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
+            <div
+              v-for="(tags, categoryName) in tagCategories"
+              :key="categoryName"
+              class="mb-6"
             >
-              저장
-            </button>
+              <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
+                {{ categoryName }}
+              </h4>
+              <div class="flex flex-wrap gap-3">
+                <button
+                  v-for="tag in tags"
+                  :key="tag"
+                  @click="toggleTag(tag)"
+                  :class="`px-4 py-2 rounded-lg border transition-colors ${
+                    selectedTags.includes(tag)
+                      ? 'gradient-primary text-white border-transparent'
+                      : 'border-[#dee2e6] text-[#1e3a5f] hover:bg-[#f8f9fa]'
+                  }`"
+                >
+                  {{ tag }}
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Menu Management Section -->
@@ -478,10 +556,10 @@ const navigateToRestaurantInfo = () => {
           <!-- Save Button -->
           <div class="flex justify-end">
             <button
-              @click="navigateToRestaurantInfo"
+              @click="saveRestaurant"
               class="px-8 py-3 gradient-primary text-white rounded-xl font-semibold hover:opacity-90 transition-opacity"
             >
-              식당정보 편집
+              {{ submitButtonText }}
             </button>
           </div>
         </div>
