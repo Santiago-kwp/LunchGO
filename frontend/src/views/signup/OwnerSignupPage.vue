@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed, onUnmounted, onMounted } from 'vue';
+import axios from 'axios';
 import { RouterLink } from 'vue-router';
 import {
   ArrowLeft,
@@ -21,6 +22,8 @@ const password = ref('');
 const passwordConfirm = ref('');
 const businessNum = ref('');
 const isBusinessNumAppropriate = ref(false);
+const businessNumMsg = ref('');
+const startAt = ref(''); //개업일자
 
 //컴포넌트 ref 생성
 const passwordConfirmRef = ref<any>(null);
@@ -59,8 +62,35 @@ watch([agreeTerms, agreePrivacy], ([terms, privacy]) => {
   agreeAll.value = terms && privacy;
 });
 
+//개업일자 자동 포맷팅
+watch(startAt, (newVal) => {
+  const cleaned = newVal.replace(/[^0-9]/g, '');
+  let formatted = cleaned;
+
+  if (cleaned.length > 8) {
+    formatted = cleaned.slice(0, 8);
+  }
+
+  if (cleaned.length > 4 && cleaned.length <= 6) {
+    formatted = `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
+  } else if (cleaned.length > 6) {
+    formatted = `${cleaned.slice(0, 4)}-${cleaned.slice(4, 6)}-${cleaned.slice(
+      6
+    )}`;
+  }
+
+  if (newVal !== formatted) {
+    startAt.value = formatted;
+  }
+});
+
 //사업자 등록번호 자동 포맷팅
 watch(businessNum, (newVal) => {
+  // [추가] 사용자가 번호를 수정하면 에러 메시지 초기화
+  if (businessNumMsg.value) {
+    businessNumMsg.value = '';
+  }
+
   const cleaned = newVal.replace(/[^0-9]/g, '');
   let formatted = cleaned;
 
@@ -142,7 +172,7 @@ const checkInputElement = () => {
   if (!isLoginIdUnique.value) return alert('아이디 중복 확인이 필요합니다.');
   if (!password.value) return alert('비밀번호를 입력해주세요.');
   if (!passwordConfirm.value) return alert('비밀번호 재입력이 필요합니다.');
-  if (!name.value) return alert('이름을 입력해주세요.');
+  if (!name.value) return alert('이름(대표자명)을 입력해주세요.');
   //전화번호도 인증, 사업자 등록번호도 인증해야하므로 별도로 입력 관리
   return null;
 };
@@ -163,14 +193,83 @@ const handleLoginIdDuplicateCheck = async () => {
 };
 
 //사업자등록번호 인증 api 연동 버튼
-const handleBusinessNumCheck = () => {
+const handleBusinessNumCheck = async () => {
+  if (!name.value) return alert('이름(대표자명)을 먼저 입력해주세요.');
+  if (!startAt.value || startAt.value.length < 10)
+    return alert('개업일자를 올바르게 입력해주세요.');
   if (!businessNum.value) return alert('사업자 등록번호를 먼저 입력해주세요.');
 
+  //api 호출해서 확인하려면 데이터 정제 필수
+  const cleanBusinessNum = businessNum.value.replace(/[^0-9]/g, '');
+  const cleanStartDt = startAt.value.replace(/[^0-9]/g, ''); // YYYYMMDD 형태
+  const cleanName = name.value;
+
   //api 연동
+  const SERVICE_KEY =
+    '71e991b467c362f2d2661868fbc38193524993405b29e8b95253665610407c50';
+
+  try {
+    const response = await axios.post(
+      `https://api.odcloud.kr/api/nts-businessman/v1/validate?serviceKey=${SERVICE_KEY}`,
+      {
+        businesses: [
+          {
+            b_no: cleanBusinessNum,
+            start_dt: cleanStartDt,
+            p_nm: cleanName,
+          },
+        ],
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+      }
+    );
+
+    const data = response.data;
+
+    if (data.data && data.data.length > 0) {
+      const result = data.data[0]; //어짜피 정보 1개
+
+      // valid: '01'(일치), '02'(불일치)
+      if (result.valid === '01') {
+        // 일치하더라도 폐업자일 수 있으므로 상태코드(b_stt_cd)도 확인 권장
+        // status가 없을 수도 있으니 안전하게 접근
+        const status = result.status?.b_stt_cd || '';
+
+        if (status === '01') {
+          // 01: 계속사업자
+          businessNumMsg.value = '사업자 정보가 확인되었습니다.';
+        } else if (status === '02') {
+          businessNumMsg.value = '휴업 상태인 사업자입니다.';
+        } else if (status === '03') {
+          businessNumMsg.value = '폐업한 사업자입니다.';
+          isBusinessNumAppropriate.value = false;
+          return;
+        } else {
+          // 상태 정보가 없지만 valid가 01인 경우 (드물지만 통과 처리 or 경고)
+          businessNumMsg.value = '사업자 정보가 없습니다.';
+          isBusinessNumAppropriate.value = false;
+          return;
+        }
+      } else {
+        // valid: '02' 인 경우 (정보 불일치)
+        businessNumMsg.value =
+          '사업자 정보가 국세청 등록 정보와 일치하지 않습니다.\n대표자명, 개업일자, 사업자번호를 다시 확인해주세요.';
+        isBusinessNumAppropriate.value = false;
+        return;
+      }
+    } else {
+      return alert('검증 오류가 발생했습니다.');
+    }
+  } catch (e) {
+    console.error('API Error: ', e);
+  }
 
   //사업자 등록번호가 이미 있는 경우 (pinia 이용해서 회원정보는 업데이트 할거임)
 
-  alert('사용할 수 있는 사업자등록번호 입니다.');
   isBusinessNumAppropriate.value = true;
 };
 
@@ -351,10 +450,36 @@ const handleSignup = async () => {
             <Input
               id="name"
               type="text"
-              placeholder="이름을 입력하세요"
+              placeholder="이름(대표자명)을 입력하세요"
               maxlength="10"
               v-model="name"
-              class="w-full h-12 px-4 border-[#dee2e6] rounded-lg focus:border-[#ff6b4a] focus:ring-1 focus:ring-[#ff6b4a] text-[#1e3a5f] text-sm"
+              :readonly="isBusinessNumAppropriate"
+              :class="`w-full h-12 px-4 border-[#dee2e6] rounded-lg transition-colors text-sm ${
+                isBusinessNumAppropriate
+                  ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                  : 'bg-white text-[#1e3a5f] focus:border-[#ff6b4a] focus:ring-1 focus:ring-[#ff6b4a]'
+              }`"
+            />
+          </div>
+
+          <div>
+            <label
+              for="startDt"
+              class="block text-sm font-medium text-[#1e3a5f] mb-2"
+              >개업일자</label
+            >
+            <Input
+              id="startDt"
+              type="text"
+              placeholder="YYYY-mm-dd(숫자 8자리 입력)"
+              maxlength="10"
+              v-model="startAt"
+              :readonly="isBusinessNumAppropriate"
+              :class="`w-full h-12 px-4 border-[#dee2e6] rounded-lg transition-colors text-sm ${
+                isBusinessNumAppropriate
+                  ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                  : 'bg-white text-[#1e3a5f] focus:border-[#ff6b4a] focus:ring-1 focus:ring-[#ff6b4a]'
+              }`"
             />
           </div>
 
@@ -371,18 +496,30 @@ const handleSignup = async () => {
                 placeholder="사업자등록번호를 입력하세요"
                 maxlength="12"
                 v-model="businessNum"
-                class="flex-1 h-12 px-4 border-[#dee2e6] rounded-lg focus:border-[#ff6b4a] focus:ring-1 focus:ring-[#ff6b4a] text-[#1e3a5f] text-sm"
+                :readonly="isBusinessNumAppropriate"
+                :class="`flex-1 h-12 px-4 border-[#dee2e6] rounded-lg transition-colors text-sm ${
+                  isBusinessNumAppropriate
+                    ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                    : 'bg-white text-[#1e3a5f] focus:border-[#ff6b4a] focus:ring-1 focus:ring-[#ff6b4a]'
+                }`"
               />
 
               <Button
                 type="button"
                 @click="handleBusinessNumCheck"
+                :disabled="isBusinessNumAppropriate"
                 variant="outline"
                 class="h-12 px-4 border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] rounded-lg whitespace-nowrap"
               >
-                인증
+                {{ isBusinessNumAppropriate ? '인증완료' : '인증' }}
               </Button>
             </div>
+            <p
+              v-if="businessNumMsg"
+              class="text-xs text-red-500 mt-1 pl-1 whitespace-pre-line"
+            >
+              {{ businessNumMsg }}
+            </p>
           </div>
 
           <div>
