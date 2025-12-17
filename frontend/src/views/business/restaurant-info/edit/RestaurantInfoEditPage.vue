@@ -401,6 +401,13 @@ watch(
 watch(avgMainPrice, (newAvg) => {
   formData.avgMainPrice = newAvg;
 });
+
+// 현재 페이지의 메뉴가 모두 삭제되었을 때 이전 페이지로 이동
+watch(paginatedMenus, (newPaginatedMenus) => {
+  if (newPaginatedMenus.length === 0 && currentPage.value > 1) {
+    currentPage.value--;
+  }
+});
 </script>
 
 <template>
