@@ -1,13 +1,15 @@
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue';
-import { Upload, X } from 'lucide-vue-next'; // User, Bell은 Header로 이동
+import { ref, reactive, onMounted, computed, watch } from 'vue';
+import { Upload, X } from 'lucide-vue-next';
 import { useRouter, useRoute } from 'vue-router';
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
+import { useRestaurantStore } from '@/stores/restaurant';
 
-// 1. 라우터 및 라우트
+// 1. 라우터, 라우트, 스토어
 const router = useRouter();
 const route = useRoute();
+const store = useRestaurantStore();
 
 // 2. 모드 및 페이지 제목
 const isEditMode = computed(() => !!route.params.id);
@@ -20,38 +22,29 @@ const imageFile = ref(null);
 const imageUrl = ref(null);
 const fileInput = ref(null);
 const menuData = reactive({
+  id: null,
   name: '',
-  type: '',
   category: '',
   price: 0,
+  tags: [], // 재료 태그는 메뉴 객체에 포함하여 관리
+  imageUrl: '', // 이미지 URL도 메뉴 객체에 포함
 });
-const selectedAllergens = ref([]);
 
 // 4. 데이터 변수
-const allergens = ref([
-  '견과류',
-  '우유',
-  '계란',
-  '밀',
-  '대두',
-  '갑각류',
-  '조개류',
-  '생선',
-  '메밀',
-  '고수',
-  '오이',
-  '파프리카',
-  '미나리',
-  '당근',
+const allIngredientTags = ref([]);
+const menuTypes = ref([
+  { value: 'MAIN', text: '주메뉴' },
+  { value: 'SUB', text: '서브메뉴' },
+  { value: 'OTHER', text: '기타(디저트, 음료)' },
 ]);
-const menuTypes = ref(['주메뉴', '서브메뉴', '기타(디저트, 음료)']);
 
 // 5. 함수
 const handleFileChange = (e) => {
   const file = e.target.files[0];
   if (file) {
     imageFile.value = file;
-    imageUrl.value = URL.createObjectURL(file);
+    menuData.imageUrl = URL.createObjectURL(file);
+    imageUrl.value = menuData.imageUrl;
   }
 };
 
@@ -62,71 +55,153 @@ const triggerFileInput = () => {
 const clearImage = () => {
   imageFile.value = null;
   imageUrl.value = null;
+  menuData.imageUrl = '';
   if (fileInput.value) {
     fileInput.value.value = '';
   }
 };
 
-const toggleAllergen = (allergen) => {
-  const index = selectedAllergens.value.indexOf(allergen);
+const toggleIngredientTag = (tag) => {
+  const index = menuData.tags.findIndex((t) => t.tagId === tag.tagId);
   if (index > -1) {
-    selectedAllergens.value.splice(index, 1);
+    menuData.tags.splice(index, 1);
   } else {
-    selectedAllergens.value.push(allergen);
+    menuData.tags.push(tag);
   }
 };
 
-// 6. 라이프사이클 훅
-onMounted(() => {
-  if (isEditMode.value) {
-    console.log('Editing menu with ID:', route.params.id);
-    const mockMenuData = {
-      name: '기존 메뉴',
-      type: '주메뉴',
-      price: 25000,
-      imageUrl: '/italian-pasta-dish.png',
-      selectedAllergens: ['밀', '계란'],
-    };
+const isTagSelected = (tag) => {
+  return menuData.tags.some((t) => t.tagId === tag.tagId);
+};
 
-    menuData.name = mockMenuData.name;
-    menuData.type = mockMenuData.type;
-    menuData.price = mockMenuData.price;
-    imageUrl.value = mockMenuData.imageUrl;
-    imageFile.value = new File([], 'mock-image.png');
-    selectedAllergens.value = mockMenuData.selectedAllergens;
+// 6. 라이프사이클 훅
+// 추후 API로부터 데이터를 받아오는 로직을 처리할 함수
+onMounted(() => {
+  // 1. (모든 메뉴 공통) 재료 태그 목록 가져오기
+  // API: GET /api/tags?category=INGREDIENT
+  const mockAllIngredientTags = [
+    { tagId: 1, content: '견과류' }, { tagId: 2, content: '우유' },
+    { tagId: 3, content: '계란' }, { tagId: 4, content: '밀' },
+    { tagId: 5, content: '대두' }, { tagId: 6, content: '갑각류' },
+    { tagId: 7, content: '조개류' }, { tagId: 8, content: '생선' },
+    { tagId: 9, content: '메밀' }, { tagId: 10, content: '고수' },
+    { tagId: 11, content: '오이' }, { tagId: 12, content: '파프리카' },
+    { tagId: 13, content: '미나리' }, { tagId: 14, content: '당근' },
+  ];
+  allIngredientTags.value = mockAllIngredientTags;
+
+  if (isEditMode.value) {
+    // 2. (수정 모드일 경우) 기존 메뉴 정보 가져오기
+    // API: GET /api/menus/{menuId}
+    const menuId = route.params.id;
+    const existingMenu = store.getMenuById(menuId);
+    if (existingMenu) {
+      // 스토어에서 찾은 메뉴로 데이터 채우기
+      menuData.id = existingMenu.id;
+      menuData.name = existingMenu.name;
+      // 'type'을 'category'로 매핑
+      menuData.category = menuTypes.value.find(mt => mt.text === existingMenu.type)?.value || '';
+      menuData.price = existingMenu.price;
+      menuData.tags = existingMenu.tags || []; // 태그가 없을 수 있으므로 기본값 설정
+      menuData.imageUrl = existingMenu.imageUrl || ''; // 이미지 URL이 없을 수 있음
+      imageUrl.value = menuData.imageUrl;
+    }
   }
+});
+
+const validationErrors = reactive({
+  image: '',
+  name: '',
+  category: '',
+  price: '',
 });
 
 // 7. 저장 함수
 const saveMenu = () => {
-  if (!imageFile.value) {
-    alert('메뉴 사진을 등록해주세요.');
-    return;
+  // 에러 초기화
+  for (const key in validationErrors) {
+    validationErrors[key] = '';
+  }
+
+  let isValid = true;
+  // menuData.imageUrl이 이미 존재하면 이미지 파일 필수 아님 (수정 모드)
+  if (!imageFile.value && !menuData.imageUrl) {
+    validationErrors.image = '메뉴 사진을 등록해주세요.';
+    isValid = false;
   }
   if (!menuData.name.trim()) {
-    alert('메뉴 이름을 입력해주세요.');
-    return;
+    validationErrors.name = '메뉴 이름을 입력해주세요.';
+    isValid = false;
   }
-  if (!menuData.type) {
-    alert('메뉴 타입을 선택해주세요.');
-    return;
+  if (!menuData.category) {
+    validationErrors.category = '메뉴 타입을 선택해주세요.';
+    isValid = false;
   }
   if (
     menuData.price === null ||
     menuData.price === undefined ||
     menuData.price <= 0
   ) {
-    alert('가격을 올바르게 입력해주세요.');
+    validationErrors.price = '가격을 1 이상 입력해주세요.';
+    isValid = false;
+  }
+
+  if (!isValid) {
+    alert('필수 입력 항목을 모두 채워주세요.');
     return;
   }
 
+  const menuTypeKor =
+    menuTypes.value.find((mt) => mt.value === menuData.category)?.text || '';
+  const menuToSave = {
+    id: menuData.id,
+    name: menuData.name,
+    category: menuData.category, // DB enum 값
+    type: menuTypeKor, // RestaurantInfoEditPage에서 보여주기 위한 한글 타입
+    price: menuData.price,
+    tags: menuData.tags,
+    imageUrl: menuData.imageUrl,
+  };
+
   if (isEditMode.value) {
+    store.updateMenu(menuToSave);
     alert('메뉴가 수정되었습니다.');
   } else {
+    menuToSave.id = store.getNextId();
+    store.addMenu(menuToSave);
     alert('메뉴가 추가되었습니다.');
   }
   router.back();
 };
+
+// Watchers for clearing errors
+watch(
+  () => menuData.name,
+  (newValue) => {
+    if (newValue.trim()) validationErrors.name = '';
+  }
+);
+watch(
+  () => menuData.category,
+  (newValue) => {
+    if (newValue) validationErrors.category = '';
+  }
+);
+watch(
+  () => menuData.price,
+  (newValue) => {
+    if (newValue > 0) validationErrors.price = '';
+  }
+);
+watch(imageFile, (newFile) => {
+  if (newFile) validationErrors.image = '';
+});
+watch(
+  () => menuData.imageUrl,
+  (newUrl) => {
+    if (newUrl) validationErrors.image = '';
+  }
+);
 </script>
 
 <template>
@@ -163,7 +238,7 @@ const saveMenu = () => {
                 >
                 <div
                   @click="triggerFileInput"
-                  class="mb-8 border-2 border-[#e9ecef] rounded-xl overflow-hidden bg-[#f8f9fa] relative cursor-pointer"
+                  class="border-2 border-[#e9ecef] rounded-xl overflow-hidden bg-[#f8f9fa] relative cursor-pointer"
                 >
                   <div class="aspect-[2/1] flex items-center justify-center">
                     <div v-if="imageUrl" class="w-full h-full">
@@ -181,7 +256,9 @@ const saveMenu = () => {
                     </div>
                     <div v-else class="text-center">
                       <Upload class="w-12 h-12 text-[#6c757d] mx-auto mb-3" />
-                      <p class="text-sm text-[#6c757d]">이미지</p>
+                      <p class="text-sm text-[#6c757d]">
+                        이미지를 업로드하세요
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -191,8 +268,13 @@ const saveMenu = () => {
                   @change="handleFileChange"
                   class="hidden"
                   accept="image/*"
-                  required
                 />
+                <p
+                  v-if="validationErrors.image"
+                  class="text-red-500 text-sm mt-1"
+                >
+                  {{ validationErrors.image }}
+                </p>
               </div>
 
               <!-- Menu Name -->
@@ -205,8 +287,13 @@ const saveMenu = () => {
                   placeholder="메뉴이름 입력"
                   v-model="menuData.name"
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
-                  required
                 />
+                <p
+                  v-if="validationErrors.name"
+                  class="text-red-500 text-sm mt-1"
+                >
+                  {{ validationErrors.name }}
+                </p>
               </div>
 
               <!-- Menu Type -->
@@ -215,22 +302,27 @@ const saveMenu = () => {
                   >메뉴타입</label
                 >
                 <select
-                  v-model="menuData.type"
+                  v-model="menuData.category"
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
-                  required
                 >
                   <option disabled value="">메뉴 타입 선택</option>
                   <option
                     v-for="typeOption in menuTypes"
-                    :key="typeOption"
-                    :value="typeOption"
+                    :key="typeOption.value"
+                    :value="typeOption.value"
                   >
-                    {{ typeOption }}
+                    {{ typeOption.text }}
                   </option>
                 </select>
+                <p
+                  v-if="validationErrors.category"
+                  class="text-red-500 text-sm mt-1"
+                >
+                  {{ validationErrors.category }}
+                </p>
               </div>
 
-              <!-- Menu Category -->
+              <!-- Menu Price -->
               <div>
                 <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
                   >가격</label
@@ -240,26 +332,32 @@ const saveMenu = () => {
                   placeholder="가격 입력"
                   v-model="menuData.price"
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
-                  required
                 />
+                <p
+                  v-if="validationErrors.price"
+                  class="text-red-500 text-sm mt-1"
+                >
+                  {{ validationErrors.price }}
+                </p>
               </div>
 
+              <!-- Ingredient Tags -->
               <div>
                 <label class="block text-sm font-semibold text-[#1e3a5f] mb-3">
                   재료 특이사항
                 </label>
                 <div class="flex flex-wrap gap-3">
                   <button
-                    v-for="allergen in allergens"
-                    :key="allergen"
-                    @click="toggleAllergen(allergen)"
+                    v-for="tag in allIngredientTags"
+                    :key="tag.tagId"
+                    @click="toggleIngredientTag(tag)"
                     :class="`px-4 py-2 rounded-lg border transition-colors ${
-                      selectedAllergens.includes(allergen)
+                      isTagSelected(tag)
                         ? 'gradient-primary text-white border-transparent'
                         : 'border-[#dee2e6] text-[#1e3a5f] hover:bg-[#f8f9fa]'
                     }`"
                   >
-                    {{ allergen }}
+                    {{ tag.content }}
                   </button>
                 </div>
               </div>

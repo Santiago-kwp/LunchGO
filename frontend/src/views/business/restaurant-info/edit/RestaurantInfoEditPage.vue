@@ -1,13 +1,35 @@
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { Upload, X } from 'lucide-vue-next';
 import { RouterLink, useRouter, useRoute } from 'vue-router';
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 import Pagination from '@/components/ui/Pagination.vue';
+import { useRestaurantStore } from '@/stores/restaurant';
 
 const router = useRouter();
 const route = useRoute();
+const store = useRestaurantStore();
+
+// 페이지네이션
+const currentPage = ref(1);
+const itemsPerPage = 5; // 한 페이지에 5개씩 보여주기
+
+const totalPages = computed(() => {
+  return Math.ceil(store.menus.length / itemsPerPage);
+});
+
+const paginatedMenus = computed(() => {
+  const startIndex = (currentPage.value - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  return store.menus.slice(startIndex, endIndex);
+});
+
+const changePage = (page) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page;
+  }
+};
 
 const isEditMode = computed(() => !!route.params.id);
 const pageTitle = computed(() =>
@@ -17,60 +39,54 @@ const submitButtonText = computed(() =>
   isEditMode.value ? '수정하기' : '등록하기'
 );
 
+const avgMainPrice = computed(() => {
+  const mainMenus = store.menus.filter((menu) => menu.type === '주메뉴');
+  if (mainMenus.length === 0) {
+    return 0;
+  }
+  const totalPrice = mainMenus.reduce((sum, menu) => sum + menu.price, 0);
+  return Math.round(totalPrice / mainMenus.length);
+});
+
 const formData = reactive({
   name: '',
   phone: '',
-  openingDate: '',
-  startTime: '',
-  endTime: '',
-  capacity: '',
   roadAddress: '',
   detailAddress: '',
-  holidayOpen: false,
-  preOrderSupported: false,
   description: '',
+  avgMainPrice: 0,
+  reservationLimit: '',
+  holidayAvailable: false,
+  preorderAvailable: false,
+  openTime: '',
+  closeTime: '',
+  openDate: '',
 });
 
 const restaurantImageFile = ref(null);
 const restaurantImageUrl = ref(null);
 const restaurantFileInput = ref(null);
 
-const closedDays = ref([]);
+const selectedClosedDays = ref([]);
 const selectedTags = ref([]);
 
-// --- Menu Management State ---
-const allMenus = ref(
-  Array.from({ length: 25 }, (_, i) => ({
-    id: i + 1,
-    name: `더미 메뉴 ${i + 1}`,
-    type:
-      i % 3 === 0
-        ? '주메뉴'
-        : i % 3 === 1
-        ? '서브메뉴'
-        : '기타(디저트, 음료)',
-    price: `${(10 + i).toFixed(3)}원`,
-  }))
-);
-const currentPage = ref(1);
-const itemsPerPage = ref(5);
-
-const totalPages = computed(() =>
-  Math.ceil(allMenus.value.length / itemsPerPage.value)
-);
-
-const paginatedMenus = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage.value;
-  const end = start + itemsPerPage.value;
-  return allMenus.value.slice(start, end);
-});
-
-const changePage = (page) => {
-  if (page < 1 || page > totalPages.value) return;
-  currentPage.value = page;
+const dayOfWeekInverseMap = {
+  일: 1,
+  월: 2,
+  화: 3,
+  수: 4,
+  목: 5,
+  금: 6,
+  토: 7,
 };
 
-// --- End of Menu Management State ---
+// 유효한 전화번호 접두사 목록 (지역번호 및 휴대폰)
+const tagCategoryDisplayNames = {
+  MENUTYPE: '식당 종류',
+  TABLETYPE: '테이블 옵션',
+  ATMOSPHERE: '식당 분위기',
+  FACILITY: '편의시설',
+};
 
 const handleRestaurantFileChange = (e) => {
   const file = e.target.files[0];
@@ -81,7 +97,13 @@ const handleRestaurantFileChange = (e) => {
 };
 
 const triggerRestaurantFileInput = () => {
-  restaurantFileInput.value.click();
+  console.log('triggerRestaurantFileInput called.');
+  console.log('restaurantFileInput ref value:', restaurantFileInput.value);
+  if (restaurantFileInput.value) {
+    restaurantFileInput.value.click();
+  } else {
+    console.error('restaurantFileInput ref is null. Cannot trigger click.');
+  }
 };
 
 const clearRestaurantImage = () => {
@@ -100,23 +122,33 @@ const openPostcodeSearch = () => {
   }).open();
 };
 
-const toggleClosedDay = (day) => {
-  const index = closedDays.value.indexOf(day);
+const toggleClosedDay = (dayString) => {
+  const dayNumber = dayOfWeekInverseMap[dayString];
+  if (dayNumber === undefined) return;
+
+  const index = selectedClosedDays.value.indexOf(dayNumber);
   if (index > -1) {
-    closedDays.value.splice(index, 1);
+    selectedClosedDays.value.splice(index, 1);
   } else {
-    closedDays.value.push(day);
+    selectedClosedDays.value.push(dayNumber);
   }
 };
 
+const isDaySelected = (dayString) => {
+  const dayNumber = dayOfWeekInverseMap[dayString];
+  return selectedClosedDays.value.includes(dayNumber);
+};
+
+const allTags = ref([]);
+const tagCategories = ref({});
+
 const toggleTag = (tag) => {
-  const restaurantTypeTags = tagCategories.value['식당종류'] || [];
-  const isRestaurantTypeTag = restaurantTypeTags.includes(tag);
-  const index = selectedTags.value.indexOf(tag);
+  const isRestaurantTypeTag = tag.category === 'MENUTYPE';
+  const index = selectedTags.value.findIndex((st) => st.tagId === tag.tagId);
 
   if (isRestaurantTypeTag) {
     selectedTags.value = selectedTags.value.filter(
-      (selected) => !restaurantTypeTags.includes(selected)
+      (st) => st.category !== 'MENUTYPE'
     );
     if (index === -1) {
       selectedTags.value.push(tag);
@@ -130,104 +162,194 @@ const toggleTag = (tag) => {
   }
 };
 
-const tagCategories = ref({});
+const isTagSelected = (tag) => {
+  return selectedTags.value.some((st) => st.tagId === tag.tagId);
+};
 
+// API: GET /api/tags
 const fetchTags = async () => {
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve([
-        { id: 1, name: '한식', category: '식당종류' },
-        { id: 2, name: '중식', category: '식당종류' },
-        { id: 3, name: '일식', category: '식당종류' },
-        { id: 4, name: '양식', category: '식당종류' },
-        { id: 5, name: '셀프바', category: '테이블 옵션' },
-        { id: 6, name: '룸', category: '테이블 옵션' },
-        { id: 7, name: '칸막이', category: '테이블 옵션' },
-        { id: 8, name: '조용한', category: '식당 분위기' },
-        { id: 9, name: '깔끔한', category: '식당 분위기' },
-        { id: 10, name: '이국적/이색적', category: '식당 분위기' },
-        { id: 11, name: '노키즈존', category: '편의사항' },
-        { id: 12, name: '주차장 제공', category: '편의사항' },
-        { id: 13, name: '와이파이', category: '편의사항' },
+        { tagId: 1, content: '한식', category: 'MENUTYPE' },
+        { tagId: 2, content: '중식', category: 'MENUTYPE' },
+        { tagId: 3, content: '일식', category: 'MENUTYPE' },
+        { tagId: 4, content: '양식', category: 'MENUTYPE' },
+        { tagId: 5, content: '퓨전', category: 'MENUTYPE' },
+        { tagId: 6, content: '셀프바', category: 'TABLETYPE' },
+        { tagId: 7, content: '룸', category: 'TABLETYPE' },
+        { tagId: 8, content: '칸막이', category: 'TABLETYPE' },
+        { tagId: 9, content: '조용한', category: 'ATMOSPHERE' },
+        { tagId: 10, content: '깔끔한', category: 'ATMOSPHERE' },
+        { tagId: 11, content: '이국적/이색적', category: 'ATMOSPHERE' },
+        { tagId: 12, content: '주차장 제공', category: 'FACILITY' },
+        { tagId: 13, content: '와이파이', category: 'FACILITY' },
       ]);
     }, 100);
   });
 };
 
-const fetchRestaurantData = async (id) => {
-  console.log(`Fetching data for restaurant ID: ${id}`);
+// API: GET /api/restaurants/{id}
+const fetchRestaurantData = async (restaurantId) => {
+  console.log(`Fetching data for restaurant ID: ${restaurantId}`);
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({
+        restaurantId: restaurantId,
         name: '런치고 한정식 (수정)',
         phone: '02-9876-5432',
-        openingDate: '2022-10-20',
-        startTime: '11:00',
-        endTime: '21:00',
-        capacity: 75,
+        openDate: '2022-10-20',
+        openTime: '11:00',
+        closeTime: '21:00',
+        reservationLimit: 75,
         roadAddress: '서울특별시 종로구 종로 1',
         detailAddress: '5층',
-        holidayOpen: true,
-        preOrderSupported: false,
+        holidayAvailable: true,
+        preorderAvailable: false,
         description: '수정된 식당 소개입니다. 더욱 맛있어졌습니다.',
-        imageUrl: '/korean-course-meal-plating.jpg',
-        closedDays: ['일'],
-        tags: ['한식', '조용한', '주차장 제공'],
+        images: [{ imageUrl: '/korean-course-meal-plating.jpg' }],
+        regularHolidays: [{ dayOfWeek: 1 }, { dayOfWeek: 7 }],
+        tags: [
+          { tagId: 1, content: '한식', category: 'MENUTYPE' },
+          { tagId: 8, content: '조용한', category: 'ATMOSPHERE' },
+          { tagId: 12, content: '주차장 제공', category: 'FACILITY' },
+        ],
+        menus: [
+          { id: 101, name: '한정식 A코스', type: '주메뉴', price: 50000, imageUrl: '/korean-course-meal-plating.jpg' },
+          { id: 102, name: '한정식 B코스', type: '주메뉴', price: 75000, imageUrl: '/korean-fine-dining.jpg' },
+          { id: 103, name: '떡갈비', type: '서브메뉴', price: 25000, imageUrl: '/placeholder.svg' },
+          { id: 104, name: '해물파전', type: '서브메뉴', price: 20000, imageUrl: '/placeholder.svg' },
+          { id: 105, name: '수정과', type: '기타(디저트, 음료)', price: 5000, imageUrl: '/placeholder.svg' },
+          { id: 106, name: '식혜', type: '기타(디저트, 음료)', price: 5000, imageUrl: '/placeholder.svg' },
+        ],
       });
     }, 500);
   });
 };
 
 onMounted(async () => {
-  // 1. 태그 목록 불러오기
   const tagsFromApi = await fetchTags();
+  allTags.value = tagsFromApi;
   const groupedTags = tagsFromApi.reduce((acc, tag) => {
     if (!acc[tag.category]) {
       acc[tag.category] = [];
     }
-    acc[tag.category].push(tag.name);
+    acc[tag.category].push(tag);
     return acc;
   }, {});
   tagCategories.value = groupedTags;
 
-  // 2. 수정 모드인 경우, 식당 데이터 불러와서 폼에 채우기
   if (isEditMode.value) {
-    const restaurantData = await fetchRestaurantData(route.params.id);
-    formData.name = restaurantData.name;
-    formData.phone = restaurantData.phone;
-    formData.openingDate = restaurantData.openingDate;
-    formData.startTime = restaurantData.startTime;
-    formData.endTime = restaurantData.endTime;
-    formData.capacity = restaurantData.capacity;
-    formData.roadAddress = restaurantData.roadAddress;
-    formData.detailAddress = restaurantData.detailAddress;
-    formData.holidayOpen = restaurantData.holidayOpen;
-    formData.preOrderSupported = restaurantData.preOrderSupported;
-    formData.description = restaurantData.description;
-    restaurantImageUrl.value = restaurantData.imageUrl;
-    closedDays.value = restaurantData.closedDays;
-    selectedTags.value = restaurantData.tags;
+    const restaurantId = Number(route.params.id);
+    // 스토어에 정보가 없거나 다른 식당 정보가 들어있으면 새로 API 호출
+    if (!store.restaurantInfo || store.restaurantInfo.restaurantId !== restaurantId) {
+      const restaurantData = await fetchRestaurantData(restaurantId);
+      store.loadRestaurant(restaurantData); // API 응답으로 스토어 전체를 설정
+    }
+    
+    // 항상 스토어의 데이터로 폼과 UI 상태를 채움
+    if (store.restaurantInfo) {
+      Object.assign(formData, store.restaurantInfo);
+      if (store.restaurantInfo.images && store.restaurantInfo.images.length > 0) {
+        restaurantImageUrl.value = store.restaurantInfo.images[0].imageUrl;
+        restaurantImageFile.value = new File([], 'mock-restaurant-image.png');
+      }
+      selectedClosedDays.value = store.restaurantInfo.regularHolidays.map(
+        (h) => h.dayOfWeek
+      );
+      selectedTags.value = store.restaurantInfo.tags;
+    }
+  } else {
+    // 새로 등록하는 경우, 이전에 수정하던 정보가 스토어에 남아있으면 초기화
+    if (store.restaurantInfo !== null) {
+      store.clearRestaurant();
+    }
   }
 });
 
 const saveRestaurant = async () => {
-  // 실제 저장 로직
+  // 1. Reset previous errors
+  for (const key in validationErrors) {
+    validationErrors[key] = '';
+  }
+
+  // 2. Validate fields
+  let isValid = true;
+  if (!restaurantImageFile.value) {
+    validationErrors.image = '식당 이미지를 등록해주세요.';
+    isValid = false;
+  }
+  if (!formData.name.trim()) {
+    validationErrors.name = '식당 이름을 입력해주세요.';
+    isValid = false;
+  }
+  if (!formData.phone.trim()) {
+    validationErrors.phone = '식당 전화번호를 입력해주세요.';
+    isValid = false;
+  } else {
+    // 유효한 접두사와 전화번호 형식을 모두 검사하는 정규식
+    const phoneRegex =
+      /^(02|010|011|01[6-9]|03[1-3]|04[1-4]|05[1-5]|06[1-4]|070|080|050)-\d{3,4}-\d{4}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      validationErrors.phone =
+        '유효하지 않은 전화번호 형식 또는 지역번호입니다.';
+      isValid = false;
+    }
+  }
+  if (!formData.openDate) {
+    validationErrors.openDate = '개업일을 입력해주세요.';
+    isValid = false;
+  }
+  if (!formData.openTime) {
+    validationErrors.openTime = '영업시작시간을 입력해주세요.';
+    isValid = false;
+  }
+  if (!formData.closeTime) {
+    validationErrors.closeTime = '영업종료시간을 입력해주세요.';
+    isValid = false;
+  }
+  if (!formData.reservationLimit || formData.reservationLimit < 4) {
+    validationErrors.reservationLimit = '예약가능인원을 4인 이상 입력해주세요.';
+    isValid = false;
+  }
+  if (!formData.roadAddress.trim()) {
+    validationErrors.roadAddress = '도로명주소를 입력해주세요.';
+    isValid = false;
+  }
+  if (!formData.detailAddress.trim()) {
+    validationErrors.detailAddress = '상세주소를 입력해주세요.';
+    isValid = false;
+  }
+  if (!formData.description.trim()) {
+    validationErrors.description = '식당 소개를 입력해주세요.';
+    isValid = false;
+  }
+
+  const hasMainMenu = store.menus.some((menu) => menu.type === '주메뉴');
+  if (!hasMainMenu) {
+    validationErrors.menus = '주메뉴를 1개 이상 등록해주세요.';
+    isValid = false;
+  }
+
+  if (!isValid) {
+    alert('필수 입력 항목을 모두 채워주세요.');
+    return;
+  }
+
+  // 3. Prepare data for submission
   const dataToSubmit = {
     ...formData,
-    closedDays: closedDays.value,
-    tags: selectedTags.value,
-    // restaurantImageFile.value // 이미지 파일도 함께 전송
+    regularHolidayNumbers: selectedClosedDays.value,
+    selectedTagIds: selectedTags.value.map((tag) => tag.tagId),
+    menus: store.menus, // Include menus from the store
   };
 
+  // 추후 API를 통해 등록/수정 요청을 보낼 부분
   try {
     if (isEditMode.value) {
-      // 수정 API 호출
       console.log('Updating restaurant:', route.params.id, dataToSubmit);
-      // await api.updateRestaurant(route.params.id, dataToSubmit);
     } else {
-      // 등록 API 호출
       console.log('Creating new restaurant:', dataToSubmit);
-      // await api.createRestaurant(dataToSubmit);
     }
     alert('저장되었습니다.');
     router.push('/business/restaurant-info');
@@ -236,6 +358,58 @@ const saveRestaurant = async () => {
     alert('저장에 실패했습니다.');
   }
 };
+
+const validationErrors = reactive({
+  image: '',
+  name: '',
+  phone: '',
+  openDate: '',
+  openTime: '',
+  closeTime: '',
+  reservationLimit: '',
+  roadAddress: '',
+  detailAddress: '',
+  description: '',
+  menus: '',
+});
+
+watch(formData, (newState) => {
+  if (newState.name) validationErrors.name = '';
+  if (newState.phone) validationErrors.phone = '';
+  if (newState.openDate) validationErrors.openDate = '';
+  if (newState.openTime) validationErrors.openTime = '';
+  if (newState.closeTime) validationErrors.closeTime = '';
+  if (newState.reservationLimit >= 4) validationErrors.reservationLimit = '';
+  if (newState.roadAddress) validationErrors.roadAddress = '';
+  if (newState.detailAddress) validationErrors.detailAddress = '';
+  if (newState.description) validationErrors.description = '';
+});
+
+watch(restaurantImageFile, (newFile) => {
+  if (newFile) validationErrors.image = '';
+});
+
+watch(
+  () => store.menus,
+  (newMenus) => {
+    if (newMenus.some((menu) => menu.type === '주메뉴')) {
+      validationErrors.menus = '';
+    }
+  },
+  { deep: true }
+);
+
+// avgMainPrice computed 속성의 변화를 감지하여 formData.avgMainPrice 업데이트
+watch(avgMainPrice, (newAvg) => {
+  formData.avgMainPrice = newAvg;
+});
+
+// 현재 페이지의 메뉴가 모두 삭제되었을 때 이전 페이지로 이동
+watch(paginatedMenus, (newPaginatedMenus) => {
+  if (newPaginatedMenus.length === 0 && currentPage.value > 1) {
+    currentPage.value--;
+  }
+});
 </script>
 
 <template>
@@ -294,6 +468,12 @@ const saveRestaurant = async () => {
                 class="hidden"
                 accept="image/*"
               />
+              <p
+                v-if="validationErrors.image"
+                class="text-red-500 text-sm mt-1"
+              >
+                {{ validationErrors.image }}
+              </p>
             </div>
 
             <!-- Form Fields -->
@@ -310,6 +490,12 @@ const saveRestaurant = async () => {
                     v-model="formData.name"
                     class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
                   />
+                  <p
+                    v-if="validationErrors.name"
+                    class="text-red-500 text-sm mt-1"
+                  >
+                    {{ validationErrors.name }}
+                  </p>
                 </div>
                 <div>
                   <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
@@ -317,10 +503,17 @@ const saveRestaurant = async () => {
                   >
                   <input
                     type="tel"
-                    placeholder="식당 전화번호를 입력하세요(예시: XXX-XXXX-XXXX)"
+                    placeholder="하이픈(-)을 포함하여 입력하세요"
                     v-model="formData.phone"
+                    maxlength="13"
                     class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
                   />
+                  <p
+                    v-if="validationErrors.phone"
+                    class="text-red-500 text-sm mt-1"
+                  >
+                    {{ validationErrors.phone }}
+                  </p>
                 </div>
               </div>
 
@@ -331,9 +524,15 @@ const saveRestaurant = async () => {
                 >
                 <input
                   type="date"
-                  v-model="formData.openingDate"
+                  v-model="formData.openDate"
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
                 />
+                <p
+                  v-if="validationErrors.openDate"
+                  class="text-red-500 text-sm mt-1"
+                >
+                  {{ validationErrors.openDate }}
+                </p>
               </div>
 
               <!-- Business Hours -->
@@ -344,9 +543,15 @@ const saveRestaurant = async () => {
                   >
                   <input
                     type="time"
-                    v-model="formData.startTime"
+                    v-model="formData.openTime"
                     class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
                   />
+                  <p
+                    v-if="validationErrors.openTime"
+                    class="text-red-500 text-sm mt-1"
+                  >
+                    {{ validationErrors.openTime }}
+                  </p>
                 </div>
                 <div>
                   <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
@@ -354,23 +559,35 @@ const saveRestaurant = async () => {
                   >
                   <input
                     type="time"
-                    v-model="formData.endTime"
+                    v-model="formData.closeTime"
                     class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
                   />
+                  <p
+                    v-if="validationErrors.closeTime"
+                    class="text-red-500 text-sm mt-1"
+                  >
+                    {{ validationErrors.closeTime }}
+                  </p>
                 </div>
               </div>
 
-              <!-- Reservation Capacity -->
+              <!-- Reservation Limit -->
               <div>
                 <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
-                  >예약인원 상한</label
+                  >예약가능인원 상한</label
                 >
                 <input
                   type="number"
                   placeholder="숫자를 입력하세요"
-                  v-model.number="formData.capacity"
+                  v-model.number="formData.reservationLimit"
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
                 />
+                <p
+                  v-if="validationErrors.reservationLimit"
+                  class="text-red-500 text-sm mt-1"
+                >
+                  {{ validationErrors.reservationLimit }}
+                </p>
               </div>
 
               <!-- Address -->
@@ -394,6 +611,12 @@ const saveRestaurant = async () => {
                     주소검색
                   </button>
                 </div>
+                <p
+                  v-if="validationErrors.roadAddress"
+                  class="text-red-500 text-sm mt-1"
+                >
+                  {{ validationErrors.roadAddress }}
+                </p>
               </div>
 
               <div>
@@ -402,10 +625,16 @@ const saveRestaurant = async () => {
                 >
                 <input
                   type="text"
-                  placeholder="상세주소 입력"
+                  placeholder="상세주소를 입력하세요"
                   v-model="formData.detailAddress"
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
                 />
+                <p
+                  v-if="validationErrors.detailAddress"
+                  class="text-red-500 text-sm mt-1"
+                >
+                  {{ validationErrors.detailAddress }}
+                </p>
               </div>
 
               <!-- Checkboxes -->
@@ -414,7 +643,7 @@ const saveRestaurant = async () => {
                   <input
                     type="checkbox"
                     id="holiday"
-                    v-model="formData.holidayOpen"
+                    v-model="formData.holidayAvailable"
                     class="w-5 h-5 rounded border-[#dee2e6]"
                   />
                   <label for="holiday" class="text-sm text-[#1e3a5f]">
@@ -425,7 +654,7 @@ const saveRestaurant = async () => {
                   <input
                     type="checkbox"
                     id="preorder"
-                    v-model="formData.preOrderSupported"
+                    v-model="formData.preorderAvailable"
                     class="w-5 h-5 rounded border-[#dee2e6]"
                   />
                   <label for="preorder" class="text-sm text-[#1e3a5f]">
@@ -434,20 +663,31 @@ const saveRestaurant = async () => {
                 </div>
               </div>
 
-              <!-- Regular Closing Days -->
+              <!-- Regular Closed Days -->
               <div>
+                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">
+                  정기휴무일
+                </label>
                 <div class="flex flex-wrap gap-3">
                   <button
-                    v-for="day in ['월', '화', '수', '목', '금', '토', '일']"
-                    :key="day"
-                    @click="toggleClosedDay(day)"
+                    v-for="dayString in [
+                      '월',
+                      '화',
+                      '수',
+                      '목',
+                      '금',
+                      '토',
+                      '일',
+                    ]"
+                    :key="dayString"
+                    @click="toggleClosedDay(dayString)"
                     :class="`px-4 py-2 rounded-lg border transition-colors ${
-                      closedDays.includes(day)
+                      isDaySelected(dayString)
                         ? 'gradient-primary text-white border-transparent'
                         : 'border-[#dee2e6] text-[#1e3a5f] hover:bg-[#f8f9fa]'
                     }`"
                   >
-                    {{ day }}
+                    {{ dayString }}
                   </button>
                 </div>
               </div>
@@ -464,13 +704,21 @@ const saveRestaurant = async () => {
                   rows="5"
                   class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A] resize-none"
                 ></textarea>
+                <p
+                  v-if="validationErrors.description"
+                  class="text-red-500 text-sm mt-1"
+                >
+                  {{ validationErrors.description }}
+                </p>
               </div>
             </div>
           </div>
 
           <!-- Restaurant Tags -->
           <div class="bg-white rounded-xl border border-[#e9ecef] p-8">
-            <h3 class="text-xl font-bold text-[#1e3a5f] mb-6">식당 태그</h3>
+            <h3 class="text-xl font-bold text-[#1e3a5f] mb-6">
+              식당 태그 선택
+            </h3>
 
             <!-- Characteristics Tags -->
             <div
@@ -479,20 +727,20 @@ const saveRestaurant = async () => {
               class="mb-6"
             >
               <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
-                {{ categoryName }}
+                {{ tagCategoryDisplayNames[categoryName] || categoryName }}
               </h4>
               <div class="flex flex-wrap gap-3">
                 <button
                   v-for="tag in tags"
-                  :key="tag"
+                  :key="tag.tagId"
                   @click="toggleTag(tag)"
                   :class="`px-4 py-2 rounded-lg border transition-colors ${
-                    selectedTags.includes(tag)
+                    isTagSelected(tag)
                       ? 'gradient-primary text-white border-transparent'
                       : 'border-[#dee2e6] text-[#1e3a5f] hover:bg-[#f8f9fa]'
                   }`"
                 >
-                  {{ tag }}
+                  #{{ tag.content }}
                 </button>
               </div>
             </div>
@@ -500,7 +748,18 @@ const saveRestaurant = async () => {
 
           <!-- Menu Management Section -->
           <div class="bg-white rounded-xl border border-[#e9ecef] p-8">
-            <h3 class="text-xl font-bold text-[#1e3a5f] mb-6">식당메뉴</h3>
+            <div class="flex items-center justify-between mb-6">
+              <h3 class="text-xl font-bold text-[#1e3a5f]">식당메뉴</h3>
+              <span class="text-lg font-semibold text-[#FF6B4A]">
+                주메뉴 평균가: {{ avgMainPrice.toLocaleString() }}원
+              </span>
+            </div>
+            <p
+              v-if="validationErrors.menus"
+              class="text-red-500 text-sm mb-4 text-center"
+            >
+              {{ validationErrors.menus }}
+            </p>
 
             <div class="overflow-x-auto">
               <table class="w-full">
@@ -537,8 +796,12 @@ const saveRestaurant = async () => {
                     <td class="px-12 py-4 text-sm text-[#1e3a5f]">
                       {{ menu.name }}
                     </td>
-                    <td class="px-12 py-4 text-sm text-[#6c757d]">{{ menu.type }}</td>
-                    <td class="px-12 py-4 text-sm text-[#6c757d]">{{ menu.price }}</td>
+                    <td class="px-12 py-4 text-sm text-[#6c757d]">
+                      {{ menu.type }}
+                    </td>
+                    <td class="px-12 py-4 text-sm text-[#6c757d]">
+                      {{ menu.price.toLocaleString() }}원
+                    </td>
                     <td class="px-4 py-4 text-left">
                       <div class="flex justify-start gap-2">
                         <RouterLink
@@ -548,6 +811,7 @@ const saveRestaurant = async () => {
                           수정
                         </RouterLink>
                         <button
+                          @click="store.deleteMenu(menu.id)"
                           class="px-3 py-2 border border-[#dc3545] text-[#dc3545] rounded-lg text-sm hover:bg-[#fff5f5] transition-colors"
                         >
                           삭제
@@ -566,7 +830,6 @@ const saveRestaurant = async () => {
                 :total-pages="totalPages"
                 @change-page="changePage"
               />
-
               <RouterLink
                 to="/business/restaurant-info/menu/add"
                 class="px-6 py-3 gradient-primary text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
