@@ -68,6 +68,39 @@ const router = createRouter({
         import('../views/business/reviews/BusinessReviewsPage.vue'),
     },
     {
+      path: '/admin/dashboard',
+      name: 'admin-dashboard',
+      component: () =>
+        import('../views/admin/dashboard/AdminDashboardPage.vue'),
+    },
+    {
+      path: '/admin/reservations',
+      name: 'admin-reservations',
+      component: () =>
+        import('../views/admin/reservations/AdminReservationsPage.vue'),
+    },
+    {
+      path: '/admin/franchises',
+      name: 'admin-franchises',
+      component: () =>
+        import('../views/admin/franchises/AdminFranchisesPage.vue'),
+    },
+    {
+      path: '/admin/reviews',
+      name: 'admin-reviews',
+      component: () => import('../views/admin/reviews/AdminReviewsPage.vue'),
+    },
+    {
+      path: '/admin/members',
+      name: 'admin-members',
+      component: () => import('../views/admin/members/AdminMembersPage.vue'),
+    },
+    {
+      path: '/admin/finance',
+      name: 'admin-finance',
+      component: () => import('../views/admin/finance/AdminFinancePage.vue'),
+    },
+    {
       path: '/intro',
       name: 'intro',
       component: () => import('../views/intro/ServiceIntroPage.vue'),
@@ -205,6 +238,13 @@ const router = createRouter({
     //사업자 - 오늘의 예약 현황 (상세보기)
     {
       path: '/business/reservations/:id',
+      name: 'reservation-detail',
+      component: () =>
+        import('@/views/business/reservations/ReservationDetailPage.vue'),
+    },
+    //사업자 - 전체 예약 관리 (상세보기)
+    {
+      path: '/reservations/:id',
       name: 'reservation-detail',
       component: () =>
         import('@/views/business/reservations/ReservationDetailPage.vue'),

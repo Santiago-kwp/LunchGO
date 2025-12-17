@@ -13,6 +13,7 @@ import {
   X,
   Plus,
   Minus,
+  Home as HomeIcon,
 } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
@@ -79,6 +80,7 @@ const defaultMenus = [
 const representativeMenus = ref(
   restaurantInfo.value?.menus?.length ? restaurantInfo.value.menus : defaultMenus,
 );
+const isRestaurantFavorite = ref(false);
 
 const highlightTags = computed(() => {
   if (!restaurantInfo.value?.topTags?.length) return '';
@@ -182,6 +184,10 @@ const openImageModal = (images, index) => {
   modalImageIndex.value = index;
   modalImageUrl.value = images[index];
   isImageModalOpen.value = true;
+};
+
+const toggleRestaurantFavorite = () => {
+  isRestaurantFavorite.value = !isRestaurantFavorite.value;
 };
 
 // 모달 닫기
@@ -407,6 +413,20 @@ watch(detailMapDistanceKm, () => {
               대표 태그: {{ highlightTags }}
             </p>
           </div>
+          <button
+            type="button"
+            class="p-2 rounded-full bg-[#f8f9fa] text-[#adb5bd] hover:text-[#ff6b4a] transition-colors"
+            :aria-pressed="isRestaurantFavorite"
+            @click="toggleRestaurantFavorite"
+          >
+            <Star
+              class="w-5 h-5"
+              :class="isRestaurantFavorite ? 'fill-current text-[#ff6b4a]' : 'fill-white'"
+            />
+            <span class="sr-only">
+              {{ isRestaurantFavorite ? '즐겨찾기 해제' : '즐겨찾기에 추가' }}
+            </span>
+          </button>
         </div>
 
         <div class="space-y-2.5">
@@ -641,10 +661,15 @@ watch(detailMapDistanceKm, () => {
     </main>
 
     <!-- Fixed Bottom Buttons -->
-    <div
-      class="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e9ecef] z-50 shadow-lg"
-    >
-      <div class="max-w-[500px] mx-auto px-4 py-3">
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e9ecef] z-50 shadow-lg">
+      <div class="relative max-w-[500px] mx-auto px-4 py-3">
+        <RouterLink
+          to="/"
+          class="absolute -top-4 right-4 w-12 h-12 rounded-full bg-white border border-[#ffe0d6] flex items-center justify-center text-[#ff6b4a] shadow-card hover:bg-[#fff7f4] transition-colors"
+          aria-label="홈으로 이동"
+        >
+          <HomeIcon class="w-5 h-5" />
+        </RouterLink>
         <div class="flex gap-3">
           <RouterLink
             :to="`/restaurant/${restaurantId}/booking?type=preorder`"

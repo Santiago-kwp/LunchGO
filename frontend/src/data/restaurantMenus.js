@@ -3,7 +3,12 @@ const defaultMenuCategories = [
     id: 'course',
     name: '코스 메뉴',
     items: [
-      { id: 'course-a', name: 'A코스', price: '35,000원', description: '전채 + 메인 + 디저트' },
+      {
+        id: 'course-a',
+        name: 'A코스',
+        price: '35,000원',
+        description: '전채 + 메인 + 디저트',
+      },
       {
         id: 'course-b',
         name: 'B코스',
@@ -20,7 +25,8 @@ const defaultMenuCategories = [
         id: 'course-d',
         name: 'D코스',
         price: '65,000원',
-        description: '최고급 전채 + 프리미엄 메인 + 특별 디저트 + 프리미엄 와인',
+        description:
+          '최고급 전채 + 프리미엄 메인 + 특별 디저트 + 프리미엄 와인',
       },
     ],
   },
@@ -40,10 +46,30 @@ const defaultMenuCategories = [
         price: '28,000원',
         description: '250g, 미디움 추천',
       },
-      { id: 'single-risotto', name: '리조또', price: '16,000원', description: '해산물 리조또' },
-      { id: 'single-pizza', name: '피자', price: '22,000원', description: '마르게리타/페퍼로니' },
-      { id: 'single-salad', name: '샐러드', price: '12,000원', description: '시저 샐러드' },
-      { id: 'single-soup', name: '수프', price: '10,000원', description: '버섯 크림 수프' },
+      {
+        id: 'single-risotto',
+        name: '리조또',
+        price: '16,000원',
+        description: '해산물 리조또',
+      },
+      {
+        id: 'single-pizza',
+        name: '피자',
+        price: '22,000원',
+        description: '마르게리타/페퍼로니',
+      },
+      {
+        id: 'single-salad',
+        name: '샐러드',
+        price: '12,000원',
+        description: '시저 샐러드',
+      },
+      {
+        id: 'single-soup',
+        name: '수프',
+        price: '10,000원',
+        description: '버섯 크림 수프',
+      },
     ],
   },
   {
@@ -91,7 +117,7 @@ const defaultMenuCategories = [
 ];
 
 const restaurantMenuCatalog = {
-  '1': defaultMenuCategories,
+  1: defaultMenuCategories,
 };
 
 const cloneMenuCategories = (categories) =>

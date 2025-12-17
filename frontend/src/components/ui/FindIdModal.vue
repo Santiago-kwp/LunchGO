@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, watch, computed, onUnmounted } from 'vue';
-import { v } from 'vue-router/dist/router-CWoNjPRp.mjs';
 
 const props = defineProps<{
   isVisible: boolean;

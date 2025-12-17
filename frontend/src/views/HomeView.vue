@@ -16,6 +16,8 @@ import {
 } from 'lucide-vue-next'; // Import Lucide icons for Vue
 import Button from '@/components/ui/Button.vue'; // Import our custom Button component
 import Card from '@/components/ui/Card.vue';
+import AppFooter from '@/components/ui/AppFooter.vue';
+import BottomNav from '@/components/ui/BottomNav.vue';
 import { RouterLink } from 'vue-router'; // Import Vue RouterLink
 import { loadKakaoMaps, geocodeAddress } from '@/utils/kakao';
 import { restaurants as restaurantData } from '@/data/restaurants';
@@ -82,6 +84,7 @@ const isCalendarOpen = ref(false);
 const calendarMonth = ref(new Date());
 const weekdayLabels = ['일', '월', '화', '수', '목', '금', '토'];
 const selectedMapRestaurant = ref(null);
+const favoriteRestaurantIds = ref([]);
 
 const perPersonBudget = computed(() => {
   if (budget.value <= 0 || !searchPartySize.value) {
@@ -302,7 +305,6 @@ const initializeMap = async () => {
       center,
       level: levelForDistance(mapDistanceStepIndex.value),
     });
-    mapInstance.value.setZoomable(false);
 
     await renderMapMarkers(kakaoMaps);
     applyHomeMapZoom();
@@ -336,12 +338,11 @@ const priceRanges = [
   '2만원~3만원',
   '3만원 이상',
 ];
-const distances = ['1km 이내', '2km 이내', '3km 이내', '5km 이내'];
+const distances = ['1km 이내', '2km 이내', '3km 이내'];
 const sortOptions = ['추천순', '거리순', '평점순', '가격순'];
 const restaurantTags = [
   '조용한',
   '깔끔한',
-  '노키즈존',
   '셀프바',
   '주차장 제공',
   '이국적/이색적',
@@ -368,11 +369,24 @@ const ingredients = [
 
 // Event handlers
 const togglePriceRange = (range) => {
-  const index = selectedPriceRanges.value.indexOf(range);
+  if (selectedPriceRanges.value.includes(range)) {
+    selectedPriceRanges.value = [];
+    return;
+  }
+
+  selectedPriceRanges.value = [range];
+};
+
+const isRestaurantFavorite = (restaurantId) => {
+  return favoriteRestaurantIds.value.includes(restaurantId);
+};
+
+const toggleRestaurantFavorite = (restaurantId) => {
+  const index = favoriteRestaurantIds.value.indexOf(restaurantId);
   if (index > -1) {
-    selectedPriceRanges.value.splice(index, 1);
+    favoriteRestaurantIds.value.splice(index, 1);
   } else {
-    selectedPriceRanges.value.push(range);
+    favoriteRestaurantIds.value.push(restaurantId);
   }
 };
 
@@ -434,16 +448,23 @@ const applySearch = () => {
 const closeMapRestaurantModal = () => {
   selectedMapRestaurant.value = null;
 };
-
 </script>
 
 <template>
   <div class="min-h-screen bg-[#f8f9fa]">
     <header class="sticky top-0 z-50 bg-white border-b border-[#e9ecef]">
-      <div class="max-w-[500px] mx-auto px-4 h-14 flex items-center justify-between">
+      <div
+        class="max-w-[500px] mx-auto px-4 h-14 flex items-center justify-between"
+      >
         <div class="flex items-center gap-3">
           <!-- Next.js Image component replaced with standard <img> -->
-          <img src="/images/lunch-go-whitebg.png" alt="런치고" width="40" height="40" class="w-10 h-10" />
+          <img
+            src="/images/lunch-go-whitebg.png"
+            alt="런치고"
+            width="56"
+            height="56"
+            class="w-14 h-14"
+          />
           <RouterLink
             to="/intro"
             class="font-semibold text-[#1e3a5f] text-base hover:text-[#ff6b4a] transition-colors"
@@ -452,10 +473,16 @@ const closeMapRestaurantModal = () => {
           </RouterLink>
         </div>
         <div class="flex items-center gap-4">
-          <RouterLink to="/login" class="text-sm text-[#495057] font-medium hover:text-[#ff6b4a] transition-colors">
+          <RouterLink
+            to="/login"
+            class="text-sm text-[#495057] font-medium hover:text-[#ff6b4a] transition-colors"
+          >
             로그인
           </RouterLink>
-          <RouterLink to="/signup" class="text-sm text-[#495057] font-medium hover:text-[#ff6b4a] transition-colors">
+          <RouterLink
+            to="/signup"
+            class="text-sm text-[#495057] font-medium hover:text-[#ff6b4a] transition-colors"
+          >
             회원가입
           </RouterLink>
         </div>
@@ -467,7 +494,9 @@ const closeMapRestaurantModal = () => {
         <div class="flex items-center gap-2">
           <MapPin class="w-5 h-5 text-[#ff6b4a]" />
           <div>
-            <h2 class="text-base font-semibold text-[#1e3a5f]">{{ currentLocation }}</h2>
+            <h2 class="text-base font-semibold text-[#1e3a5f]">
+              {{ currentLocation }}
+            </h2>
             <p class="text-xs text-[#6c757d]">현재 위치 기준</p>
           </div>
         </div>
@@ -475,15 +504,21 @@ const closeMapRestaurantModal = () => {
 
       <div class="relative h-64">
         <div ref="mapContainer" class="w-full h-full" />
-        <div class="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/20 via-transparent to-transparent" />
-        <div class="absolute top-4 right-4 z-10 pointer-events-auto flex flex-col items-center gap-2">
+        <div
+          class="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/20 via-transparent to-transparent"
+        />
+        <div
+          class="absolute top-4 right-4 z-10 pointer-events-auto flex flex-col items-center gap-2"
+        >
           <button
             @click="changeMapDistance(-1)"
             class="w-8 h-8 rounded-sm bg-white shadow-card flex items-center justify-center text-[#1e3a5f] hover:bg-[#f8f9fa]"
           >
             <Plus class="w-4 h-4" />
           </button>
-          <div class="h-20 w-[6px] bg-white/80 rounded relative shadow-card overflow-hidden">
+          <div
+            class="h-20 w-[6px] bg-white/80 rounded relative shadow-card overflow-hidden"
+          >
             <div
               class="absolute top-0 left-0 right-0 bg-[#ff6b4a] transition-all"
               :style="{ height: `${distanceSliderFill}%` }"
@@ -496,7 +531,9 @@ const closeMapRestaurantModal = () => {
             <Minus class="w-4 h-4" />
           </button>
         </div>
-        <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-card flex items-center gap-2 text-sm text-[#1e3a5f]">
+        <div
+          class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-card flex items-center gap-2 text-sm text-[#1e3a5f]"
+        >
           <MapPin class="w-4 h-4 text-[#ff6b4a]" />
           <span>{{ currentLocation }} · {{ currentDistanceLabel }} 반경</span>
         </div>
@@ -504,7 +541,9 @@ const closeMapRestaurantModal = () => {
 
       <div class="px-4 py-5">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-[#1e3a5f]">오늘의 추천 회식 맛집</h3>
+          <h3 class="text-lg font-semibold text-[#1e3a5f]">
+            오늘의 추천 회식 맛집
+          </h3>
           <Button
             @click="isSearchOpen = true"
             variant="outline"
@@ -532,9 +571,27 @@ const closeMapRestaurantModal = () => {
             :key="restaurant.id"
             :to="`/restaurant/${restaurant.id}`"
           >
-            <Card class="overflow-hidden border-[#e9ecef] rounded-xl bg-white shadow-card hover:shadow-lg transition-shadow cursor-pointer">
+            <Card
+              class="relative overflow-hidden border-[#e9ecef] rounded-xl bg-white shadow-card hover:shadow-lg transition-shadow cursor-pointer"
+            >
+              <button
+                type="button"
+                class="absolute top-3 right-3 z-10 p-2 rounded-full bg-white/90 shadow-card text-[#c4c4c4] hover:text-[#ff6b4a] transition-colors"
+                :aria-pressed="isRestaurantFavorite(restaurant.id)"
+                @click.stop.prevent="toggleRestaurantFavorite(restaurant.id)"
+              >
+                <Star
+                  class="w-4 h-4"
+                  :class="isRestaurantFavorite(restaurant.id) ? 'fill-current text-[#ff6b4a]' : 'text-[#adb5bd] fill-white'"
+                />
+                <span class="sr-only">
+                  {{ isRestaurantFavorite(restaurant.id) ? '즐겨찾기 해제' : '즐겨찾기에 추가' }}
+                </span>
+              </button>
               <div class="flex gap-3 p-2">
-                <div class="relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden">
+                <div
+                  class="relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden"
+                >
                   <img
                     :src="restaurant.image || '/placeholder.svg'"
                     :alt="restaurant.name"
@@ -544,13 +601,21 @@ const closeMapRestaurantModal = () => {
 
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 mb-1">
-                    <h4 class="font-semibold text-[#1e3a5f] text-sm">{{ restaurant.name }}</h4>
+                    <h4 class="font-semibold text-[#1e3a5f] text-sm">
+                      {{ restaurant.name }}
+                    </h4>
                   </div>
-                  <p class="text-xs text-[#6c757d] mb-1 truncate">{{ restaurant.address }}</p>
+                  <p class="text-xs text-[#6c757d] mb-1 truncate">
+                    {{ restaurant.address }}
+                  </p>
                   <div class="flex items-center gap-1 mb-1.5">
                     <Star class="w-3.5 h-3.5 fill-[#ffc107] text-[#ffc107]" />
-                    <span class="text-sm font-medium text-[#1e3a5f]">{{ restaurant.rating }}</span>
-                    <span class="text-xs text-[#6c757d]">(리뷰수 : {{ restaurant.reviews }})</span>
+                    <span class="text-sm font-medium text-[#1e3a5f]">{{
+                      restaurant.rating
+                    }}</span>
+                    <span class="text-xs text-[#6c757d]"
+                      >(리뷰수 : {{ restaurant.reviews }})</span
+                    >
                   </div>
                   <div class="flex flex-wrap gap-1 mb-2">
                     <span
@@ -561,7 +626,9 @@ const closeMapRestaurantModal = () => {
                       {{ tag.name }} {{ tag.count }}
                     </span>
                   </div>
-                  <p class="text-sm font-semibold text-[#1e3a5f]">{{ restaurant.price }}</p>
+                  <p class="text-sm font-semibold text-[#1e3a5f]">
+                    {{ restaurant.price }}
+                  </p>
                 </div>
               </div>
             </Card>
@@ -569,7 +636,10 @@ const closeMapRestaurantModal = () => {
         </div>
 
         <div v-if="totalPages > 1" class="mt-6">
-          <nav class="flex flex-wrap items-center justify-center gap-2 text-sm" aria-label="페이지네이션">
+          <nav
+            class="flex flex-wrap items-center justify-center gap-2 text-sm"
+            aria-label="페이지네이션"
+          >
             <button
               type="button"
               class="min-w-[56px] h-9 px-4 rounded-2xl border border-[#e9ecef] bg-white text-[#495057] font-medium transition-colors disabled:text-[#c7cdd3] disabled:border-[#f1f3f5] disabled:cursor-not-allowed"
@@ -607,7 +677,10 @@ const closeMapRestaurantModal = () => {
         </div>
       </div>
 
-      <div v-if="selectedMapRestaurant" class="fixed bottom-20 left-0 right-0 z-[60] px-4">
+      <div
+        v-if="selectedMapRestaurant"
+        class="fixed bottom-20 left-0 right-0 z-[60] px-4"
+      >
         <div class="max-w-[500px] mx-auto">
           <RouterLink
             :to="`/restaurant/${selectedMapRestaurant.id}`"
@@ -638,7 +711,9 @@ const closeMapRestaurantModal = () => {
                   </button>
                 </div>
                 <div class="flex items-center gap-2 text-xs text-[#6c757d]">
-                  <span class="flex items-center gap-1 text-[#1e3a5f] font-semibold">
+                  <span
+                    class="flex items-center gap-1 text-[#1e3a5f] font-semibold"
+                  >
                     <Star class="w-3.5 h-3.5 fill-[#ffc107] text-[#ffc107]" />
                     {{ selectedMapRestaurant.rating }}
                   </span>
@@ -654,57 +729,27 @@ const closeMapRestaurantModal = () => {
         </div>
       </div>
 
-      <footer class="bg-white border-t border-[#e9ecef] px-4 py-6 mt-8">
-        <div class="text-xs text-[#6c757d] space-y-1 leading-relaxed">
-          <p class="font-semibold text-[#1e3a5f]">(주) 런치고</p>
-          <p>주소 : 경기도 성남시 분당구 대왕판교로 ~~</p>
-          <p>
-            서비스 이용 약관 | 개인정보 처리방침 | 위치정보 이용약관 | 환불 정책 |
-            <RouterLink to="/partner" class="text-[#FF6B4A] hover:underline">
-              입점 문의
-            </RouterLink>
-          </p>
-        </div>
-      </footer>
+      <AppFooter />
     </main>
 
-    <!-- Bottom Navigation -->
-    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e9ecef] z-50 shadow-lg">
-      <div class="max-w-[500px] mx-auto flex items-center justify-around h-16 px-4">
-        <RouterLink
-          to="/my-reservations"
-          class="flex items-center justify-center text-[#ff6b4a] hover:text-[#FF8A6D] transition-colors min-w-[60px]"
-        >
-          <Calendar class="w-6 h-6" />
-        </RouterLink>
-
-        <button
-          type="button"
-          class="flex items-center justify-center -mt-4"
-          @click="resetMapToHome"
-          aria-label="홈으로 이동"
-        >
-          <div class="w-12 h-12 rounded-full gradient-primary flex items-center justify-center shadow-button-hover border-4 border-white">
-            <Home class="w-5 h-5 text-white" />
-            <span class="sr-only">홈으로 이동</span>
-          </div>
-        </button>
-
-        <RouterLink
-          to="/mypage"
-          class="flex items-center justify-center text-[#ff6b4a] hover:text-[#FF8A6D] transition-colors min-w-[60px]"
-        >
-          <User class="w-6 h-6" />
-        </RouterLink>
-      </div>
-    </nav>
+    <BottomNav @home="resetMapToHome" />
 
     <!-- Filter Modal -->
-    <div v-if="isFilterOpen" class="fixed inset-0 z-[100] bg-black/50 flex items-end">
-      <div class="w-full max-w-[500px] mx-auto bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
-        <div class="sticky top-0 bg-white border-b border-[#e9ecef] px-4 py-4 flex items-center justify-between">
+    <div
+      v-if="isFilterOpen"
+      class="fixed inset-0 z-[100] bg-black/50 flex items-end"
+    >
+      <div
+        class="w-full max-w-[500px] mx-auto bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300"
+      >
+        <div
+          class="sticky top-0 bg-white border-b border-[#e9ecef] px-4 py-4 flex items-center justify-between"
+        >
           <h3 class="text-lg font-semibold text-[#1e3a5f]">필터 및 정렬</h3>
-          <button @click="isFilterOpen = false" class="text-[#6c757d] hover:text-[#1e3a5f]">
+          <button
+            @click="isFilterOpen = false"
+            class="text-[#6c757d] hover:text-[#1e3a5f]"
+          >
             <X class="w-6 h-6" />
           </button>
         </div>
@@ -749,7 +794,9 @@ const closeMapRestaurantModal = () => {
           </div>
         </div>
 
-        <div class="sticky bottom-0 bg-white border-t border-[#e9ecef] p-4 flex gap-3">
+        <div
+          class="sticky bottom-0 bg-white border-t border-[#e9ecef] p-4 flex gap-3"
+        >
           <Button
             @click="resetFilters"
             variant="outline"
@@ -757,7 +804,10 @@ const closeMapRestaurantModal = () => {
           >
             초기화
           </Button>
-          <Button @click="applyFilters" class="flex-1 h-12 gradient-primary text-white rounded-xl">
+          <Button
+            @click="applyFilters"
+            class="flex-1 h-12 gradient-primary text-white rounded-xl"
+          >
             적용하기
           </Button>
         </div>
@@ -765,11 +815,21 @@ const closeMapRestaurantModal = () => {
     </div>
 
     <!-- Search Modal -->
-    <div v-if="isSearchOpen" class="fixed inset-0 z-[100] bg-black/50 flex items-end">
-      <div class="w-full max-w-[500px] mx-auto bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
-        <div class="sticky top-0 bg-white border-b border-[#e9ecef] px-4 py-4 flex items-center justify-between">
+    <div
+      v-if="isSearchOpen"
+      class="fixed inset-0 z-[100] bg-black/50 flex items-end"
+    >
+      <div
+        class="w-full max-w-[500px] mx-auto bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300"
+      >
+        <div
+          class="sticky top-0 bg-white border-b border-[#e9ecef] px-4 py-4 flex items-center justify-between"
+        >
           <h3 class="text-lg font-semibold text-[#1e3a5f]">검색 필터</h3>
-          <button @click="isSearchOpen = false" class="text-[#6c757d] hover:text-[#1e3a5f]">
+          <button
+            @click="isSearchOpen = false"
+            class="text-[#6c757d] hover:text-[#1e3a5f]"
+          >
             <X class="w-6 h-6" />
           </button>
         </div>
@@ -784,7 +844,10 @@ const closeMapRestaurantModal = () => {
                 @click="toggleCalendar"
                 class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg text-sm flex items-center justify-between text-left text-[#495057] focus:outline-none focus:ring-2 focus:ring-[#ff6b4a] focus:border-transparent"
               >
-                <span :class="searchDate ? 'text-[#1e3a5f]' : 'text-[#adb5bd]'">{{ formattedSearchDate }}</span>
+                <span
+                  :class="searchDate ? 'text-[#1e3a5f]' : 'text-[#adb5bd]'"
+                  >{{ formattedSearchDate }}</span
+                >
                 <Calendar class="w-5 h-5 text-[#ff6b4a]" />
               </button>
 
@@ -792,21 +855,35 @@ const closeMapRestaurantModal = () => {
                 v-if="isCalendarOpen"
                 class="absolute right-0 top-full mt-2 w-72 bg-white border border-[#e9ecef] rounded-xl shadow-card z-20"
               >
-                <div class="flex items-center justify-between px-4 py-3 border-b border-[#e9ecef]">
+                <div
+                  class="flex items-center justify-between px-4 py-3 border-b border-[#e9ecef]"
+                >
                   <button
                     @click.stop="previousCalendarMonth"
                     class="p-1 rounded-full hover:bg-[#f8f9fa] transition-colors"
                   >
                     <ChevronLeft class="w-4 h-4 text-[#495057]" />
                   </button>
-                  <span class="text-sm font-semibold text-[#1e3a5f]">{{ formattedCalendarMonth }}</span>
-                  <button @click.stop="nextCalendarMonth" class="p-1 rounded-full hover:bg-[#f8f9fa] transition-colors">
+                  <span class="text-sm font-semibold text-[#1e3a5f]">{{
+                    formattedCalendarMonth
+                  }}</span>
+                  <button
+                    @click.stop="nextCalendarMonth"
+                    class="p-1 rounded-full hover:bg-[#f8f9fa] transition-colors"
+                  >
                     <ChevronRight class="w-4 h-4 text-[#495057]" />
                   </button>
                 </div>
                 <div class="px-4 py-3">
-                  <div class="grid grid-cols-7 text-center text-xs text-[#6c757d] mb-2">
-                    <span v-for="dayName in weekdayLabels" :key="dayName" class="py-1">{{ dayName }}</span>
+                  <div
+                    class="grid grid-cols-7 text-center text-xs text-[#6c757d] mb-2"
+                  >
+                    <span
+                      v-for="dayName in weekdayLabels"
+                      :key="dayName"
+                      class="py-1"
+                      >{{ dayName }}</span
+                    >
                   </div>
                   <div class="grid grid-cols-7 gap-1">
                     <button
@@ -880,7 +957,9 @@ const closeMapRestaurantModal = () => {
                 <Minus class="w-4 h-4 text-[#495057]" />
               </button>
               <div class="flex-1 text-center">
-                <span class="text-2xl font-semibold text-[#1e3a5f]">{{ searchPartySize }}</span>
+                <span class="text-2xl font-semibold text-[#1e3a5f]">{{
+                  searchPartySize
+                }}</span>
                 <span class="text-sm text-[#6c757d] ml-1">명</span>
               </div>
               <button
@@ -895,11 +974,17 @@ const closeMapRestaurantModal = () => {
 
           <!-- Budget Slider -->
           <div>
-            <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">총 회식 가격</h4>
+            <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
+              총 회식 가격
+            </h4>
             <div class="space-y-3">
               <div class="text-center">
                 <span class="text-2xl font-semibold text-[#1e3a5f]">
-                  {{ budget >= 500000 ? '50만원 이상' : `${(budget / 10000).toFixed(0)}만원` }}
+                  {{
+                    budget >= 500000
+                      ? '50만원 이상'
+                      : `${(budget / 10000).toFixed(0)}만원`
+                  }}
                 </span>
               </div>
               <input
@@ -919,7 +1004,9 @@ const closeMapRestaurantModal = () => {
                 class="mt-2 p-3 bg-[#f8f9fa] border border-[#e9ecef] rounded-lg text-center text-sm text-[#495057]"
               >
                 <p>1인당 예상 금액</p>
-                <p class="text-xl font-semibold text-[#1e3a5f]">{{ perPersonBudgetDisplay }}</p>
+                <p class="text-xl font-semibold text-[#1e3a5f]">
+                  {{ perPersonBudgetDisplay }}
+                </p>
               </div>
             </div>
           </div>
@@ -982,7 +1069,9 @@ const closeMapRestaurantModal = () => {
           </div>
         </div>
 
-        <div class="sticky bottom-0 bg-white border-t border-[#e9ecef] p-4 flex gap-3">
+        <div
+          class="sticky bottom-0 bg-white border-t border-[#e9ecef] p-4 flex gap-3"
+        >
           <Button
             @click="resetSearch"
             variant="outline"
@@ -990,7 +1079,10 @@ const closeMapRestaurantModal = () => {
           >
             초기화
           </Button>
-          <Button @click="applySearch" class="flex-1 h-12 gradient-primary text-white rounded-xl">
+          <Button
+            @click="applySearch"
+            class="flex-1 h-12 gradient-primary text-white rounded-xl"
+          >
             검색하기
           </Button>
         </div>
