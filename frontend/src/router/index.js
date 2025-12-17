@@ -197,6 +197,11 @@ const router = createRouter({
       name: 'signup-user',
       component: () => import('../views/signup/UserSignupPage.vue'),
     },
+    {
+      path: '/signup/owner',
+      name: 'signup-owner',
+      component: () => import('../views/signup/OwnerSignupPage.vue'),
+    },
     //사업자 - 오늘의 예약 현황 (상세보기)
     {
       path: '/business/reservations/:id',

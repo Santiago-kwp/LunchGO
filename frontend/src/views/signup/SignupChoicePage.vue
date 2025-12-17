@@ -62,6 +62,7 @@ import { ArrowLeft, User, Building2, ChevronRight } from 'lucide-vue-next';
         </RouterLink>
 
         <RouterLink
+          to="/signup/owner"
           class="block group relative bg-white p-8 rounded-2xl shadow-card border border-[#e9ecef] text-left hover:border-[#1e3a5f] hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
         >
           <div class="flex justify-between items-start mb-6">
