@@ -58,6 +58,32 @@ const tagCategoryDisplayNames = {
   FACILITY: '편의시설',
 };
 
+const handleRestaurantFileChange = (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    restaurantImageFile.value = file;
+    restaurantImageUrl.value = URL.createObjectURL(file);
+  }
+};
+
+const triggerRestaurantFileInput = () => {
+  console.log('triggerRestaurantFileInput called.');
+  console.log('restaurantFileInput ref value:', restaurantFileInput.value);
+  if (restaurantFileInput.value) {
+    restaurantFileInput.value.click();
+  } else {
+    console.error('restaurantFileInput ref is null. Cannot trigger click.');
+  }
+};
+
+const clearRestaurantImage = () => {
+  restaurantImageFile.value = null;
+  restaurantImageUrl.value = null;
+  if (restaurantFileInput.value) {
+    restaurantFileInput.value.value = '';
+  }
+};
+
 const openPostcodeSearch = () => {
   new window.daum.Postcode({
     oncomplete: (data) => {
