@@ -64,8 +64,10 @@ const formData = reactive({
 });
 
 const restaurantImageFile = ref(null);
-const restaurantImageUrl = ref(null);
 const restaurantFileInput = ref(null);
+
+// restaurantImageUrl을 store와 연동된 computed 속성으로 변경
+const restaurantImageUrl = computed(() => store.restaurantInfo?.images?.[0]?.imageUrl || null);
 
 const selectedClosedDays = ref([]);
 const selectedTags = ref([]);
@@ -92,7 +94,9 @@ const handleRestaurantFileChange = (e) => {
   const file = e.target.files[0];
   if (file) {
     restaurantImageFile.value = file;
-    restaurantImageUrl.value = URL.createObjectURL(file);
+    // 로컬 URL을 생성하고 store 상태를 업데이트
+    const localUrl = URL.createObjectURL(file);
+    store.setDraftImageUrl(localUrl);
   }
 };
 
@@ -108,7 +112,8 @@ const triggerRestaurantFileInput = () => {
 
 const clearRestaurantImage = () => {
   restaurantImageFile.value = null;
-  restaurantImageUrl.value = null;
+  // store의 이미지 URL 상태를 업데이트
+  store.setDraftImageUrl(null);
   if (restaurantFileInput.value) {
     restaurantFileInput.value.value = '';
   }
@@ -251,7 +256,8 @@ onMounted(async () => {
     if (store.restaurantInfo) {
       Object.assign(formData, store.restaurantInfo);
       if (store.restaurantInfo.images && store.restaurantInfo.images.length > 0) {
-        restaurantImageUrl.value = store.restaurantInfo.images[0].imageUrl;
+        // This line is now redundant because of the computed property, but safe to keep
+        // restaurantImageUrl.value = store.restaurantInfo.images[0].imageUrl; 
         restaurantImageFile.value = new File([], 'mock-restaurant-image.png');
       }
       selectedClosedDays.value = store.restaurantInfo.regularHolidays.map(
@@ -260,9 +266,16 @@ onMounted(async () => {
       selectedTags.value = store.restaurantInfo.tags;
     }
   } else {
-    // 새로 등록하는 경우, 이전에 수정하던 정보가 스토어에 남아있으면 초기화
-    if (store.restaurantInfo !== null) {
-      store.clearRestaurant();
+    // 등록 모드에서는 페이지를 다시 방문해도 store의 상태를 유지합니다.
+    // store는 router.beforeEach 네비게이션 가드에 의해 관리됩니다.
+    // 또한, 폼 데이터가 store에 이미 있을 수 있으므로 onMounted에서 다시 채워줍니다.
+    if (store.restaurantInfo) {
+      Object.assign(formData, store.restaurantInfo);
+       if (store.restaurantInfo.images && store.restaurantInfo.images.length > 0) {
+        restaurantImageFile.value = new File([], 'mock-restaurant-image.png');
+      }
+      selectedClosedDays.value = store.restaurantInfo.regularHolidays || [];
+      selectedTags.value = store.restaurantInfo.tags || [];
     }
   }
 });

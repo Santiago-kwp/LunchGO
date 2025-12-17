@@ -57,11 +57,22 @@ export const useRestaurantStore = defineStore('restaurant', () => {
     return Date.now();
   }
 
+  function setDraftImageUrl(url) {
+    if (!restaurantInfo.value) {
+      restaurantInfo.value = { images: [] };
+    }
+    if (!restaurantInfo.value.images || restaurantInfo.value.images.length === 0) {
+      restaurantInfo.value.images = [{ imageUrl: null }];
+    }
+    restaurantInfo.value.images[0].imageUrl = url;
+  }
+
   return { 
     restaurantInfo,
     menus, 
     loadRestaurant,
     clearRestaurant,
+    setDraftImageUrl,
     addMenu, 
     updateMenu, 
     deleteMenu,

@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import HomeView from '../views/HomeView.vue';
 
+import { useRestaurantStore } from '@/stores/restaurant';
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -258,4 +260,26 @@ const router = createRouter({
   ],
 });
 
+router.beforeEach((to, from) => {
+  // Pinia 스토어는 Vue 앱이 실행된 후에 사용 가능하므로, 가드 내에서 직접 호출합니다.
+  const store = useRestaurantStore();
+
+  // 식당 정보 등록/수정 워크플로우에 해당하는 라우트 이름 목록
+  const workflowRoutes = [
+    'business-restaurant-info-add',
+    'business-restaurant-info-edit',
+    'business-restaurant-menu-add',
+    'business-restaurant-menu-edit',
+  ];
+
+  const isFromWorkflow = workflowRoutes.includes(from.name);
+  const isToWorkflow = workflowRoutes.includes(to.name);
+
+  // 워크플로우를 벗어나는 경우에만 store를 초기화합니다.
+  if (isFromWorkflow && !isToWorkflow) {
+    store.clearRestaurant();
+  }
+});
+
 export default router;
+
