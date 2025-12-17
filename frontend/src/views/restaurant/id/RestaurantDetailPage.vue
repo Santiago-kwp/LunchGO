@@ -13,6 +13,7 @@ import {
   X,
   Plus,
   Minus,
+  Home as HomeIcon,
 } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
@@ -660,10 +661,15 @@ watch(detailMapDistanceKm, () => {
     </main>
 
     <!-- Fixed Bottom Buttons -->
-    <div
-      class="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e9ecef] z-50 shadow-lg"
-    >
-      <div class="max-w-[500px] mx-auto px-4 py-3">
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e9ecef] z-50 shadow-lg">
+      <div class="relative max-w-[500px] mx-auto px-4 py-3">
+        <RouterLink
+          to="/"
+          class="absolute -top-4 right-4 w-12 h-12 rounded-full bg-white border border-[#ffe0d6] flex items-center justify-center text-[#ff6b4a] shadow-card hover:bg-[#fff7f4] transition-colors"
+          aria-label="홈으로 이동"
+        >
+          <HomeIcon class="w-5 h-5" />
+        </RouterLink>
         <div class="flex gap-3">
           <RouterLink
             :to="`/restaurant/${restaurantId}/booking?type=preorder`"
