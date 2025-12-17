@@ -5,7 +5,7 @@ import { RouterLink } from 'vue-router';
 
 <template>
   <header
-    class="bg-white border-b border-[#e9ecef] px-8 py-4 flex items-center justify-between"
+    class="bg-white border-b border-[#e9ecef] px-8 py-5 flex items-center justify-between"
   >
     <RouterLink to="/admin/dashboard">
       <h1

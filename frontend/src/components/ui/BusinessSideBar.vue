@@ -12,7 +12,7 @@ defineProps({
 
 <template>
   <aside class="w-64 bg-white border-r border-[#e9ecef] flex flex-col">
-    <div class="p-6 border-b border-[#e9ecef]">
+    <div class="px-6 py-5 border-b border-[#e9ecef]">
       <RouterLink to="/business/dashboard">
         <img
           src="/images/lunch-go-whitebg.png"

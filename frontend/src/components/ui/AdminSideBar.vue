@@ -11,26 +11,26 @@ defineProps({
 </script>
 
 <template>
-  <aside class="w-64 bg-white border-r border-[#e9ecef] flex flex-col">
-    <div class="p-6 border-b border-[#e9ecef]">
+  <aside class="w-56 bg-white border-r border-[#e9ecef] flex flex-col">
+    <div class="px-4 py-5 border-b border-[#e9ecef]">
       <RouterLink to="/admin/dashboard">
         <img
           src="/images/lunch-go-whitebg.png"
           alt="LunchGo"
-          class="w-auto h-12"
-          width="150"
-          height="60"
+          class="w-auto h-10"
+          width="130"
+          height="50"
         />
       </RouterLink>
     </div>
 
-    <nav class="flex-1 p-4">
-      <ul class="space-y-2">
+    <nav class="flex-1 p-3">
+      <ul class="space-y-1.5">
         <li>
           <RouterLink
             to="/admin/dashboard"
             :class="[
-              'block px-4 py-3 rounded-lg transition-colors',
+              'block px-3 py-2.5 rounded-lg transition-colors text-sm',
               activeMenu === 'dashboard'
                 ? 'text-white bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] font-semibold'
                 : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
@@ -43,7 +43,7 @@ defineProps({
           <RouterLink
             to="/admin/reservations"
             :class="[
-              'block px-4 py-3 rounded-lg transition-colors',
+              'block px-3 py-2.5 rounded-lg transition-colors text-sm',
               activeMenu === 'reservations'
                 ? 'text-white bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] font-semibold'
                 : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
@@ -56,7 +56,7 @@ defineProps({
           <RouterLink
             to="/admin/franchises"
             :class="[
-              'block px-4 py-3 rounded-lg transition-colors',
+              'block px-3 py-2.5 rounded-lg transition-colors text-sm',
               activeMenu === 'franchises'
                 ? 'text-white bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] font-semibold'
                 : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
@@ -69,7 +69,7 @@ defineProps({
           <RouterLink
             to="/admin/reviews"
             :class="[
-              'block px-4 py-3 rounded-lg transition-colors',
+              'block px-3 py-2.5 rounded-lg transition-colors text-sm',
               activeMenu === 'reviews'
                 ? 'text-white bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] font-semibold'
                 : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
@@ -82,7 +82,7 @@ defineProps({
           <RouterLink
             to="/admin/members"
             :class="[
-              'block px-4 py-3 rounded-lg transition-colors',
+              'block px-3 py-2.5 rounded-lg transition-colors text-sm',
               activeMenu === 'members'
                 ? 'text-white bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] font-semibold'
                 : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
@@ -95,7 +95,7 @@ defineProps({
           <RouterLink
             to="/admin/finance"
             :class="[
-              'block px-4 py-3 rounded-lg transition-colors',
+              'block px-3 py-2.5 rounded-lg transition-colors text-sm',
               activeMenu === 'finance'
                 ? 'text-white bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] font-semibold'
                 : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
