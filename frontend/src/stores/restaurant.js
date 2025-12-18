@@ -44,6 +44,10 @@ export const useRestaurantStore = defineStore('restaurant', () => {
     menus.value = menus.value.filter(menu => menu.id !== menuId);
   }
 
+  function deleteMenus(menuIds) {
+    menus.value = menus.value.filter(menu => !menuIds.includes(menu.id));
+  }
+
   function getMenuById(menuId) {
     const id = Number(menuId);
     return menus.value.find(menu => menu.id === id);
@@ -76,6 +80,7 @@ export const useRestaurantStore = defineStore('restaurant', () => {
     addMenu, 
     updateMenu, 
     deleteMenu,
+    deleteMenus,
     getMenuById,
     getNextId,
   };

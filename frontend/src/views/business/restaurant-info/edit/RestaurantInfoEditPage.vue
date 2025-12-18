@@ -11,18 +11,61 @@ const router = useRouter();
 const route = useRoute();
 const store = useRestaurantStore();
 
+// 메뉴 검색 및 필터링
+const menuSearchKeyword = ref('');
+const menuTypes = ['전체', '주메뉴', '서브메뉴', '기타(디저트, 음료)'];
+const selectedMenuType = ref('전체');
+const sortOptions = ['기본', '이름순', '가격 높은순', '가격 낮은순'];
+const selectedSort = ref('기본');
+
+// 필터링 및 정렬된 메뉴
+const filteredMenus = computed(() => {
+  let menus = store.menus;
+
+  // 메뉴 타입으로 필터링
+  if (selectedMenuType.value !== '전체') {
+    menus = menus.filter((menu) => menu.type === selectedMenuType.value);
+  }
+
+  // 메뉴 이름 키워드로 필터링
+  if (menuSearchKeyword.value) {
+    menus = menus.filter((menu) => menu.name.includes(menuSearchKeyword.value));
+  }
+
+  // 정렬
+  const sortedMenus = [...menus]; // 원본 배열 수정을 피하기 위해 복사
+  switch (selectedSort.value) {
+    case '이름순':
+      sortedMenus.sort((a, b) => a.name.localeCompare(b.name));
+      break;
+    case '가격 높은순':
+      sortedMenus.sort((a, b) => b.price - a.price);
+      break;
+    case '가격 낮은순':
+      sortedMenus.sort((a, b) => a.price - b.price);
+      break;
+  }
+
+  return sortedMenus;
+});
+
 // 페이지네이션
 const currentPage = ref(1);
 const itemsPerPage = 5; // 한 페이지에 5개씩 보여주기
 
 const totalPages = computed(() => {
-  return Math.ceil(store.menus.length / itemsPerPage);
+  return Math.ceil(filteredMenus.value.length / itemsPerPage);
 });
 
 const paginatedMenus = computed(() => {
   const startIndex = (currentPage.value - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  return store.menus.slice(startIndex, endIndex);
+  return filteredMenus.value.slice(startIndex, endIndex);
+});
+
+// 검색어, 메뉴 타입 또는 정렬 변경 시 첫 페이지로 이동
+watch([menuSearchKeyword, selectedMenuType, selectedSort], () => {
+  currentPage.value = 1;
 });
 
 const changePage = (page) => {
@@ -67,7 +110,9 @@ const restaurantImageFile = ref(null);
 const restaurantFileInput = ref(null);
 
 // restaurantImageUrl을 store와 연동된 computed 속성으로 변경
-const restaurantImageUrl = computed(() => store.restaurantInfo?.images?.[0]?.imageUrl || null);
+const restaurantImageUrl = computed(
+  () => store.restaurantInfo?.images?.[0]?.imageUrl || null
+);
 
 const selectedClosedDays = ref([]);
 const selectedTags = ref([]);
@@ -220,12 +265,48 @@ const fetchRestaurantData = async (restaurantId) => {
           { tagId: 12, content: '주차장 제공', category: 'FACILITY' },
         ],
         menus: [
-          { id: 101, name: '한정식 A코스', type: '주메뉴', price: 50000, imageUrl: '/korean-course-meal-plating.jpg' },
-          { id: 102, name: '한정식 B코스', type: '주메뉴', price: 75000, imageUrl: '/korean-fine-dining.jpg' },
-          { id: 103, name: '떡갈비', type: '서브메뉴', price: 25000, imageUrl: '/placeholder.svg' },
-          { id: 104, name: '해물파전', type: '서브메뉴', price: 20000, imageUrl: '/placeholder.svg' },
-          { id: 105, name: '수정과', type: '기타(디저트, 음료)', price: 5000, imageUrl: '/placeholder.svg' },
-          { id: 106, name: '식혜', type: '기타(디저트, 음료)', price: 5000, imageUrl: '/placeholder.svg' },
+          {
+            id: 101,
+            name: '한정식 A코스',
+            type: '주메뉴',
+            price: 50000,
+            imageUrl: '/korean-course-meal-plating.jpg',
+          },
+          {
+            id: 102,
+            name: '한정식 B코스',
+            type: '주메뉴',
+            price: 75000,
+            imageUrl: '/korean-fine-dining.jpg',
+          },
+          {
+            id: 103,
+            name: '떡갈비',
+            type: '서브메뉴',
+            price: 25000,
+            imageUrl: '/placeholder.svg',
+          },
+          {
+            id: 104,
+            name: '해물파전',
+            type: '서브메뉴',
+            price: 20000,
+            imageUrl: '/placeholder.svg',
+          },
+          {
+            id: 105,
+            name: '수정과',
+            type: '기타(디저트, 음료)',
+            price: 5000,
+            imageUrl: '/placeholder.svg',
+          },
+          {
+            id: 106,
+            name: '식혜',
+            type: '기타(디저트, 음료)',
+            price: 5000,
+            imageUrl: '/placeholder.svg',
+          },
         ],
       });
     }, 500);
@@ -247,17 +328,23 @@ onMounted(async () => {
   if (isEditMode.value) {
     const restaurantId = Number(route.params.id);
     // 스토어에 정보가 없거나 다른 식당 정보가 들어있으면 새로 API 호출
-    if (!store.restaurantInfo || store.restaurantInfo.restaurantId !== restaurantId) {
+    if (
+      !store.restaurantInfo ||
+      store.restaurantInfo.restaurantId !== restaurantId
+    ) {
       const restaurantData = await fetchRestaurantData(restaurantId);
       store.loadRestaurant(restaurantData); // API 응답으로 스토어 전체를 설정
     }
-    
+
     // 항상 스토어의 데이터로 폼과 UI 상태를 채움
     if (store.restaurantInfo) {
       Object.assign(formData, store.restaurantInfo);
-      if (store.restaurantInfo.images && store.restaurantInfo.images.length > 0) {
+      if (
+        store.restaurantInfo.images &&
+        store.restaurantInfo.images.length > 0
+      ) {
         // This line is now redundant because of the computed property, but safe to keep
-        // restaurantImageUrl.value = store.restaurantInfo.images[0].imageUrl; 
+        // restaurantImageUrl.value = store.restaurantInfo.images[0].imageUrl;
         restaurantImageFile.value = new File([], 'mock-restaurant-image.png');
       }
       selectedClosedDays.value = store.restaurantInfo.regularHolidays.map(
@@ -271,7 +358,10 @@ onMounted(async () => {
     // 또한, 폼 데이터가 store에 이미 있을 수 있으므로 onMounted에서 다시 채워줍니다.
     if (store.restaurantInfo) {
       Object.assign(formData, store.restaurantInfo);
-       if (store.restaurantInfo.images && store.restaurantInfo.images.length > 0) {
+      if (
+        store.restaurantInfo.images &&
+        store.restaurantInfo.images.length > 0
+      ) {
         restaurantImageFile.value = new File([], 'mock-restaurant-image.png');
       }
       selectedClosedDays.value = store.restaurantInfo.regularHolidays || [];
@@ -369,6 +459,22 @@ const saveRestaurant = async () => {
   } catch (error) {
     console.error('저장 실패:', error);
     alert('저장에 실패했습니다.');
+  }
+};
+
+const handleBulkDelete = () => {
+  if (filteredMenus.value.length === 0) {
+    alert('삭제할 메뉴가 없습니다. 먼저 메뉴를 필터링해주세요.');
+    return;
+  }
+
+  const confirmDelete = confirm(
+    `필터링된 ${filteredMenus.value.length}개의 식당메뉴를 정말로 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`
+  );
+
+  if (confirmDelete) {
+    const idsToDelete = filteredMenus.value.map((menu) => menu.id);
+    store.deleteMenus(idsToDelete); // 스토어 액션 호출
   }
 };
 
@@ -763,7 +869,38 @@ watch(paginatedMenus, (newPaginatedMenus) => {
           <div class="bg-white rounded-xl border border-[#e9ecef] p-8">
             <div class="flex items-center justify-between mb-6">
               <h3 class="text-xl font-bold text-[#1e3a5f]">식당메뉴</h3>
-              <span class="text-lg font-semibold text-[#FF6B4A]">
+              <div class="flex items-center gap-4">
+                <!-- 메뉴 타입 필터 드롭다운 -->
+                <select
+                  v-model="selectedMenuType"
+                  class="px-3 py-2 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A] text-sm"
+                >
+                  <option v-for="type in menuTypes" :key="type" :value="type">
+                    {{ type }}
+                  </option>
+                </select>
+
+                <!-- 메뉴 이름 검색창 -->
+                <input
+                  type="text"
+                  v-model="menuSearchKeyword"
+                  placeholder="메뉴 이름으로 검색"
+                  class="w-48 px-4 py-2 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A] text-sm"
+                />
+
+                <!-- 정렬 드롭다운 -->
+                <select
+                  v-model="selectedSort"
+                  class="px-3 py-2 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A] text-sm"
+                >
+                  <option v-for="opt in sortOptions" :key="opt" :value="opt">
+                    {{ opt }}
+                  </option>
+                </select>
+              </div>
+              <span
+                class="text-base font-semibold text-[#FF6B4A] whitespace-nowrap"
+              >
                 주메뉴 평균가: {{ avgMainPrice.toLocaleString() }}원
               </span>
             </div>
@@ -836,19 +973,27 @@ watch(paginatedMenus, (newPaginatedMenus) => {
               </table>
             </div>
 
-            <!-- 페이지네이션 적용 위치 -->
+            <!-- 페이지네이션 및 버튼 그룹 -->
             <div class="flex items-center justify-between mt-6">
               <Pagination
                 :current-page="currentPage"
                 :total-pages="totalPages"
                 @change-page="changePage"
               />
-              <RouterLink
-                to="/business/restaurant-info/menu/add"
-                class="px-6 py-3 gradient-primary text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
-              >
-                메뉴 추가
-              </RouterLink>
+              <div class="flex items-center gap-3">
+                <button
+                  @click="handleBulkDelete"
+                  class="px-6 py-3 border border-[#dc3545] text-[#dc3545] rounded-lg font-semibold hover:bg-[#fff5f5] transition-colors"
+                >
+                  일괄 삭제
+                </button>
+                <RouterLink
+                  to="/business/restaurant-info/menu/add"
+                  class="px-6 py-3 gradient-primary text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
+                >
+                  메뉴 추가
+                </RouterLink>
+              </div>
             </div>
           </div>
 
