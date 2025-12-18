@@ -258,7 +258,7 @@ onMounted(() => {
                 <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">
                   정기휴무일
                 </label>
-                <div class="flex gap-3">
+                <div class="flex flex-wrap gap-3">
                   <button
                     v-for="day in ['월', '화', '수', '목', '금', '토', '일']"
                     :key="day"
