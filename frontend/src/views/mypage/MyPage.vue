@@ -250,6 +250,7 @@ const handleVerifyEmail = () => {
 
 const handleEmailSuccess = () => {
   isEmailVerified.value = true;
+
   showEmailModal.value = false;
 };
 
@@ -583,6 +584,7 @@ const handleWithdraw = () => {
                 class="input-field mb-2"
               />
               <label
+                v-if="isEmailVerified"
                 class="flex items-center gap-2 text-xs text-[#6C757D] cursor-pointer"
               >
                 <input
@@ -636,6 +638,11 @@ const handleWithdraw = () => {
 
         <div class="info-card">
           <div class="card-title">기타</div>
+
+          <p class="px-6 pt-4 text-xs text-[#868E96] leading-relaxed">
+            팀원의 특이사항도 입력해보세요! 함께 반영됩니다.
+          </p>
+
           <div class="p-6 space-y-5">
             <div class="input-group">
               <label>특이사항</label>
