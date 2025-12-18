@@ -114,8 +114,33 @@ const taglineDisplay = computed(
 const detailMapContainer = ref(null);
 let detailMapInstance = null;
 let detailMarker = null;
-const detailMapDistanceKm = ref(2);
-const detailDistanceRange = { min: 1, max: 5 };
+const detailMapDistanceSteps = Object.freeze([
+  { label: '100m', level: 2 },
+  { label: '250m', level: 3 },
+  { label: '500m', level: 4 },
+  { label: '1km', level: 5 },
+  { label: '2km', level: 6 },
+  { label: '3km', level: 7 },
+]);
+const detailDefaultMapDistanceIndex = detailMapDistanceSteps.findIndex(
+  (step) => step.label === '500m',
+);
+const detailMapDistanceStepIndex = ref(
+  detailDefaultMapDistanceIndex === -1 ? 0 : detailDefaultMapDistanceIndex,
+);
+const detailCurrentDistanceLabel = computed(
+  () =>
+    detailMapDistanceSteps[detailMapDistanceStepIndex.value]?.label ??
+    detailMapDistanceSteps[0].label,
+);
+const detailDistanceSliderFill = computed(() => {
+  if (detailMapDistanceSteps.length <= 1) return 0;
+  return (
+    ((detailMapDistanceSteps.length - 1 - detailMapDistanceStepIndex.value) /
+      (detailMapDistanceSteps.length - 1)) *
+    100
+  );
+});
 
 const representativeReviews = ref([
   {
@@ -275,7 +300,7 @@ const initializeDetailMap = async () => {
 
     detailMapInstance = new kakaoMaps.Map(detailMapContainer.value, {
       center,
-      level: detailLevelForDistance(detailMapDistanceKm.value),
+      level: detailLevelForDistance(detailMapDistanceStepIndex.value),
     });
     detailMapInstance.setZoomable(false);
 
@@ -291,29 +316,24 @@ const initializeDetailMap = async () => {
   }
 };
 
-const detailLevelForDistance = (distance) => {
-  const mapping = {
-    1: 3,
-    2: 4,
-    3: 5,
-    4: 6,
-    5: 7,
-  };
-  return mapping[distance] ?? 4;
+const detailLevelForDistance = (stepIndex) => {
+  const step = detailMapDistanceSteps[stepIndex] ?? detailMapDistanceSteps[0];
+  return step.level;
 };
 
 const applyDetailMapZoom = () => {
   if (!detailMapInstance) return;
-  detailMapInstance.setLevel(detailLevelForDistance(detailMapDistanceKm.value), {
+  detailMapInstance.setLevel(detailLevelForDistance(detailMapDistanceStepIndex.value), {
     animate: { duration: 300 },
   });
 };
 
 const changeDetailMapDistance = (delta) => {
-  detailMapDistanceKm.value = Math.min(
-    detailDistanceRange.max,
-    Math.max(detailDistanceRange.min, detailMapDistanceKm.value + delta)
+  const next = Math.min(
+    detailMapDistanceSteps.length - 1,
+    Math.max(0, detailMapDistanceStepIndex.value + delta),
   );
+  detailMapDistanceStepIndex.value = next;
 };
 
 // 컴포넌트 마운트 후 드래그 스크롤 및 지도 설정
@@ -333,7 +353,7 @@ onBeforeUnmount(() => {
   detailMapInstance = null;
 });
 
-watch(detailMapDistanceKm, () => {
+watch(detailMapDistanceStepIndex, () => {
   applyDetailMapZoom();
 });
 </script>
@@ -463,9 +483,7 @@ watch(detailMapDistanceKm, () => {
             <div class="h-16 w-[5px] bg-white/80 rounded relative shadow-card overflow-hidden">
               <div
                 class="absolute top-0 left-0 right-0 bg-[#ff6b4a] transition-all"
-                :style="{
-                  height: `${((detailDistanceRange.max - detailMapDistanceKm) / (detailDistanceRange.max - detailDistanceRange.min)) * 100}%`,
-                }"
+                :style="{ height: `${detailDistanceSliderFill}%` }"
               ></div>
             </div>
             <button
@@ -474,6 +492,11 @@ watch(detailMapDistanceKm, () => {
             >
               <Minus class="w-3.5 h-3.5" />
             </button>
+            <div
+              class="mt-1 px-2 py-1 rounded-full bg-white text-[11px] font-semibold text-[#1e3a5f] shadow-card"
+            >
+              반경 {{ detailCurrentDistanceLabel }}
+            </div>
           </div>
         </div>
         <p class="text-xs text-[#6c757d] mt-2">{{ addressDisplay }}</p>

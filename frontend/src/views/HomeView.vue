@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, reactive } from 'vue';
 import {
   MapPin,
   Calendar,
@@ -24,8 +24,12 @@ import { restaurants as restaurantData } from '@/data/restaurants';
 
 // State management (React's useState -> Vue's ref)
 const isFilterOpen = ref(false);
-const selectedPriceRanges = ref([]);
 const selectedSort = ref('추천순');
+const selectedPriceRange = ref(null);
+const filterForm = reactive({
+  sort: selectedSort.value,
+  priceRange: selectedPriceRange.value,
+});
 
 const isSearchOpen = ref(false);
 const searchDate = ref('');
@@ -40,10 +44,50 @@ const budget = ref(500000);
 const restaurants = restaurantData;
 const restaurantsPerPage = 10;
 const currentPage = ref(1);
-const totalPages = computed(() => Math.max(1, Math.ceil(restaurants.length / restaurantsPerPage)));
+const processedRestaurants = computed(() => {
+  let result = restaurants.slice();
+
+  const activeRange = selectedPriceRange.value;
+  if (activeRange && activeRange !== '전체') {
+    const range = priceRangeMap[activeRange];
+    if (range) {
+      result = result.filter((restaurant) => {
+        const priceValue = extractPriceValue(restaurant.price);
+        if (priceValue == null) return false;
+        return priceValue >= range.min && priceValue <= range.max;
+      });
+    }
+  }
+
+  const center = defaultMapCenter;
+  const getDistance = (restaurant) => haversineDistance(restaurant.coords, center);
+
+  const sorters = {
+    추천순: (a, b) => {
+      const ratingDiff = (b.rating ?? 0) - (a.rating ?? 0);
+      if (ratingDiff !== 0) return ratingDiff;
+      return (b.reviews ?? 0) - (a.reviews ?? 0);
+    },
+    거리순: (a, b) => getDistance(a) - getDistance(b),
+    평점순: (a, b) => (b.rating ?? 0) - (a.rating ?? 0),
+    가격순: (a, b) => {
+      const priceA = extractPriceValue(a.price) ?? Number.POSITIVE_INFINITY;
+      const priceB = extractPriceValue(b.price) ?? Number.POSITIVE_INFINITY;
+      return priceA - priceB;
+    },
+  };
+
+  const sorter = sorters[selectedSort.value] || sorters.추천순;
+  result.sort(sorter);
+
+  return result;
+});
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(processedRestaurants.value.length / restaurantsPerPage)),
+);
 const paginatedRestaurants = computed(() => {
   const start = (currentPage.value - 1) * restaurantsPerPage;
-  return restaurants.slice(start, start + restaurantsPerPage);
+  return processedRestaurants.value.slice(start, start + restaurantsPerPage);
 });
 const pageNumbers = computed(() =>
   Array.from({ length: totalPages.value }, (_, index) => index + 1),
@@ -62,14 +106,15 @@ const defaultMapCenter =
   };
 const currentLocation = ref('경기도 성남시 분당구 판교동');
 const mapDistanceSteps = Object.freeze([
+  { label: '100m', level: 2 },
   { label: '250m', level: 3 },
   { label: '500m', level: 4 },
   { label: '1km', level: 5 },
   { label: '2km', level: 6 },
   { label: '3km', level: 7 },
-  { label: '5km', level: 8 },
 ]);
-const mapDistanceStepIndex = ref(mapDistanceSteps.length - 1);
+const defaultMapDistanceIndex = mapDistanceSteps.findIndex((step) => step.label === '500m');
+const mapDistanceStepIndex = ref(defaultMapDistanceIndex === -1 ? 0 : defaultMapDistanceIndex);
 const currentDistanceLabel = computed(() => mapDistanceSteps[mapDistanceStepIndex.value].label);
 const distanceSliderFill = computed(() => {
   if (mapDistanceSteps.length <= 1) return 0;
@@ -199,6 +244,14 @@ watch(totalPages, (newTotal) => {
   }
 });
 
+watch(selectedSort, () => {
+  currentPage.value = 1;
+});
+
+watch(selectedPriceRange, () => {
+  currentPage.value = 1;
+});
+
 const goToPage = (page) => {
   if (page < 1 || page > totalPages.value) return;
   currentPage.value = page;
@@ -292,7 +345,7 @@ const resetMapToHome = () => {
 
   const targetCenter = new kakaoMaps.LatLng(defaultMapCenter.lat, defaultMapCenter.lng);
   mapInstance.value.panTo(targetCenter);
-  mapDistanceStepIndex.value = mapDistanceSteps.length - 1;
+  mapDistanceStepIndex.value = defaultMapDistanceIndex === -1 ? 0 : defaultMapDistanceIndex;
   applyHomeMapZoom();
 };
 
@@ -338,6 +391,14 @@ const priceRanges = [
   '2만원~3만원',
   '3만원 이상',
 ];
+const priceRangeMap = Object.freeze({
+  전체: null,
+  '1만원 이하': { min: 0, max: 10000 },
+  '1만원~1.5만원': { min: 10000, max: 15000 },
+  '1.5만원~2만원': { min: 15000, max: 20000 },
+  '2만원~3만원': { min: 20000, max: 30000 },
+  '3만원 이상': { min: 30000, max: Number.POSITIVE_INFINITY },
+});
 const distances = ['1km 이내', '2km 이내', '3km 이내'];
 const sortOptions = ['추천순', '거리순', '평점순', '가격순'];
 const restaurantTags = [
@@ -367,14 +428,45 @@ const ingredients = [
   '당근',
 ];
 
+const extractPriceValue = (priceText = '') => {
+  const match = priceText.match(/([\d.,]+)\s*원/);
+  const target = match?.[1] ?? priceText;
+  const digits = target.replace(/[^0-9]/g, '');
+  if (!digits) return null;
+  return Number(digits);
+};
+
+const haversineDistance = (coordsA = {}, coordsB = {}) => {
+  if (!coordsA.lat || !coordsA.lng || !coordsB.lat || !coordsB.lng) {
+    return Number.POSITIVE_INFINITY;
+  }
+  const toRad = (value) => (value * Math.PI) / 180;
+  const earthRadius = 6371; // km
+  const dLat = toRad(coordsB.lat - coordsA.lat);
+  const dLng = toRad(coordsB.lng - coordsA.lng);
+  const lat1 = toRad(coordsA.lat);
+  const lat2 = toRad(coordsB.lat);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadius * c;
+};
+
 // Event handlers
-const togglePriceRange = (range) => {
-  if (selectedPriceRanges.value.includes(range)) {
-    selectedPriceRanges.value = [];
+const openFilterModal = () => {
+  filterForm.sort = selectedSort.value;
+  filterForm.priceRange = selectedPriceRange.value;
+  isFilterOpen.value = true;
+};
+
+const toggleFilterPriceRange = (range) => {
+  if (filterForm.priceRange === range) {
+    filterForm.priceRange = null;
     return;
   }
-
-  selectedPriceRanges.value = [range];
+  filterForm.priceRange = range;
 };
 
 const isRestaurantFavorite = (restaurantId) => {
@@ -391,13 +483,15 @@ const toggleRestaurantFavorite = (restaurantId) => {
 };
 
 const resetFilters = () => {
-  selectedSort.value = '추천순';
-  selectedPriceRanges.value = [];
+  filterForm.sort = '추천순';
+  filterForm.priceRange = null;
 };
 
 const applyFilters = () => {
+  selectedSort.value = filterForm.sort || '추천순';
+  selectedPriceRange.value = filterForm.priceRange || null;
+  currentPage.value = 1;
   isFilterOpen.value = false;
-  // 필터 적용 로직 (Vue version)
 };
 
 const toggleSearchCategory = (category) => {
@@ -530,6 +624,11 @@ const closeMapRestaurantModal = () => {
           >
             <Minus class="w-4 h-4" />
           </button>
+          <div
+            class="mt-2 px-3 py-1 rounded-full bg-white text-xs font-semibold text-[#1e3a5f] shadow-card"
+          >
+            반경 {{ currentDistanceLabel }}
+          </div>
         </div>
         <div
           class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-card flex items-center gap-2 text-sm text-[#1e3a5f]"
@@ -557,7 +656,7 @@ const closeMapRestaurantModal = () => {
 
         <div class="flex items-center gap-2 mb-4">
           <button
-            @click="isFilterOpen = true"
+            @click="openFilterModal"
             class="flex items-center gap-1.5 text-sm text-[#6c757d] hover:text-[#ff6b4a] transition-colors"
           >
             <SlidersHorizontal class="w-4 h-4" />
@@ -762,9 +861,9 @@ const closeMapRestaurantModal = () => {
               <button
                 v-for="option in sortOptions"
                 :key="option"
-                @click="selectedSort = option"
+                @click="filterForm.sort = option"
                 :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedSort === option
+                  filterForm.sort === option
                     ? 'gradient-primary text-white'
                     : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
                 }`"
@@ -781,9 +880,9 @@ const closeMapRestaurantModal = () => {
               <button
                 v-for="range in priceRanges"
                 :key="range"
-                @click="togglePriceRange(range)"
+                @click="toggleFilterPriceRange(range)"
                 :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedPriceRanges.includes(range)
+                  filterForm.priceRange === range
                     ? 'gradient-primary text-white'
                     : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
                 }`"
