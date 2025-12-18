@@ -12,8 +12,12 @@ import {
 } from 'lucide-vue-next';
 import ReservationHistory from '@/components/ui/ReservationHistory.vue';
 import UsageHistory from '@/components/ui/UsageHistory.vue';
+import CheckEmailModal from '@/components/ui/CheckEmailModal.vue';
 
 const router = useRouter();
+
+// 이메일 인증 모달 표시 여부
+const showEmailModal = ref(false);
 
 // 이미지 상태 관리
 const profileImage = ref<string | null>(null); // 미리보기용 (Base64 URL)
@@ -240,7 +244,13 @@ const checkInputElement = () => {
 
 const handleVerifyEmail = () => {
   if (!email.value) return alert('이메일을 먼저 입력해주세요.');
+
+  showEmailModal.value = true;
+};
+
+const handleEmailSuccess = () => {
   isEmailVerified.value = true;
+  showEmailModal.value = false;
 };
 
 // 전화번호 변경 및 인증 요청 핸들러
@@ -660,6 +670,13 @@ const handleWithdraw = () => {
             </div>
           </div>
         </div>
+
+        <CheckEmailModal
+          v-if="showEmailModal"
+          :email="email"
+          @close="showEmailModal = false"
+          @verified="handleEmailSuccess"
+        />
 
         <button @click="handleSave" class="btn-primary-gradient">
           수정 사항 저장하기
