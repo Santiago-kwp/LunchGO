@@ -8,7 +8,10 @@ import {
   CalendarDays,
   Star,
   X,
+  FileText,
 } from 'lucide-vue-next';
+import ReservationHistory from '@/components/ui/ReservationHistory.vue';
+import UsageHistory from '@/components/ui/UsageHistory.vue';
 
 const router = useRouter();
 
@@ -404,6 +407,14 @@ const handleWithdraw = () => {
           </button>
           <div class="w-[1px] h-4 bg-[#E9ECEF] self-center"></div>
           <button
+            @click="activeNav = 'usage'"
+            :class="['nav-item', activeNav === 'usage' ? 'active' : '']"
+          >
+            <FileText class="w-4 h-4 mr-1.5" />
+            이용내역
+          </button>
+          <div class="w-[1px] h-4 bg-[#E9ECEF] self-center"></div>
+          <button
             @click="activeNav = 'favorite'"
             :class="['nav-item', activeNav === 'favorite' ? 'active' : '']"
           >
@@ -664,13 +675,9 @@ const handleWithdraw = () => {
         </div>
       </div>
 
-      <div
-        v-else-if="activeNav === 'history'"
-        class="py-20 flex flex-col items-center justify-center text-[#ADB5BD]"
-      >
-        <CalendarDays class="w-12 h-12 mb-3 opacity-20" />
-        <p>예약 내역이 없습니다.</p>
-      </div>
+      <ReservationHistory v-else-if="activeNav === 'history'" />
+
+      <UsageHistory v-else-if="activeNav === 'usage'" />
 
       <div
         v-else-if="activeNav === 'favorite'"
