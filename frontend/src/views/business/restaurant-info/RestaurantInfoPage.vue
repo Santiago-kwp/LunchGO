@@ -1,11 +1,16 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-import { RouterLink, useRoute } from 'vue-router';
+import { RouterLink } from 'vue-router'; // Removed useRoute
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 
-// 1. 라우터
-const route = useRoute();
+// Define props to receive the restaurant ID from the route
+const props = defineProps({
+  id: {
+    type: String,
+    required: true,
+  },
+});
 
 // 2. 상태
 const restaurant = ref(null); // API로부터 받은 식당 정보를 저장할 ref
@@ -41,9 +46,11 @@ const mainImageUrl = computed(() => {
 // 5. 라이프사이클 훅
 // 추후 API로부터 데이터를 받아오는 로직을 처리할 함수
 onMounted(() => {
-  // API: GET /api/my-restaurant
+  // API: GET /api/my-restaurant/:id
+  // Here, you would typically make an API call to fetch restaurant data using props.id
+  // For now, we'll use a mock data, but simulate using props.id
   const mockRestaurantDataFromApi = {
-    restaurantId: 1,
+    restaurantId: props.id, // Use the prop ID here
     name: '런치고 한정식',
     phone: '02-1234-5678',
     roadAddress: '서울특별시 강남구 테헤란로 123',
@@ -294,15 +301,19 @@ onMounted(() => {
           </div>
 
           <!-- View All Menus Button -->
-          <button
-            class="w-full gradient-primary text-white py-4 rounded-xl text-lg font-semibold hover:opacity-90 transition-opacity"
+          <RouterLink
+            :to="{
+              name: 'business-restaurant-menus',
+              params: { id: props.id },
+            }"
+            class="block w-full text-center gradient-primary text-white py-4 rounded-xl text-lg font-semibold hover:opacity-90 transition-opacity"
           >
             식당메뉴 전체보기
-          </button>
+          </RouterLink>
 
           <!-- Edit Button -->
           <div class="flex justify-end">
-            <RouterLink :to="`/business/restaurant-info/edit/${restaurant.restaurantId}`">
+            <RouterLink :to="`/business/restaurant-info/edit/${props.id}`">
               <button
                 class="px-8 py-3 border-2 border-[#FF6B4A] text-[#FF6B4A] rounded-xl font-semibold hover:bg-[#fff5f2] transition-colors"
               >

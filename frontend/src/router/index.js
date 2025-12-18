@@ -53,10 +53,18 @@ const router = createRouter({
       props: true,
     },
     {
-      path: '/business/restaurant-info',
+      path: '/business/restaurant-info/:id',
       name: 'business-restaurant-info',
       component: () =>
         import('../views/business/restaurant-info/RestaurantInfoPage.vue'),
+      props: true,
+    },
+    {
+      path: '/business/restaurant-info/:id/menus',
+      name: 'business-restaurant-menus',
+      component: () =>
+        import('../views/business/restaurant-info/menu/MenusInfoPage.vue'),
+      props: true,
     },
     {
       path: '/business/staff',
