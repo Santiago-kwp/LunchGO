@@ -33,9 +33,24 @@ const timeSlots = ref(['11:00', '12:00', '13:00', '14:00']);
 
 const canProceed = computed(() => selectedDateIndex.value !== null && selectedTime.value !== null);
 
-const nextPage = computed(() =>
-  isPreorder.value ? `/restaurant/${restaurantId}/menu` : `/restaurant/${restaurantId}/payment?type=deposit`,
-);
+//예약금 * 인원수 계산식
+const nextPage = computed(() => {
+  if (isPreorder.value) return `/restaurant/${restaurantId}/menu`;
+
+  // 예약금 결제 페이지로 partySize 전달
+  return {
+    path: `/restaurant/${restaurantId}/payment`,
+    query: {
+      type: 'deposit',
+      partySize: partySize.value,
+      // 원하면 요청사항도 같이 넘김 (백엔드 붙기 전 임시로라도 UI 반영 가능)
+      requestNote: requestNote.value,
+      // 날짜/시간도 넘기고 싶으면 같이:
+      // dateIndex: selectedDateIndex.value,
+      // time: selectedTime.value,
+    },
+  };
+});
 
 const selectDate = (idx) => {
   selectedDateIndex.value = idx;
@@ -119,7 +134,7 @@ const selectDate = (idx) => {
 
         <div class="flex items-center justify-between max-w-xs mx-auto">
           <button
-            @click="partySize = Math.max(4, partySize - 1)"
+            @click="partySize = Math.max(4, partySize.value - 1)"
             :disabled="partySize <= 4"
             class="w-12 h-12 rounded-full border-2 border-[#dee2e6] bg-white text-[#1e3a5f] font-bold text-xl disabled:opacity-30 disabled:cursor-not-allowed hover:border-[#ff6b4a] hover:text-[#ff6b4a] transition-colors"
           >

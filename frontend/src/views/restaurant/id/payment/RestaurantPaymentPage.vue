@@ -4,23 +4,44 @@ import { RouterLink, useRouter, useRoute } from 'vue-router';
 import { ArrowLeft, CreditCard, Smartphone, Building2, Check } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
+import { validators } from 'tailwind-merge';
 
 const router = useRouter();
 const route = useRoute();
 const restaurantId = route.params.id || '1'; // Default to '1' if id is not available
-const paymentType = route.query.type || 'full'; // 'deposit' or 'full'
 
-const isDepositOnly = computed(() => paymentType === 'deposit');
+//예약하기 플로우 = 예약금만 결제
+const isDepositOnly = computed(() => true);
 
 const selectedPayment = ref(null);
+
+//예약 약관
 const agreedToTerms = ref(false);
 const agreedToRefund = ref(false);
+//예약 약관 전체동의
+const allAgreed = computed ({
+  get : () => agreedToTerms.value && agreedToRefund.value,
+  set : (v) => {
+    agreedToTerms.value = v;
+    agreedToRefund.value = v;
+  },
+})
+
 const isTermsModalOpen = ref(false);
 const modalTitle = ref('');
 const modalContent = ref('');
 
-const depositAmount = 10000; // 예약금 1만원
-const totalAmount = computed(() => (isDepositOnly.value ? depositAmount : 176000));
+//인원수 : query에서 partySize로 받는다고 가정 (없으면 1명)
+const headcount = computed(() => {
+  const q = Number(route.query.partySize);
+  return Number.isFinite(q) && q > 0 ? q : 1;
+});
+
+//1~6인 5,000원 / 7인 이상 : 10,000원
+const depositPerPaerson = computed(() => (headcount.value >= 7 ? 10000 : 5000));
+
+//총 예약금
+const totalAmount = computed (() => headcount.value * depositPerPaerson.value);
 
 const bookingId = computed(() => route.query.bookingId || null);
 const bookingSummary = ref({
@@ -172,6 +193,19 @@ const handlePayment = () => {
       <div class="px-4 py-5 bg-white border-t border-b border-[#e9ecef]">
         <h2 class="text-base font-semibold text-[#1e3a5f] mb-4">약관 동의</h2>
         <div class="space-y-3">
+          <!-- 예약 이용 약관 전체 동의 -->
+          <label :class="`flex items-start gap-3 cursor-pointer group rounded-xl p-2 -m-2 transition-colors ${allAgreed ? 'bg-[#fff5f3]' : ''}`">
+            <div class="relative flex-shrink-0 mt-0.5">
+              <input type="checkbox" v-model="allAgreed" class="sr-only" />
+              <div :class="`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${allAgreed ? 'bg-[#ff6b4a] border-[#ff6b4a]' : 'bg-white border-[#dee2e6]'} group-hover:border-[#ff6b4a]`">
+                <Check v-if="allAgreed" class="w-3.5 h-3.5 text-white" />
+              </div>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm text-[#1e3a5f] font-semibold mb-0.5">(필수) 전체 동의</p>
+              <p class="text-xs text-[#6c757d]">서비스 이용약관 및 취소/환불 정책에 모두 동의합니다.</p>
+            </div>
+          </label>
           <label :class="`flex items-start gap-3 cursor-pointer group rounded-xl p-2 -m-2 transition-colors ${agreedToTerms ? 'bg-[#fff5f3]' : ''}`">
             <div class="relative flex-shrink-0 mt-0.5">
               <input type="checkbox" v-model="agreedToTerms" class="sr-only" />
