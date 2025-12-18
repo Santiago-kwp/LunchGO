@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { RouterLink, useRoute } from 'vue-router'; // Import useRoute to get dynamic params
 import { ArrowLeft, Plus, Minus, ShoppingCart } from 'lucide-vue-next';
+import { getMenuCategoriesByRestaurant } from '@/data/restaurantMenus';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 
@@ -10,49 +11,25 @@ const restaurantId = route.params.id || '1'; // Default to '1' if id is not avai
 
 const cart = ref([]); // Use ref for the cart array
 
-const menuItems = ref([
-  {
-    id: 1,
-    name: 'A코스',
-    price: 35000,
-    description: '전채 + 메인 + 디저트',
-    category: '코스 메뉴',
-  },
-  {
-    id: 2,
-    name: 'B코스',
-    price: 45000,
-    description: '전채 + 메인 + 디저트 + 와인',
-    category: '코스 메뉴',
-  },
-  {
-    id: 3,
-    name: 'C코스',
-    price: 55000,
-    description: '전채 + 메인 + 디저트 + 프리미엄 와인',
-    category: '코스 메뉴',
-  },
-  {
-    id: 4,
-    name: '파스타',
-    price: 18000,
-    category: '단품 메뉴',
-  },
-  {
-    id: 5,
-    name: '스테이크',
-    price: 28000,
-    category: '단품 메뉴',
-  },
-  {
-    id: 6,
-    name: '리조또',
-    price: 16000,
-    category: '단품 메뉴',
-  },
-]);
+const menuCategories = ref(getMenuCategoriesByRestaurant(restaurantId));
 
-const categories = ref(['코스 메뉴', '단품 메뉴']);
+// "35,000원" -> 35000
+const parsePrice = (price) => Number(String(price).replace(/[^\d]/g, ''));
+
+// flat으로 펴서 지금 UI 구조 유지
+const menuItems = computed(() =>
+  menuCategories.value.flatMap((cat) =>
+    cat.items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      category: cat.name,
+      price: parsePrice(item.price),
+    })),
+  ),
+);
+
+const categories = computed(() => menuCategories.value.map((c) => c.name));
 
 const addToCart = (item) => {
   const existingItem = cart.value.find((cartItem) => cartItem.id === item.id);
@@ -82,6 +59,15 @@ const totalAmount = computed(() => {
 const totalItems = computed(() => {
   return cart.value.reduce((sum, item) => sum + item.quantity, 0);
 });
+
+// 예약 페이지에서 넘어온 인원수 (없으면 1)
+const partySize = computed(() => {
+  const q = Number(route.query.partySize);
+  return Number.isFinite(q) && q > 0 ? q : 1;
+});
+
+// 1인당 최소 1개 => 총 선택 개수 >= 인원수
+const canProceed = computed(() => totalItems.value >= partySize.value);
 </script>
 
 <template>
@@ -161,11 +147,32 @@ const totalItems = computed(() => {
           </div>
           <p class="text-lg font-bold text-[#1e3a5f]">{{ totalAmount.toLocaleString() }}원</p>
         </div>
-        <RouterLink :to="`/restaurant/${restaurantId}/summary`">
+        <RouterLink
+          v-if="canProceed"
+          :to="{
+            path: `/restaurant/${restaurantId}/payment`,
+            query: {
+              type: 'full',
+              totalAmount: totalAmount, 
+              partySize: route.query.partySize,
+              requestNote: route.query.requestNote,
+              dateIndex: route.query.dateIndex,
+              time: route.query.time,
+            },
+          }"
+        >
           <Button class="w-full h-12 gradient-primary text-white font-semibold text-base rounded-xl shadow-button-hover hover:shadow-button-pressed">
-            예약 확인하기
+            {{ totalAmount.toLocaleString() }}원 결제하기
           </Button>
         </RouterLink>
+
+        <Button
+          v-else
+          disabled
+          class="w-full h-12 gradient-primary text-white font-semibold text-base rounded-xl opacity-50 cursor-not-allowed"
+        >
+          1인당 최소 1개 선택 ({{ totalItems }}/{{ partySize }})
+        </Button>
       </div>
     </div>
   </div>

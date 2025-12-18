@@ -33,9 +33,20 @@ const timeSlots = ref(['11:00', '12:00', '13:00', '14:00']);
 
 const canProceed = computed(() => selectedDateIndex.value !== null && selectedTime.value !== null);
 
-//예약금 * 인원수 계산식
+//예약금 * 인원수 계산식 + 선주문/선결제 플로우 포함
 const nextPage = computed(() => {
-  if (isPreorder.value) return `/restaurant/${restaurantId}/menu`;
+  if (isPreorder.value) {
+  return {
+    path: `/restaurant/${restaurantId}/menu`,
+    query: {
+      type: 'preorder',
+      partySize: partySize.value,
+      requestNote: requestNote.value,
+      dateIndex: selectedDateIndex.value,
+      time: selectedTime.value,
+    },
+  };
+}
 
   // 예약금 결제 페이지로 partySize 전달
   return {
@@ -134,7 +145,7 @@ const selectDate = (idx) => {
 
         <div class="flex items-center justify-between max-w-xs mx-auto">
           <button
-            @click="partySize = Math.max(4, partySize.value - 1)"
+            @click="partySize = Math.max(4, partySize - 1)"
             :disabled="partySize <= 4"
             class="w-12 h-12 rounded-full border-2 border-[#dee2e6] bg-white text-[#1e3a5f] font-bold text-xl disabled:opacity-30 disabled:cursor-not-allowed hover:border-[#ff6b4a] hover:text-[#ff6b4a] transition-colors"
           >
