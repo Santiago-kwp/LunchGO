@@ -6,6 +6,7 @@ import {
   onMounted,
   onBeforeUnmount,
   reactive,
+  nextTick,
 } from 'vue';
 import {
   MapPin,
@@ -48,11 +49,25 @@ const avoidIngredients = ref([]);
 const searchDistance = ref('');
 const budget = ref(500000);
 
+const selectedDistanceKm = computed(() => {
+  if (!searchDistance.value) return null;
+  const kmMatch = searchDistance.value.match(/([\d.]+)\s*km/);
+  if (kmMatch) return Number(kmMatch[1]);
+  return null;
+});
+
 const restaurants = restaurantData;
 const restaurantsPerPage = 10;
 const currentPage = ref(1);
 const processedRestaurants = computed(() => {
   let result = restaurants.slice();
+
+  const distanceLimit = selectedDistanceKm.value;
+  if (distanceLimit) {
+    result = result.filter((restaurant) =>
+      isWithinDistance(restaurant.coords, distanceLimit)
+    );
+  }
 
   const activeRange = selectedPriceRange.value;
   if (activeRange && activeRange !== '전체') {
@@ -78,7 +93,7 @@ const processedRestaurants = computed(() => {
     },
     거리순: (a, b) => getDistance(a) - getDistance(b),
     평점순: (a, b) => (b.rating ?? 0) - (a.rating ?? 0),
-    '낮은 가격순': (a, b) => {
+    가격순: (a, b) => {
       const priceA = extractPriceValue(a.price) ?? Number.POSITIVE_INFINITY;
       const priceB = extractPriceValue(b.price) ?? Number.POSITIVE_INFINITY;
       return priceA - priceB;
@@ -106,6 +121,8 @@ const restaurantGeocodeCache = new Map();
 
 const mapContainer = ref(null);
 const mapInstance = ref(null);
+const kakaoMapsApi = ref(null);
+const isMapReady = ref(false);
 const mapMarkers = [];
 const defaultMapCenter = restaurants[0]?.coords || {
   lat: 37.394374,
@@ -328,20 +345,29 @@ const renderMapMarkers = async (kakaoMaps) => {
   mapMarkers.forEach((marker) => marker.setMap(null));
   mapMarkers.length = 0;
 
+  const distanceLimit = selectedDistanceKm.value;
+
   for (const restaurant of restaurants) {
     const coords = await resolveRestaurantCoords(restaurant);
-    if (!coords) continue;
+    if (!isValidCoords(coords)) continue;
+    if (distanceLimit && !isWithinDistance(coords, distanceLimit)) {
+      continue;
+    }
 
     const marker = new kakaoMaps.Marker({
       position: new kakaoMaps.LatLng(coords.lat, coords.lng),
       title: restaurant.name,
     });
 
-    marker.setMap(mapInstance.value);
-    kakaoMaps.event.addListener(marker, 'click', () => {
-      selectedMapRestaurant.value = restaurant;
-    });
-    mapMarkers.push(marker);
+    try {
+      marker.setMap(mapInstance.value);
+      kakaoMaps.event.addListener(marker, 'click', () => {
+        selectedMapRestaurant.value = restaurant;
+      });
+      mapMarkers.push(marker);
+    } catch (error) {
+      console.error('지도 마커 표시 실패:', restaurant?.name, error);
+    }
   }
 };
 
@@ -350,11 +376,64 @@ const levelForDistance = (stepIndex) => {
   return step.level;
 };
 
-const applyHomeMapZoom = () => {
-  if (!mapInstance.value) return;
-  mapInstance.value.setLevel(levelForDistance(mapDistanceStepIndex.value), {
-    animate: { duration: 300 },
+let mapZoomRafId = 0;
+let mapZoomRetryId = 0;
+let mapZoomAttempts = 0;
+let pendingMapZoomLevel = null;
+const maxMapZoomAttempts = 3;
+const scheduleMapZoom = (force = false) => {
+  if (mapZoomRafId) {
+    cancelAnimationFrame(mapZoomRafId);
+  }
+  if (mapZoomRetryId) {
+    clearTimeout(mapZoomRetryId);
+    mapZoomRetryId = 0;
+  }
+  mapZoomAttempts = 0;
+  mapZoomRafId = requestAnimationFrame(() => {
+    mapZoomRafId = 0;
+    if (!mapInstance.value) return;
+    if (!force && !isMapReady.value) return;
+    if (isSearchOpen.value) return;
+    if (!mapContainer.value?.offsetWidth || !mapContainer.value?.offsetHeight) {
+      return;
+    }
+    if (!mapContainer.value?.isConnected || !mapContainer.value?.offsetParent) {
+      return;
+    }
+    const targetLevel =
+      pendingMapZoomLevel ?? levelForDistance(mapDistanceStepIndex.value);
+    const attemptZoom = () => {
+      if (!mapInstance.value) return;
+      try {
+        mapInstance.value.relayout?.();
+        if (typeof mapInstance.value.getBounds === 'function') {
+          const bounds = mapInstance.value.getBounds();
+          if (!bounds) throw new Error('map-bounds-unavailable');
+        }
+        if (typeof mapInstance.value.getLevel === 'function') {
+          const currentLevel = mapInstance.value.getLevel();
+          if (currentLevel === targetLevel) {
+            pendingMapZoomLevel = null;
+            return;
+          }
+        }
+        mapInstance.value.setLevel(targetLevel);
+        pendingMapZoomLevel = null;
+      } catch (error) {
+        mapZoomAttempts += 1;
+        if (mapZoomAttempts < maxMapZoomAttempts) {
+          mapZoomRetryId = setTimeout(attemptZoom, 120);
+        }
+      }
+    };
+    attemptZoom();
   });
+};
+
+const applyHomeMapZoom = (force = false) => {
+  pendingMapZoomLevel = levelForDistance(mapDistanceStepIndex.value);
+  scheduleMapZoom(force);
 };
 
 const changeMapDistance = (delta) => {
@@ -384,6 +463,7 @@ const initializeMap = async () => {
   if (!mapContainer.value) return;
   try {
     const kakaoMaps = await loadKakaoMaps();
+    kakaoMapsApi.value = kakaoMaps;
     const center = new kakaoMaps.LatLng(
       defaultMapCenter.lat,
       defaultMapCenter.lng
@@ -392,9 +472,15 @@ const initializeMap = async () => {
       center,
       level: levelForDistance(mapDistanceStepIndex.value),
     });
+    kakaoMaps.event.addListener(mapInstance.value, 'idle', () => {
+      if (pendingMapZoomLevel != null) {
+        scheduleMapZoom(true);
+      }
+    });
 
     await renderMapMarkers(kakaoMaps);
-    applyHomeMapZoom();
+    applyHomeMapZoom(true);
+    isMapReady.value = true;
   } catch (error) {
     console.error('카카오 지도 초기화에 실패했습니다.', error);
   }
@@ -408,10 +494,33 @@ onBeforeUnmount(() => {
   mapMarkers.forEach((marker) => marker.setMap(null));
   mapMarkers.length = 0;
   mapInstance.value = null;
+  isMapReady.value = false;
+  if (mapRenderRafId) {
+    cancelAnimationFrame(mapRenderRafId);
+    mapRenderRafId = 0;
+  }
+  if (mapZoomRafId) {
+    cancelAnimationFrame(mapZoomRafId);
+    mapZoomRafId = 0;
+  }
+  if (mapZoomRetryId) {
+    clearTimeout(mapZoomRetryId);
+    mapZoomRetryId = 0;
+  }
 });
 
 watch(mapDistanceStepIndex, () => {
   applyHomeMapZoom();
+});
+
+watch(isSearchOpen, (isOpen) => {
+  if (!isOpen) {
+    nextTick(() => {
+      setTimeout(() => {
+        applyHomeMapZoom(true);
+      }, 120);
+    });
+  }
 });
 
 // Static data (constants)
@@ -487,6 +596,46 @@ const haversineDistance = (coordsA = {}, coordsB = {}) => {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return earthRadius * c;
 };
+
+const isValidCoords = (coords) =>
+  Number.isFinite(coords?.lat) && Number.isFinite(coords?.lng);
+
+const isWithinDistance = (coords, limitKm) => {
+  if (!limitKm) return true;
+  if (!isValidCoords(coords)) return false;
+  return haversineDistance(coords, defaultMapCenter) <= limitKm;
+};
+
+let mapRenderRafId = 0;
+const scheduleMapMarkerRender = () => {
+  if (mapRenderRafId) {
+    cancelAnimationFrame(mapRenderRafId);
+  }
+  mapRenderRafId = requestAnimationFrame(() => {
+    mapRenderRafId = 0;
+    if (!isMapReady.value || !kakaoMapsApi.value || !mapInstance.value) {
+      return;
+    }
+    if (!mapContainer.value?.offsetWidth || !mapContainer.value?.offsetHeight) {
+      return;
+    }
+    renderMapMarkers(kakaoMapsApi.value);
+  });
+};
+
+watch(selectedDistanceKm, (distanceLimit) => {
+  if (distanceLimit) {
+    const label = `${distanceLimit}km`;
+    const stepIndex = mapDistanceSteps.findIndex(
+      (step) => step.label === label
+    );
+    if (stepIndex !== -1) {
+      mapDistanceStepIndex.value = stepIndex;
+    }
+  }
+
+  scheduleMapMarkerRender();
+});
 
 // Event handlers
 const openFilterModal = () => {
