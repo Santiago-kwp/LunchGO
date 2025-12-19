@@ -61,6 +61,19 @@ const restaurantId = computed(
         </li>
         <li>
           <RouterLink
+            to="/business/notifications"
+            :class="[
+              'block px-4 py-3 rounded-lg transition-colors',
+              activeMenu === 'notifications'
+                ? 'text-white bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] font-semibold'
+                : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
+            ]"
+          >
+            알림 내역
+          </RouterLink>
+        </li>
+        <li>
+          <RouterLink
             :to="`/business/restaurant-info/${restaurantId}`"
             :class="[
               'block px-4 py-3 rounded-lg transition-colors',
@@ -96,19 +109,6 @@ const restaurantId = computed(
             ]"
           >
             리뷰 관리
-          </RouterLink>
-        </li>
-        <li>
-          <RouterLink
-            to="/business/analytics"
-            :class="[
-              'block px-4 py-3 rounded-lg transition-colors',
-              activeMenu === 'analytics'
-                ? 'text-white bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] font-semibold'
-                : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
-            ]"
-          >
-            대시보드
           </RouterLink>
         </li>
         <li>

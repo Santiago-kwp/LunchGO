@@ -256,6 +256,12 @@ const router = createRouter({
       name: 'signup-owner',
       component: () => import('../views/signup/OwnerSignupPage.vue'),
     },
+    //방문 선택 확인 페이지
+    {
+      path: '/business/notifications',
+      name: 'business-notifications',
+      component: () => import('../views/business/notifications/BusinessNotificationsPage.vue'),
+    },
     //예약 상세보기
     {
       path: '/business/reservations/:id',
