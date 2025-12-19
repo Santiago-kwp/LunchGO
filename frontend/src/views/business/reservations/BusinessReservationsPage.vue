@@ -189,13 +189,11 @@ const submitCancel = () => {
 
   if (!reason) {
     cancelError.value = '취소 사유는 필수 입니다.';
-    window.alert('취소 사유를 입력해주세요.');
     return;
   }
 
   if (reason.length > MAX_CANCEL_REASON) {
     cancelError.value = `취소 사유는 ${MAX_CANCEL_REASON}자 이내로 입력해주세요.`;
-    window.alert(`취소 사유는 ${MAX_CANCEL_REASON}자 이내로 입력해주세요.`);
     return;
   }
 
