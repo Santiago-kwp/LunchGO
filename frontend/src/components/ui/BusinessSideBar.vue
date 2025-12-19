@@ -8,6 +8,14 @@ defineProps({
     required: true,
   },
 });
+<<<<<<< Updated upstream
+=======
+
+const restaurantStore = useRestaurantStore();
+const restaurantId = computed(
+  () => restaurantStore.restaurantInfo?.restaurantId || 1
+); // 스토어에 ID가 없을 경우 임시로 1을 사용
+>>>>>>> Stashed changes
 </script>
 
 <template>
@@ -102,6 +110,19 @@ defineProps({
             ]"
           >
             대시보드
+          </RouterLink>
+        </li>
+        <li>
+          <RouterLink
+            :to="`/business/mypage`"
+            :class="[
+              'block px-4 py-3 rounded-lg transition-colors',
+              activeMenu === 'business-mypage'
+                ? 'text-white bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] font-semibold'
+                : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
+            ]"
+          >
+            마이페이지
           </RouterLink>
         </li>
       </ul>

@@ -131,7 +131,12 @@ const router = createRouter({
     {
       path: '/mypage',
       name: 'mypage',
-      component: () => import('../views/mypage/MyPage.vue'),
+      component: () => import('../views/mypage/UserMyPage.vue'),
+    },
+    {
+      path: '/business/mypage',
+      name: 'business-mypage',
+      component: () => import('../views/mypage/OwnerMyPage.vue'),
     },
     {
       path: '/partner',
@@ -282,4 +287,3 @@ router.beforeEach((to, from) => {
 });
 
 export default router;
-
