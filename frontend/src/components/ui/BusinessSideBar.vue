@@ -1,5 +1,7 @@
 <script setup>
 import { RouterLink } from 'vue-router';
+import { computed } from 'vue';
+import { useRestaurantStore } from '@/stores/restaurant';
 
 // 'activeMenu' 라는 이름의 prop을 정의합니다.
 defineProps({
