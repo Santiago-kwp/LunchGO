@@ -1,0 +1,59 @@
+name: Backend Deploy to Private Server
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "backend/**"
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v3
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      # 1. Spring Boot 빌드
+      - name: Build with Gradle
+        working-directory: ./backend
+        run: |
+          chmod +x gradlew
+          ./gradlew clean bootJar
+
+      # 2. Jar 파일을 Server 1(Bastion)으로 전송
+      - name: Copy Jar to Bastion (Server 1)
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }} # Server 1의 공인 IP
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "./backend/build/libs/*.jar"
+          target: "/home/ncp-user/deploy"
+          strip_components: 3 # 경로 떼고 파일만 전송
+
+      # 3. Server 1에서 Server 2로 전송 및 실행 스크립트 가동
+      - name: Deploy to Server 2 via Bastion
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            # Server 1 내부에서 실행되는 명령어들
+
+            # 1. Server 2(Private)로 파일 전송 (scp)
+            # 주의: Server 1에서 Server 2로 접속할 때 쓸 pem키가 Server 1에 있어야 함
+            scp -i /home/ncp-user/lunchgo.pem /home/ncp-user/deploy/*.jar root@10.0.2.6:/home/ncp-user/app.jar
+
+            # 2. Server 2에 원격 명령 내려서 재시작
+            ssh -i /home/ncp-user/lunchgo.pem root@10.0.2.6 "
+              fuser -k 8080/tcp || true
+              nohup java -jar /home/ncp-user/app.jar > /home/ncp-user/app.log 2>&1 &
+            "

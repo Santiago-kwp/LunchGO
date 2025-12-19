@@ -1,0 +1,40 @@
+name: Frontend Deploy to NCP Object Storage
+
+on:
+  push:
+    branches: ["dev"]
+    paths:
+      - "frontend/**" # frontend 폴더가 변경될 때만 실행 (프로젝트 구조에 맞게 수정)
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18" # 프로젝트 버전에 맞게 수정
+
+      # 1. Vue 프로젝트 빌드
+      - name: Install and Build
+        working-directory: ./frontend # Vue 프로젝트가 있는 폴더명
+        run: |
+          npm install
+          npm run build
+
+      # 2. NCP Object Storage로 업로드 (S3 호환)
+      - name: Deploy to NCP Object Storage
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.NCP_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.NCP_SECRET_KEY }}
+        run: |
+          # NCP의 리전이 한국이면 kr-standard 사용
+          aws s3 sync ./frontend/dist s3://${{ secrets.NCP_BUCKET_NAME }} \
+            --region kr-standard \
+            --endpoint-url=http://lunchgo-bucket.s3-website.kr.object.ncloudstorage.com/ \
+            --acl public-read \
+            --delete
