@@ -269,11 +269,11 @@ const selectDay = (day) => {
               <button @click="nextMonth" class="px-4 py-2 text-sm font-medium text-[#1e3a5f] hover:bg-[#f8f9fa] rounded-lg">&gt;</button>
             </div>
 
-            <div class="grid grid-cols-7 gap-2">
+            <div class="grid grid-cols-7 gap-x-2 gap-y-1">
               <div
                 v-for="dayName in ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']"
                 :key="dayName"
-                class="text-center text-sm font-medium text-[#6c757d] py-2"
+                class="text-center text-sm font-medium text-[#6c757d] py-1"
               >
                 {{ dayName }}
               </div>
@@ -283,7 +283,8 @@ const selectDay = (day) => {
                 @click="selectDay(day)"
                 :disabled="!day"
                 :class="[
-                  'relative aspect-square rounded-xl p-3 flex flex-col justify-between items-stretch border transition-all',
+                  'relative h-24 rounded-xl p-3 flex flex-col justify-between items-stretch border transition-all',
+                  
                   { invisible: !day },
                   isSelectedDate(day)
                     ? 'bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] text-white border-transparent shadow-md'
@@ -299,13 +300,13 @@ const selectDay = (day) => {
                 <div
                   v-if="day && getReservationCountForDay(day) > 0"
                   :class="[
-                    'mt-2 rounded-lg px-3 py-2 text-center font-semibold',
+                    'mt-1 rounded-lg px-2 py-1 text-center font-semibold text-xs',
                     isSelectedDate(day)
                       ? 'bg-white/20 text-white'
                       : 'bg-[#1e3a5f] text-white'
                   ]"
                 >
-                  예약 <span class="text-xl font-extrabold">{{ getReservationCountForDay(day) }}</span>건
+                  예약 <span class="text-base font-extrabold">{{ getReservationCountForDay(day) }}</span>건
                 </div>
               </button>
             </div>
