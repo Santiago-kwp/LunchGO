@@ -35,6 +35,6 @@ jobs:
           # NCP의 리전이 한국이면 kr-standard 사용
           aws s3 sync ./frontend/dist s3://${{ secrets.NCP_BUCKET_NAME }} \
             --region kr-standard \
-            --endpoint-url=http://lunchgo-bucket.s3-website.kr.object.ncloudstorage.com/ \
+            --endpoint-url=https://kr.object.ncloudstorage.com \
             --acl public-read \
             --delete
