@@ -455,7 +455,16 @@ const saveRestaurant = async () => {
       console.log('Creating new restaurant:', dataToSubmit);
     }
     alert('저장되었습니다.');
-    router.push('/business/restaurant-info');
+    if (isEditMode.value) {
+      // 수정 모드일 경우, 현재 restaurantId를 사용하여 상세 페이지로 이동
+      router.push(`/business/restaurant-info/${route.params.id}`);
+    } else {
+      // 등록 모드일 경우, 새로운 restaurantId가 필요합니다.
+      // 현재 API가 실제 ID를 반환하지 않으므로, 임시로 1로 설정합니다.
+      // TODO: 실제 API 연동 시, 응답으로 받은 새 ID를 사용해야 합니다.
+      const newRestaurantId = 1;
+      router.push(`/business/restaurant-info/${newRestaurantId}`);
+    }
   } catch (error) {
     console.error('저장 실패:', error);
     alert('저장에 실패했습니다.');
