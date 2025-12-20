@@ -513,6 +513,18 @@ watch(formData, (newState) => {
   if (newState.description) validationErrors.description = '';
 });
 
+// formData의 변경을 감지하여 Pinia store에 동기화
+watch(
+  formData,
+  (newData) => {
+    // store.restaurantInfo가 존재할 때만 동기화
+    if (store.restaurantInfo) {
+      Object.assign(store.restaurantInfo, newData);
+    }
+  },
+  { deep: true }
+);
+
 watch(restaurantImageFile, (newFile) => {
   if (newFile) validationErrors.image = '';
 });
