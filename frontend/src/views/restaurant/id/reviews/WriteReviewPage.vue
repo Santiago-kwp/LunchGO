@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { ArrowLeft, X, Upload, Plus } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
+import axios from 'axios';
+
 
 const route = useRoute();
 const router = useRouter();
@@ -350,10 +352,43 @@ const closeReceiptModal = () => {
 };
 
 // 영수증 업로드
-const handleReceiptUpload = () => {
-  // 실제 구현 시 파일 업로드 로직
-  receipt.value.uploaded = true;
-  closeReceiptModal();
+const handleReceiptUpload = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // 로딩 표시를 해주면 좋습니다.
+  console.log("OCR 처리 시작...");
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const response = await axios.post('/api/ocr/receipt', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+
+    const data = response.data;
+
+    // 2. 영수증 데이터 UI에 매핑
+    receipt.value.date = formatOcrDate(data.date); // 날짜 포맷팅 함수 필요시 적용
+    receipt.value.totalAmount = data.totalAmount;
+    receipt.value.items = data.items; // 서버에서 받아온 메뉴 리스트
+    receipt.value.uploaded = true;
+
+    closeReceiptModal();
+    alert("영수증 인식이 완료되었습니다.");
+  } catch (error) {
+    console.error("OCR 실패:", error);
+    alert("영수증 인식에 실패했습니다. 직접 입력해주세요.");
+  }
+};
+// 날짜 형식 예쁘게 바꾸는 헬퍼 함수 (선택)
+const formatOcrDate = (dateStr) => {
+  if(!dateStr) return '';
+  // '2023-07-11' -> '2023년 07월 11일'
+  const date = new Date(dateStr);
+  const days = ['일', '월', '화', '수', '목', '금', '토'];
+  return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 (${days[date.getDay()]})`;
 };
 
 // 마우스 드래그 스크롤 설정
