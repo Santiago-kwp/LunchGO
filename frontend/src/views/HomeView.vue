@@ -7,7 +7,7 @@ import {
   onBeforeUnmount,
   reactive,
   nextTick,
-} from 'vue';
+} from "vue";
 import {
   MapPin,
   Calendar,
@@ -21,33 +21,39 @@ import {
   ChevronLeft,
   ChevronRight,
   Home,
-} from 'lucide-vue-next'; // Import Lucide icons for Vue
-import Button from '@/components/ui/Button.vue'; // Import our custom Button component
-import Card from '@/components/ui/Card.vue';
-import AppFooter from '@/components/ui/AppFooter.vue';
-import BottomNav from '@/components/ui/BottomNav.vue';
-import { RouterLink } from 'vue-router'; // Import Vue RouterLink
-import { loadKakaoMaps, geocodeAddress } from '@/utils/kakao';
-import { restaurants as restaurantData } from '@/data/restaurants';
-import AppHeader from '@/components/ui/AppHeader.vue';
+} from "lucide-vue-next"; // Import Lucide icons for Vue
+import Button from "@/components/ui/Button.vue"; // Import our custom Button component
+import Card from "@/components/ui/Card.vue";
+import AppFooter from "@/components/ui/AppFooter.vue";
+import BottomNav from "@/components/ui/BottomNav.vue";
+import { RouterLink } from "vue-router"; // Import Vue RouterLink
+import { loadKakaoMaps, geocodeAddress } from "@/utils/kakao";
+import { restaurants as restaurantData } from "@/data/restaurants";
+import AppHeader from "@/components/ui/AppHeader.vue";
+import CafeteriaMenuUploadModal from "@/components/ui/CafeteriaMenuUploadModal.vue";
+import CafeteriaRecommendationList from "@/components/ui/CafeteriaRecommendationList.vue";
+import { cafeteriaRecommendationsSample } from "@/data/cafeteriaRecommendations";
 
 // State management (React's useState -> Vue's ref)
 const isFilterOpen = ref(false);
-const selectedSort = ref('추천순');
+const selectedSort = ref("추천순");
 const selectedPriceRange = ref(null);
+const isCafeteriaMenuModalOpen = ref(false);
+const cafeteriaRecommendations = ref([]);
+const cafeteriaRecommendationStorageKey = "cafeteriaRecommendations";
 const filterForm = reactive({
   sort: selectedSort.value,
   priceRange: selectedPriceRange.value,
 });
 
 const isSearchOpen = ref(false);
-const searchDate = ref('');
-const searchTime = ref('');
+const searchDate = ref("");
+const searchTime = ref("");
 const searchCategories = ref([]);
 const searchPartySize = ref(4);
 const searchTags = ref([]);
 const avoidIngredients = ref([]);
-const searchDistance = ref('');
+const searchDistance = ref("");
 const budget = ref(500000);
 
 const selectedDistanceKm = computed(() => {
@@ -71,7 +77,7 @@ const processedRestaurants = computed(() => {
   }
 
   const activeRange = selectedPriceRange.value;
-  if (activeRange && activeRange !== '전체') {
+  if (activeRange && activeRange !== "전체") {
     const range = priceRangeMap[activeRange];
     if (range) {
       result = result.filter((restaurant) => {
@@ -129,17 +135,17 @@ const defaultMapCenter = restaurants[0]?.coords || {
   lat: 37.394374,
   lng: 127.110636,
 };
-const currentLocation = ref('경기도 성남시 분당구 판교동');
+const currentLocation = ref("경기도 성남시 분당구 판교동");
 const mapDistanceSteps = Object.freeze([
-  { label: '100m', level: 2 },
-  { label: '250m', level: 3 },
-  { label: '500m', level: 4 },
-  { label: '1km', level: 5 },
-  { label: '2km', level: 6 },
-  { label: '3km', level: 7 },
+  { label: "100m", level: 2 },
+  { label: "250m", level: 3 },
+  { label: "500m", level: 4 },
+  { label: "1km", level: 5 },
+  { label: "2km", level: 6 },
+  { label: "3km", level: 7 },
 ]);
 const defaultMapDistanceIndex = mapDistanceSteps.findIndex(
-  (step) => step.label === '500m'
+  (step) => step.label === "500m"
 );
 const mapDistanceStepIndex = ref(
   defaultMapDistanceIndex === -1 ? 0 : defaultMapDistanceIndex
@@ -158,7 +164,7 @@ const distanceSliderFill = computed(() => {
 
 const isCalendarOpen = ref(false);
 const calendarMonth = ref(new Date());
-const weekdayLabels = ['일', '월', '화', '수', '목', '금', '토'];
+const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
 const selectedMapRestaurant = ref(null);
 const favoriteRestaurantIds = ref([]);
 
@@ -171,30 +177,30 @@ const perPersonBudget = computed(() => {
 
 const perPersonBudgetDisplay = computed(() => {
   if (!perPersonBudget.value) {
-    return '0원';
+    return "0원";
   }
   return `${perPersonBudget.value.toLocaleString()}원`;
 });
 
 const formattedSearchDate = computed(() => {
   if (!searchDate.value) {
-    return '날짜를 선택하세요';
+    return "날짜를 선택하세요";
   }
   const date = new Date(searchDate.value);
   if (Number.isNaN(date.getTime())) {
-    return '날짜를 선택하세요';
+    return "날짜를 선택하세요";
   }
-  return date.toLocaleDateString('ko-KR', {
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
+  return date.toLocaleDateString("ko-KR", {
+    month: "long",
+    day: "numeric",
+    weekday: "short",
   });
 });
 
 const formattedCalendarMonth = computed(() => {
-  return calendarMonth.value.toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: 'long',
+  return calendarMonth.value.toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "long",
   });
 });
 
@@ -223,8 +229,8 @@ const calendarDays = computed(() => {
 
 const formatDateValue = (date) => {
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
 
@@ -300,8 +306,8 @@ watch(selectedPriceRange, () => {
 const goToPage = (page) => {
   if (page < 1 || page > totalPages.value) return;
   currentPage.value = page;
-  if (typeof window !== 'undefined') {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (typeof window !== "undefined") {
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 };
 
@@ -335,7 +341,7 @@ const resolveRestaurantCoords = async (restaurant) => {
     restaurant.coords = coords;
     return coords;
   } catch (error) {
-    console.error('주소 지오코딩 실패:', cacheKey, error);
+    console.error("주소 지오코딩 실패:", cacheKey, error);
     return null;
   }
 };
@@ -362,12 +368,12 @@ const renderMapMarkers = async (kakaoMaps) => {
 
     try {
       marker.setMap(mapInstance.value);
-      kakaoMaps.event.addListener(marker, 'click', () => {
+      kakaoMaps.event.addListener(marker, "click", () => {
         selectedMapRestaurant.value = restaurant;
       });
       mapMarkers.push(marker);
     } catch (error) {
-      console.error('지도 마커 표시 실패:', restaurant?.name, error);
+      console.error("지도 마커 표시 실패:", restaurant?.name, error);
     }
   }
 };
@@ -408,11 +414,11 @@ const scheduleMapZoom = (force = false) => {
       if (!mapInstance.value) return;
       try {
         mapInstance.value.relayout?.();
-        if (typeof mapInstance.value.getBounds === 'function') {
+        if (typeof mapInstance.value.getBounds === "function") {
           const bounds = mapInstance.value.getBounds();
-          if (!bounds) throw new Error('map-bounds-unavailable');
+          if (!bounds) throw new Error("map-bounds-unavailable");
         }
-        if (typeof mapInstance.value.getLevel === 'function') {
+        if (typeof mapInstance.value.getLevel === "function") {
           const currentLevel = mapInstance.value.getLevel();
           if (currentLevel === targetLevel) {
             pendingMapZoomLevel = null;
@@ -473,7 +479,7 @@ const initializeMap = async () => {
       center,
       level: levelForDistance(mapDistanceStepIndex.value),
     });
-    kakaoMaps.event.addListener(mapInstance.value, 'idle', () => {
+    kakaoMaps.event.addListener(mapInstance.value, "idle", () => {
       if (pendingMapZoomLevel != null) {
         scheduleMapZoom(true);
       }
@@ -483,7 +489,7 @@ const initializeMap = async () => {
     applyHomeMapZoom(true);
     isMapReady.value = true;
   } catch (error) {
-    console.error('카카오 지도 초기화에 실패했습니다.', error);
+    console.error("카카오 지도 초기화에 실패했습니다.", error);
   }
 };
 
@@ -525,57 +531,57 @@ watch(isSearchOpen, (isOpen) => {
 });
 
 // Static data (constants)
-const categories = ['한식', '중식', '일식', '양식'];
-const timeSlots = ['11:00', '12:00', '13:00', '14:00'];
+const categories = ["한식", "중식", "일식", "양식"];
+const timeSlots = ["11:00", "12:00", "13:00", "14:00"];
 const priceRanges = [
-  '전체',
-  '1만원 이하',
-  '1만원~1.5만원',
-  '1.5만원~2만원',
-  '2만원~3만원',
-  '3만원 이상',
+  "전체",
+  "1만원 이하",
+  "1만원~1.5만원",
+  "1.5만원~2만원",
+  "2만원~3만원",
+  "3만원 이상",
 ];
 const priceRangeMap = Object.freeze({
   전체: null,
-  '1만원 이하': { min: 0, max: 10000 },
-  '1만원~1.5만원': { min: 10000, max: 15000 },
-  '1.5만원~2만원': { min: 15000, max: 20000 },
-  '2만원~3만원': { min: 20000, max: 30000 },
-  '3만원 이상': { min: 30000, max: Number.POSITIVE_INFINITY },
+  "1만원 이하": { min: 0, max: 10000 },
+  "1만원~1.5만원": { min: 10000, max: 15000 },
+  "1.5만원~2만원": { min: 15000, max: 20000 },
+  "2만원~3만원": { min: 20000, max: 30000 },
+  "3만원 이상": { min: 30000, max: Number.POSITIVE_INFINITY },
 });
-const distances = ['1km 이내', '2km 이내', '3km 이내'];
-const sortOptions = ['추천순', '거리순', '평점순', '낮은 가격순'];
+const distances = ["1km 이내", "2km 이내", "3km 이내"];
+const sortOptions = ["추천순", "거리순", "평점순", "낮은 가격순"];
 const restaurantTags = [
-  '조용한',
-  '깔끔한',
-  '셀프바',
-  '주차장 제공',
-  '이국적/이색적',
-  '칸막이',
-  '룸',
-  '단체',
+  "조용한",
+  "깔끔한",
+  "셀프바",
+  "주차장 제공",
+  "이국적/이색적",
+  "칸막이",
+  "룸",
+  "단체",
 ];
 const ingredients = [
-  '견과류',
-  '우유',
-  '계란',
-  '밀',
-  '대두',
-  '갑각류',
-  '조개류',
-  '생선',
-  '메밀',
-  '고수',
-  '오이',
-  '파프리카',
-  '미나리',
-  '당근',
+  "견과류",
+  "우유",
+  "계란",
+  "밀",
+  "대두",
+  "갑각류",
+  "조개류",
+  "생선",
+  "메밀",
+  "고수",
+  "오이",
+  "파프리카",
+  "미나리",
+  "당근",
 ];
 
-const extractPriceValue = (priceText = '') => {
+const extractPriceValue = (priceText = "") => {
   const match = priceText.match(/([\d.,]+)\s*원/);
   const target = match?.[1] ?? priceText;
-  const digits = target.replace(/[^0-9]/g, '');
+  const digits = target.replace(/[^0-9]/g, "");
   if (!digits) return null;
   return Number(digits);
 };
@@ -667,12 +673,12 @@ const toggleRestaurantFavorite = (restaurantId) => {
 };
 
 const resetFilters = () => {
-  filterForm.sort = '추천순';
+  filterForm.sort = "추천순";
   filterForm.priceRange = null;
 };
 
 const applyFilters = () => {
-  selectedSort.value = filterForm.sort || '추천순';
+  selectedSort.value = filterForm.sort || "추천순";
   selectedPriceRange.value = filterForm.priceRange || null;
   currentPage.value = 1;
   isFilterOpen.value = false;
@@ -705,13 +711,13 @@ const toggleAvoidIngredient = (ingredient) => {
 };
 
 const resetSearch = () => {
-  searchDate.value = '';
-  searchTime.value = '';
+  searchDate.value = "";
+  searchTime.value = "";
   searchCategories.value = [];
   searchPartySize.value = 4;
   searchTags.value = [];
   avoidIngredients.value = [];
-  searchDistance.value = '';
+  searchDistance.value = "";
   budget.value = 500000;
   isCalendarOpen.value = false;
   calendarMonth.value = new Date();
@@ -726,6 +732,35 @@ const applySearch = () => {
 const closeMapRestaurantModal = () => {
   selectedMapRestaurant.value = null;
 };
+
+const handleCafeteriaRecommend = () => {
+  cafeteriaRecommendations.value = cafeteriaRecommendationsSample;
+  sessionStorage.setItem(
+    cafeteriaRecommendationStorageKey,
+    JSON.stringify(cafeteriaRecommendations.value)
+  );
+  isCafeteriaMenuModalOpen.value = false;
+  isFilterOpen.value = false;
+};
+
+const clearCafeteriaRecommendations = () => {
+  cafeteriaRecommendations.value = [];
+  sessionStorage.removeItem(cafeteriaRecommendationStorageKey);
+};
+
+onMounted(() => {
+  const storedRecommendations = sessionStorage.getItem(
+    cafeteriaRecommendationStorageKey
+  );
+  if (storedRecommendations) {
+    try {
+      cafeteriaRecommendations.value = JSON.parse(storedRecommendations);
+    } catch (error) {
+      console.error("추천 데이터 복원 실패:", error);
+      sessionStorage.removeItem(cafeteriaRecommendationStorageKey);
+    }
+  }
+});
 </script>
 
 <template>
@@ -790,9 +825,14 @@ const closeMapRestaurantModal = () => {
       <div class="px-4 py-5">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-[#1e3a5f]">
-            오늘의 추천 회식 맛집
+            {{
+              cafeteriaRecommendations.length
+                ? "구내식당 대체 추천"
+                : "오늘의 추천 회식 맛집"
+            }}
           </h3>
           <Button
+            v-if="!cafeteriaRecommendations.length"
             @click="isSearchOpen = true"
             variant="outline"
             size="sm"
@@ -801,9 +841,21 @@ const closeMapRestaurantModal = () => {
             <Search class="w-3.5 h-3.5" />
             검색
           </Button>
+          <Button
+            v-else
+            @click="clearCafeteriaRecommendations"
+            variant="outline"
+            size="sm"
+            class="h-8 px-3 text-xs border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] hover:text-[#1e3a5f] rounded-lg flex items-center gap-1"
+          >
+            추천 해제
+          </Button>
         </div>
 
-        <div class="flex items-center gap-2 mb-4">
+        <div
+          v-if="!cafeteriaRecommendations.length"
+          class="flex items-center gap-2 mb-4"
+        >
           <button
             @click="openFilterModal"
             class="flex items-center gap-1.5 text-sm text-[#6c757d] hover:text-[#ff6b4a] transition-colors"
@@ -813,7 +865,15 @@ const closeMapRestaurantModal = () => {
           </button>
         </div>
 
-        <div class="space-y-3">
+        <CafeteriaRecommendationList
+          v-if="cafeteriaRecommendations.length"
+          :recommendations="cafeteriaRecommendations"
+          :favoriteRestaurantIds="favoriteRestaurantIds"
+          :onToggleFavorite="toggleRestaurantFavorite"
+          class="mb-6"
+        />
+
+        <div v-else class="space-y-3">
           <RouterLink
             v-for="restaurant in paginatedRestaurants"
             :key="restaurant.id"
@@ -839,8 +899,8 @@ const closeMapRestaurantModal = () => {
                 <span class="sr-only">
                   {{
                     isRestaurantFavorite(restaurant.id)
-                      ? '즐겨찾기 해제'
-                      : '즐겨찾기에 추가'
+                      ? "즐겨찾기 해제"
+                      : "즐겨찾기에 추가"
                   }}
                 </span>
               </button>
@@ -891,7 +951,10 @@ const closeMapRestaurantModal = () => {
           </RouterLink>
         </div>
 
-        <div v-if="totalPages > 1" class="mt-6">
+        <div
+          v-if="!cafeteriaRecommendations.length && totalPages > 1"
+          class="mt-6"
+        >
           <nav
             class="flex flex-wrap items-center justify-center gap-2 text-sm"
             aria-label="페이지네이션"
@@ -1050,6 +1113,18 @@ const closeMapRestaurantModal = () => {
               </button>
             </div>
           </div>
+
+          <!-- TODO: 로그인 사용자만 노출 (백엔드 연동 후 v-if 적용) -->
+          <div>
+            <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">추천옵션</h4>
+            <button
+              type="button"
+              class="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]"
+              @click="isCafeteriaMenuModalOpen = true"
+            >
+              구내식당 대체 추천
+            </button>
+          </div>
         </div>
 
         <div
@@ -1071,6 +1146,12 @@ const closeMapRestaurantModal = () => {
         </div>
       </div>
     </div>
+
+    <CafeteriaMenuUploadModal
+      v-if="isCafeteriaMenuModalOpen"
+      @close="isCafeteriaMenuModalOpen = false"
+      @recommend="handleCafeteriaRecommend"
+    />
 
     <!-- Search Modal -->
     <div
@@ -1240,7 +1321,7 @@ const closeMapRestaurantModal = () => {
                 <span class="text-2xl font-semibold text-[#1e3a5f]">
                   {{
                     budget >= 500000
-                      ? '50만원 이상'
+                      ? "50만원 이상"
                       : `${(budget / 10000).toFixed(0)}만원`
                   }}
                 </span>
