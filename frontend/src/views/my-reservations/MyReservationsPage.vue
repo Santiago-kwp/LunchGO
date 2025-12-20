@@ -115,6 +115,22 @@ const allReservations = ref([
     status: "past",
     review: null, // 환불 완료 시 리뷰 데이터가 없어야 정상
   },
+  {
+    id: 6,
+    confirmationNumber: "LG2024111500001",
+    restaurant: {
+      id: 1,
+      name: "김치찌개",
+      address: "서울시 강남구 테헤란로 132",
+    },
+    booking: { date: "2024년 11월 15일 (금)", time: "11:00", partySize: 4 },
+    visitCount: 2,
+    daysSinceLastVisit: 70,
+    payment: { amount: 85000 },
+    reservationStatus: "completed", // 이용완료 -> 리뷰 작성 가능
+    status: "past",
+    review: null,
+  },
 ]);
 
 // 필터링: status가 'upcoming'인 것만 추출
