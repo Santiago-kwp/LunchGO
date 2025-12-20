@@ -3,8 +3,14 @@ import { ref, computed } from 'vue';
 import { Filter } from 'lucide-vue-next'; // Bell, User는 Header로 이동
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
+import StaffSideBar from '@/components/ui/StaffSideBar.vue';
 import { useRouter } from 'vue-router';
 const router = useRouter();
+
+
+// 권한 확인 로직 (실제 앱에서는 Pinia Store나 localStorage에서 가져옵니다)
+// 예: const authStore = useAuthStore(); const userRole = computed(() => authStore.userRole);
+const userRole = ref('owner'); // 현재는 직접 입력으로 바꿔야함(owner/staff)
 
 const goDetail = (id) => {
   router.push({ name: 'reservation-detail', params: { id: String(id) } });
@@ -183,7 +189,14 @@ const salesStats = computed(() => {
 
 <template>
   <div class="flex h-screen bg-[#f8f9fa]">
-    <BusinessSidebar activeMenu="dashboard" />
+    <BusinessSidebar 
+      v-if="userRole === 'owner'" 
+      activeMenu="dashboard" 
+    />
+    <StaffSideBar 
+      v-else-if="userRole === 'staff'" 
+      activeMenu="dashboard" 
+    />
 
     <!-- Main Content -->
     <div class="flex-1 flex flex-col overflow-hidden">

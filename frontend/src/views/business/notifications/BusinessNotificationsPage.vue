@@ -5,13 +5,18 @@ import { Filter, Bell, CheckCircle2, XCircle, Clock, Search } from 'lucide-vue-n
 
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
+import StaffSideBar from '@/components/ui/StaffSideBar.vue';
 
 const router = useRouter();
 const route = useRoute();
 
-const activeMenu = computed(() =>
-  route.query.from === 'notifications' ? 'notifications' : 'reservations'
-);
+// 권한 확인 로직 (실제 앱에서는 Pinia Store나 localStorage에서 가져옵니다)
+// 예: const authStore = useAuthStore(); const userRole = computed(() => authStore.userRole);
+const userRole = ref('owner'); // 현재는 직접 입력으로 바꿔야함(owner/staff)
+
+// const activeMenu = computed(() =>
+//   route.query.from === 'notifications' ? 'notifications' : 'reservations'
+// );
 
 const goReservationDetail = (reservationId) => {
   router.push({
@@ -139,7 +144,14 @@ const statusIcon = (s) => {
 
 <template>
   <div class="flex h-screen bg-[#f8f9fa]">
-    <BusinessSidebar :activeMenu="activeMenu" />>
+    <BusinessSidebar 
+      v-if="userRole === 'owner'" 
+      activeMenu="notifications" 
+    />
+    <StaffSideBar 
+      v-else-if="userRole === 'staff'" 
+      activeMenu="notifications" 
+    />
 
     <div class="flex-1 flex flex-col overflow-hidden">
       <BusinessHeader />

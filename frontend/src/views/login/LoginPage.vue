@@ -104,6 +104,7 @@ const handleLogin = async () => {
           return '/admin/dashboard';
         case 'user':
         case 'staff':
+          return '/staff/list'; //임시적
         default:
           return '/';
       }

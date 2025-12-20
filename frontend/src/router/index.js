@@ -158,11 +158,6 @@ const router = createRouter({
       component: () => import('../views/partner/PartnerPage.vue'),
     },
     {
-      path: '/partner/signup',
-      name: 'partner-signup',
-      component: () => import('../views/partner/signup/PartnerSignupPage.vue'),
-    },
-    {
       path: '/restaurant/:id/booking',
       name: 'restaurant-booking',
       component: () =>
@@ -269,6 +264,11 @@ const router = createRouter({
       component: () => import('@/views/business/reservations/ReservationDetailPage.vue'),
       props: true,
       alias: '/reservations/:id',
+    },
+    {
+      path: '/staff/list',
+      name : 'staff-list',
+      component: () => import('@/views/staff/StaffListPage.vue'),
     },
     // Wildcard route for 404 - make sure this is the last route
     {
