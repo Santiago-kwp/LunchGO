@@ -13,6 +13,7 @@ import {
 import ReservationHistory from '@/components/ui/ReservationHistory.vue';
 import UsageHistory from '@/components/ui/UsageHistory.vue';
 import CheckEmailModal from '@/components/ui/CheckEmailModal.vue';
+import UserFavorites from '@/components/ui/UserFavorites.vue';
 
 const router = useRouter();
 
@@ -703,13 +704,7 @@ const handleWithdraw = () => {
 
       <UsageHistory v-else-if="activeNav === 'usage'" />
 
-      <div
-        v-else-if="activeNav === 'favorite'"
-        class="py-20 flex flex-col items-center justify-center text-[#ADB5BD]"
-      >
-        <Star class="w-12 h-12 mb-3 opacity-20" />
-        <p>즐겨찾기한 항목이 없습니다.</p>
-      </div>
+      <UserFavorites v-else-if="activeNav === 'favorite'" />
     </main>
 
     <Transition name="fade">
