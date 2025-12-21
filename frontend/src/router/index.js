@@ -117,6 +117,11 @@ const router = createRouter({
       component: () => import('../views/admin/finance/AdminFinancePage.vue'),
     },
     {
+      path: '/admin/owners',
+      name: 'admin-owners',
+      component: () => import('../views/admin/owners/AdminOwnerApprovalPage.vue'),
+    },
+    {
       path: '/intro',
       name: 'intro',
       component: () => import('../views/intro/ServiceIntroPage.vue'),
