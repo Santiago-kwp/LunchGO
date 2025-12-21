@@ -80,6 +80,19 @@ defineProps({
         </li>
         <li>
           <RouterLink
+            to="/admin/owners"
+            :class="[
+              'block px-3 py-2.5 rounded-lg transition-colors text-sm',
+              activeMenu === 'owners'
+                ? 'text-white bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] font-semibold'
+                : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
+            ]"
+          >
+            사업자 현황
+          </RouterLink>
+        </li>
+        <li>
+          <RouterLink
             to="/admin/members"
             :class="[
               'block px-3 py-2.5 rounded-lg transition-colors text-sm',
