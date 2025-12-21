@@ -44,6 +44,7 @@ const cafeteriaRecommendationStorageKey = "cafeteriaRecommendations";
 const filterForm = reactive({
   sort: selectedSort.value,
   priceRange: selectedPriceRange.value,
+  recommendation: null,
 });
 
 const isSearchOpen = ref(false);
@@ -549,6 +550,13 @@ const priceRangeMap = Object.freeze({
   "2만원~3만원": { min: 20000, max: 30000 },
   "3만원 이상": { min: 30000, max: Number.POSITIVE_INFINITY },
 });
+const recommendationOptions = [
+  "구내식당 대체 추천",
+  "예산 맞춤",
+  "취향 맞춤",
+  "인기순",
+  "날씨 추천",
+];
 const distances = ["1km 이내", "2km 이내", "3km 이내"];
 const sortOptions = ["추천순", "거리순", "평점순", "낮은 가격순"];
 const restaurantTags = [
@@ -675,6 +683,7 @@ const toggleRestaurantFavorite = (restaurantId) => {
 const resetFilters = () => {
   filterForm.sort = "추천순";
   filterForm.priceRange = null;
+  filterForm.recommendation = null;
 };
 
 const applyFilters = () => {
@@ -682,6 +691,17 @@ const applyFilters = () => {
   selectedPriceRange.value = filterForm.priceRange || null;
   currentPage.value = 1;
   isFilterOpen.value = false;
+};
+
+const toggleRecommendationOption = (option) => {
+  if (option === "구내식당 대체 추천") {
+    isCafeteriaMenuModalOpen.value = true;
+    filterForm.recommendation = option;
+    return;
+  }
+
+  filterForm.recommendation =
+    filterForm.recommendation === option ? null : option;
 };
 
 const toggleSearchCategory = (category) => {
@@ -1117,13 +1137,21 @@ onMounted(() => {
           <!-- TODO: 로그인 사용자만 노출 (백엔드 연동 후 v-if 적용) -->
           <div>
             <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">추천옵션</h4>
-            <button
-              type="button"
-              class="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]"
-              @click="isCafeteriaMenuModalOpen = true"
-            >
-              구내식당 대체 추천
-            </button>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="option in recommendationOptions"
+                :key="option"
+                type="button"
+                @click="toggleRecommendationOption(option)"
+                :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  filterForm.recommendation === option
+                    ? 'gradient-primary text-white'
+                    : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
+                }`"
+              >
+                {{ option }}
+              </button>
+            </div>
           </div>
         </div>
 
