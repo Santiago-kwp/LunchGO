@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { Upload, X } from 'lucide-vue-next';
 import { RouterLink, useRouter, useRoute } from 'vue-router';
+import axios from 'axios';
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 import Pagination from '@/components/ui/Pagination.vue';
@@ -127,7 +128,6 @@ const dayOfWeekInverseMap = {
   토: 7,
 };
 
-// 유효한 전화번호 접두사 목록 (지역번호 및 휴대폰)
 const tagCategoryDisplayNames = {
   MENUTYPE: '식당 종류',
   TABLETYPE: '테이블 옵션',
@@ -216,27 +216,16 @@ const isTagSelected = (tag) => {
   return selectedTags.value.some((st) => st.tagId === tag.tagId);
 };
 
-// API: GET /api/tags
+// API: GET /api/tags/search
 const fetchTags = async () => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([
-        { tagId: 1, content: '한식', category: 'MENUTYPE' },
-        { tagId: 2, content: '중식', category: 'MENUTYPE' },
-        { tagId: 3, content: '일식', category: 'MENUTYPE' },
-        { tagId: 4, content: '양식', category: 'MENUTYPE' },
-        { tagId: 5, content: '퓨전', category: 'MENUTYPE' },
-        { tagId: 6, content: '셀프바', category: 'TABLETYPE' },
-        { tagId: 7, content: '룸', category: 'TABLETYPE' },
-        { tagId: 8, content: '칸막이', category: 'TABLETYPE' },
-        { tagId: 9, content: '조용한', category: 'ATMOSPHERE' },
-        { tagId: 10, content: '깔끔한', category: 'ATMOSPHERE' },
-        { tagId: 11, content: '이국적/이색적', category: 'ATMOSPHERE' },
-        { tagId: 12, content: '주차장 제공', category: 'FACILITY' },
-        { tagId: 13, content: '와이파이', category: 'FACILITY' },
-      ]);
-    }, 100);
-  });
+  try {
+    const response = await axios.get('/api/tags/search');
+    return response.data; // axios는 응답 데이터를 response.data로 제공합니다.
+  } catch (error) {
+    console.error('Failed to fetch tags:', error);
+    // 에러 발생 시 빈 객체 반환 또는 에러 다시 던지기
+    return {};
+  }
 };
 
 // API: GET /api/restaurants/{id}
@@ -271,6 +260,10 @@ const fetchRestaurantData = async (restaurantId) => {
             type: '주메뉴',
             price: 50000,
             imageUrl: '/korean-course-meal-plating.jpg',
+            tags: [ // Add sample tags for testing
+              { tagId: 15, content: '우유' },
+              { tagId: 17, content: '대두' },
+            ]
           },
           {
             id: 102,
@@ -315,15 +308,8 @@ const fetchRestaurantData = async (restaurantId) => {
 
 onMounted(async () => {
   const tagsFromApi = await fetchTags();
-  allTags.value = tagsFromApi;
-  const groupedTags = tagsFromApi.reduce((acc, tag) => {
-    if (!acc[tag.category]) {
-      acc[tag.category] = [];
-    }
-    acc[tag.category].push(tag);
-    return acc;
-  }, {});
-  tagCategories.value = groupedTags;
+  // allTags is no longer needed as backend groups by category
+  tagCategories.value = tagsFromApi; // Assign directly as backend returns grouped data
 
   if (isEditMode.value) {
     const restaurantId = Number(route.params.id);
@@ -862,16 +848,16 @@ watch(paginatedMenus, (newPaginatedMenus) => {
 
             <!-- Characteristics Tags -->
             <div
-              v-for="(tags, categoryName) in tagCategories"
+              v-for="(displayName, categoryName) in tagCategoryDisplayNames"
               :key="categoryName"
               class="mb-6"
             >
               <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
-                {{ tagCategoryDisplayNames[categoryName] || categoryName }}
+                {{ displayName }}
               </h4>
               <div class="flex flex-wrap gap-3">
                 <button
-                  v-for="tag in tags"
+                  v-for="tag in tagCategories[categoryName]"
                   :key="tag.tagId"
                   @click="toggleTag(tag)"
                   :class="`px-4 py-2 rounded-lg border transition-colors ${

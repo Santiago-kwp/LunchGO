@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { Upload, X } from 'lucide-vue-next';
 import { useRouter, useRoute } from 'vue-router';
+import axios from 'axios';
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 import { useRestaurantStore } from '@/stores/restaurant';
@@ -75,20 +76,23 @@ const isTagSelected = (tag) => {
 };
 
 // 6. 라이프사이클 훅
+const fetchIngredientTags = async () => {
+  try {
+    const response = await axios.get('/api/tags/search', {
+      params: { categories: 'INGREDIENT' },
+    });
+    // API는 { "INGREDIENT": [...] } 와 같은 객체를 반환하므로 배열을 추출합니다.
+    return response.data.INGREDIENT || [];
+  } catch (error) {
+    console.error('Failed to fetch ingredient tags:', error);
+    return [];
+  }
+};
+
 // 추후 API로부터 데이터를 받아오는 로직을 처리할 함수
-onMounted(() => {
+onMounted(async () => {
   // 1. (모든 메뉴 공통) 재료 태그 목록 가져오기
-  // API: GET /api/tags?category=INGREDIENT
-  const mockAllIngredientTags = [
-    { tagId: 1, content: '견과류' }, { tagId: 2, content: '우유' },
-    { tagId: 3, content: '계란' }, { tagId: 4, content: '밀' },
-    { tagId: 5, content: '대두' }, { tagId: 6, content: '갑각류' },
-    { tagId: 7, content: '조개류' }, { tagId: 8, content: '생선' },
-    { tagId: 9, content: '메밀' }, { tagId: 10, content: '고수' },
-    { tagId: 11, content: '오이' }, { tagId: 12, content: '파프리카' },
-    { tagId: 13, content: '미나리' }, { tagId: 14, content: '당근' },
-  ];
-  allIngredientTags.value = mockAllIngredientTags;
+  allIngredientTags.value = await fetchIngredientTags();
 
   if (isEditMode.value) {
     // 2. (수정 모드일 경우) 기존 메뉴 정보 가져오기
