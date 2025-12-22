@@ -39,6 +39,7 @@ CREATE TABLE owners (
                         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                         last_login_at DATETIME,
                         role CHAR(20) NOT NULL DEFAULT 'OWNER',
+                        start_at date not null,
                         CONSTRAINT chk_owner_status
                             CHECK (status IN ('PENDING', 'ACTIVE', 'WITHDRAWAL'))
 );

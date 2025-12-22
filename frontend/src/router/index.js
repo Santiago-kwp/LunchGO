@@ -138,11 +138,6 @@ const router = createRouter({
         import('../views/my-reservations/MyReservationsPage.vue'),
     },
     {
-      path: '/mypage/favorites',
-      name: 'mypage-favorites',
-      component: () => import('../views/mypage/favorites/FavoritesPage.vue'),
-    },
-    {
       path: '/mypage/reviews',
       name: 'mypage-reviews',
       component: () => import('../views/mypage/reviews/ReviewsPage.vue'),
