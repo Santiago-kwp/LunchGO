@@ -9,6 +9,11 @@ build/
 application-secret.properties
 AWSCLIV2.pkg
 
+## mac OS 때문에 생기는 파일
+.DS_Store
+**/.DS_Store
+**/._*
+
 
 ### STS ###
 .apt_generated
