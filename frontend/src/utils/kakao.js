@@ -5,7 +5,9 @@ let cachedGeocoder = null;
 
 export const loadKakaoMaps = () => {
   if (typeof window === 'undefined') {
-    return Promise.reject(new Error('Kakao Maps can only be loaded in the browser.'));
+    return Promise.reject(
+      new Error('Kakao Maps can only be loaded in the browser.')
+    );
   }
 
   if (window.kakao && window.kakao.maps) {
