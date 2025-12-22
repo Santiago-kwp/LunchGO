@@ -6,6 +6,7 @@ use testdb;
 # 외래키는 하단에 따로 모아뒀습니다.
 
 -- 1. 검색 태그
+DROP TABLE IF EXISTS search_tags;
 CREATE TABLE search_tags
 (
     tag_id   BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '태그ID',
@@ -14,7 +15,11 @@ CREATE TABLE search_tags
     CONSTRAINT chk_tag_category CHECK (category IN ('MENUTYPE', 'TABLETYPE', 'ATMOSPHERE', 'FACILITY', 'INGREDIENT'))
 ) COMMENT '검색태그';
 
+-- 인덱스 추가
+CREATE INDEX idx_search_tags_category ON search_tags (category);
+
 -- 2. 식당
+DROP TABLE IF EXISTS restaurants;
 CREATE TABLE restaurants
 (
     restaurant_id      BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '식당 ID',
@@ -39,15 +44,23 @@ CREATE TABLE restaurants
     CONSTRAINT chk_restaurant_status CHECK (status IN ('OPEN', 'CLOSED', 'DELETED'))
 ) COMMENT '식당 정보';
 
+-- 인덱스 추가
+CREATE INDEX idx_restaurants_owner_id ON restaurants (owner_id);
+CREATE INDEX idx_restaurants_name ON restaurants (name);
+
+
 -- 3. 식당 이미지
+DROP TABLE IF EXISTS restaurant_images;
 CREATE TABLE restaurant_images
 (
     restaurant_image_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '식당이미지ID',
     restaurant_id       BIGINT       NOT NULL COMMENT '식당ID',
-    image_url           LONGTEXT NOT NULL COMMENT '식당이미지 URL'
+    image_url           LONGTEXT NULL COMMENT '식당이미지 URL'
 ) COMMENT '식당 이미지';
 
+
 -- 4. 식당 메뉴
+DROP TABLE IF EXISTS menus;
 CREATE TABLE menus
 (
     menu_id       BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '식당메뉴ID',
@@ -60,15 +73,19 @@ CREATE TABLE menus
     CONSTRAINT chk_menu_category CHECK (category IN ('MAIN', 'SUB', 'OTHER'))
 ) COMMENT '식당 메뉴';
 
+
 -- 5. 식당 메뉴 이미지
+DROP TABLE IF EXISTS menu_images;
 CREATE TABLE menu_images
 (
     menu_image_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '식당메뉴이미지ID',
     menu_id       BIGINT       NOT NULL COMMENT '식당메뉴ID',
-    image_url     LONGTEXT NOT NULL COMMENT '식당메뉴이미지 URL'
+    image_url     LONGTEXT NULL COMMENT '식당메뉴이미지 URL'
 ) COMMENT '식당 메뉴 이미지';
 
+
 -- 6. 식당-태그 매핑 (복합키 이름 지정: pk_restaurant_tag_map)
+DROP TABLE IF EXISTS restaurant_tag_maps;
 CREATE TABLE restaurant_tag_maps
 (
     restaurant_id BIGINT NOT NULL COMMENT '식당ID',
@@ -76,7 +93,9 @@ CREATE TABLE restaurant_tag_maps
     CONSTRAINT pk_restaurant_tag_map PRIMARY KEY (restaurant_id, tag_id)
 ) COMMENT '식당-태그 매핑';
 
+
 -- 7. 식당메뉴-태그 매핑 (복합키 이름 지정: pk_menu_tag_map)
+DROP TABLE IF EXISTS menu_tag_maps;
 CREATE TABLE menu_tag_maps
 (
     menu_id BIGINT NOT NULL COMMENT '식당메뉴ID',
@@ -84,7 +103,9 @@ CREATE TABLE menu_tag_maps
     CONSTRAINT pk_menu_tag_map PRIMARY KEY (menu_id, tag_id)
 ) COMMENT '식당메뉴-태그 매핑';
 
+
 -- 8. 정기 휴무일
+DROP TABLE IF EXISTS regular_holidays;
 CREATE TABLE regular_holidays
 (
     reg_holiday_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '정기휴무일ID',
@@ -93,7 +114,9 @@ CREATE TABLE regular_holidays
     CONSTRAINT chk_day_of_week CHECK (day_of_week BETWEEN 1 AND 7)
 ) COMMENT '정기 휴무일';
 
+
 -- 9. 임시 휴무일
+DROP TABLE IF EXISTS temporary_holidays;
 CREATE TABLE temporary_holidays
 (
     temp_holiday_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '임시휴무ID',
@@ -102,8 +125,3 @@ CREATE TABLE temporary_holidays
     end_date        DATE         NOT NULL COMMENT '임시휴무종료일자',
     reason          VARCHAR(255) NOT NULL COMMENT '휴업사유'
 ) COMMENT '임시 휴무일';
-
--- 인덱스 추가
-CREATE INDEX idx_restaurants_owner_id ON restaurants (owner_id);
-CREATE INDEX idx_search_tags_category ON search_tags (category);
-CREATE INDEX idx_restaurants_name ON restaurants (name);
