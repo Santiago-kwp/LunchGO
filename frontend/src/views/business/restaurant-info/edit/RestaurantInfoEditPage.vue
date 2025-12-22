@@ -378,7 +378,7 @@ const saveRestaurant = async () => {
   } else {
     // 유효한 접두사와 전화번호 형식을 모두 검사하는 정규식
     const phoneRegex =
-      /^(02|010|011|01[6-9]|03[1-3]|04[1-4]|05[1-5]|06[1-4]|070|080|050)-\d{3,4}-\d{4}$/;
+      /^(02|010|011|01[6-9]|03[1-3]|04[1-4]|05[1-5]|06[1-4]|070|080|050[0-9]|050)-\d{3,4}-\d{4}$/;
     if (!phoneRegex.test(formData.phone)) {
       validationErrors.phone =
         '유효하지 않은 전화번호 형식 또는 지역번호입니다.';
@@ -631,7 +631,7 @@ watch(paginatedMenus, (newPaginatedMenus) => {
                     type="tel"
                     placeholder="하이픈(-)을 포함하여 입력하세요"
                     v-model="formData.phone"
-                    maxlength="13"
+                    maxlength="15"
                     class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A]"
                   />
                   <p
