@@ -1,3 +1,4 @@
+use lunchgo;
 # 01. 정산 테이블 (플랫폼이 식당에게 돈을 주는 데이터)
 DROP TABLE IF EXISTS settlements;
 CREATE TABLE settlements (

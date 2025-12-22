@@ -3,20 +3,6 @@
    - 리뷰 생성을 위한 필수 선행 데이터입니다.
    ================================================== */
 
--- 1-1. 사용자 (Users) 생성
--- 1번: 식당 사장님, 2~4번: 일반 직장인 유저
-INSERT INTO users (user_id, email, password, name, nickname, phone, role, status, marketing_agree, email_authentication) VALUES
-                                                                                                                             (1, 'owner@test.com', 'pass1234', '김사장', '대박나자', '010-1111-1111', 'ROLE_OWNER', 'ACTIVE', 1, 1),
-                                                                                                                             (2, 'user1@test.com', 'pass1234', '이대리', '맛집탐방러', '010-2222-2222', 'ROLE_USER', 'ACTIVE', 1, 1),
-                                                                                                                             (3, 'user2@test.com', 'pass1234', '박과장', '회식요정', '010-3333-3333', 'ROLE_USER', 'ACTIVE', 1, 1),
-                                                                                                                             (4, 'user3@test.com', 'pass1234', '최신입', '막내온탑', '010-4444-4444', 'ROLE_USER', 'ACTIVE', 0, 1);
-
--- 1-2. 식당 (Restaurants) 생성
--- 1번 유저(김사장)가 소유한 식당
-INSERT INTO restaurants (restaurant_id, owner_id, name, phone, road_address, detail_address, status, description, avg_main_price, reservation_limit, open_time, close_time, open_date) VALUES
-                                                                                                                                                                                           (1, 1, '숙성도 강남점', '02-123-4567', '서울 강남구 테헤란로 123', '1층 101호', 'OPEN', '최고급 숙성 돼지고기 전문점입니다.', 18000, 50, '11:00:00', '22:00:00', '2023-01-01'),
-                                                                                                                                                                                           (2, 1, '바다향기 횟집', '02-987-6543', '서울 강남구 역삼로 456', '2층', 'OPEN', '신선한 제철 회 전문', 35000, 30, '15:00:00', '23:00:00', '2023-02-01');
-
 -- 1-3. 예약 (Reservations) 생성
 -- 리뷰 및 영수증 연결을 위한 지난 예약 데이터 (COMPLETED 상태)
 INSERT INTO reservations (reservation_id, restaurant_id, owner_id, type, status, reserved_date, reserved_time, party_size, request_message, visit_confirm_status, assumed_deposit_amount, total_prepay_amount, created_at, updated_at) VALUES

@@ -1,5 +1,3 @@
-use lunchgo;
-
 USE lunchgo;
 
 -- ==========================================
@@ -14,10 +12,10 @@ INSERT INTO users (email, password, name, nickname, phone, birth, gender, compan
                                                                                                                                                             ('choi@lunch.com', '1234', '최탈퇴', NULL, '010-3333-4444', '1990-01-01', 'F', '무소속', '서울', 'WITHDRAWAL', 0, 0);
 
 -- [1-2] Owners (점주)
-INSERT INTO owners (login_id, password, business_num, name, phone, status, role) VALUES
-                                                                                     ('owner_korean', '1234', '111-22-33333', '백종원', '010-5555-6666', 'ACTIVE', 'OWNER'),
-                                                                                     ('owner_japan', '1234', '444-55-66666', '최현석', '010-7777-8888', 'ACTIVE', 'OWNER'),
-                                                                                     ('owner_new', '1234', '777-88-99999', '새내기', '010-0000-0000', 'PENDING', 'OWNER');
+INSERT INTO owners (login_id, password, business_num, name, phone, status, role, start_at) VALUES
+                                                                                     ('owner_korean', '1234', '111-22-33333', '백종원', '010-5555-6666', 'ACTIVE', 'OWNER', '2002-01-01'),
+                                                                                     ('owner_japan', '1234', '444-55-66666', '최현석', '010-7777-8888', 'ACTIVE', 'OWNER', '2003-01-01'),
+                                                                                     ('owner_new', '1234', '777-88-99999', '새내기', '010-0000-0000', 'PENDING', 'OWNER', '2004-01-01');
 
 -- [1-3] Managers (관리자) - last_login_at NOT NULL 주의
 INSERT INTO managers (login_id, password, role, last_login_at) VALUES

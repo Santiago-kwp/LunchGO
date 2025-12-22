@@ -1,7 +1,8 @@
 # 테스트용 로컬 db
 
-create database testdb;
-use testdb;
+#create database testdb;
+#use testdb;
+use lunchgo;
 
 # 외래키는 하단에 따로 모아뒀습니다.
 

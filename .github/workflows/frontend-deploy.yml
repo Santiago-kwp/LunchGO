@@ -2,7 +2,7 @@ name: Frontend Deploy to NCP Object Storage
 
 on:
   push:
-    branches: ["dev"]
+    branches: ["main"]
     paths:
       - "frontend/**" # frontend 폴더가 변경될 때만 실행 (프로젝트 구조에 맞게 수정)
 

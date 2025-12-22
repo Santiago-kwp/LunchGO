@@ -1,5 +1,3 @@
-# 연관관계가 많은 테이블부터 삭제하고 생성, bigint pk auto increment
-
 use lunchgo;
 # drop database lunchgo;
 # create schema lunchgo collate utf8mb4_general_ci;
@@ -90,51 +88,51 @@ CREATE TABLE cafeteria_menus (
 
 
 #### 아래는 유닛테스트를 위한 연관 테이블 생성
-# 01. 사용자
-DROP TABLE IF EXISTS users;
-CREATE TABLE users (
-    user_id	bigint	NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    email	varchar(100)	NOT NULL,
-    password	varchar(255)	NOT NULL,
-    name	varchar(50)	NOT NULL,
-    nickname	varchar(100)	NULL,
-    phone	varchar(20)	NOT NULL,
-    birth	date	NULL,
-    gender	varchar(10)	NULL,
-    image	varchar(255)	NULL,
-    status	varchar(20)	NOT NULL	DEFAULT 'ACTIVE'	COMMENT 'ACTIVE, DORMANT, WITHDRAWAL',
-    created_at	datetime	NOT NULL	DEFAULT current_timestamp,
-    updated_at	datetime	NULL	DEFAULT current_timestamp,
-    last_login_at	datetime	NULL,
-    withdrawal_at	datetime	NULL,
-    marketing_agree	tinyint	NOT NULL	DEFAULT 0,
-    email_authentication	tinyint	NOT NULL	DEFAULT 0,
-    role	char(20)	NOT NULL	DEFAULT 'ROLE_USER',
-    company_address	varchar(255)	NULL,
-    company_name	varchar(50)	NULL
-);
+# 01. 사용자 => tables_create_member_info.sql꺼 사용!
+# DROP TABLE IF EXISTS users;
+# CREATE TABLE users (
+#     user_id	bigint	NOT NULL PRIMARY KEY AUTO_INCREMENT,
+#     email	varchar(100)	NOT NULL,
+#     password	varchar(255)	NOT NULL,
+#     name	varchar(50)	NOT NULL,
+#     nickname	varchar(100)	NULL,
+#     phone	varchar(20)	NOT NULL,
+#     birth	date	NULL,
+#     gender	varchar(10)	NULL,
+#     image	varchar(255)	NULL,
+#     status	varchar(20)	NOT NULL	DEFAULT 'ACTIVE'	COMMENT 'ACTIVE, DORMANT, WITHDRAWAL',
+#     created_at	datetime	NOT NULL	DEFAULT current_timestamp,
+#     updated_at	datetime	NULL	DEFAULT current_timestamp,
+#     last_login_at	datetime	NULL,
+#     withdrawal_at	datetime	NULL,
+#     marketing_agree	tinyint	NOT NULL	DEFAULT 0,
+#     email_authentication	tinyint	NOT NULL	DEFAULT 0,
+#     role	char(20)	NOT NULL	DEFAULT 'ROLE_USER',
+#     company_address	varchar(255)	NULL,
+#     company_name	varchar(50)	NULL
+# );
 
-# 02. 식당 테이블
-DROP TABLE IF EXISTS restaurants;
-CREATE TABLE restaurants (
-    restaurant_id	bigint	NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    owner_id	bigint	NOT NULL,
-    name	varchar(50)	NOT NULL,
-    phone	varchar(15)	NOT NULL,
-    road_address	varchar(255)	NOT NULL,
-    detail_address	varchar(255)	NOT NULL,
-    status	varchar(50)	NOT NULL	DEFAULT 'OPEN' COMMENT 'OPEN, CLOSED, DELETED',
-    description	text	NULL,
-    avg_main_price	int	NOT NULL,
-    reservation_limit	int	NOT NULL,
-    holiday_available	boolean	NOT NULL	DEFAULT false,
-    preorder_available	boolean	NOT NULL	DEFAULT false,
-    open_time	time	NOT NULL,
-    close_time	time	NOT NULL,
-    open_date	date	NOT NULL,
-    created_at	datetime	NOT NULL	DEFAULT current_timestamp,
-    updated_at	datetime	NOT NULL	DEFAULT current_timestamp
-);
+# 02. 식당 테이블 => tables_create_restaurant_info.sql 사용
+# DROP TABLE IF EXISTS restaurants;
+# CREATE TABLE restaurants (
+#     restaurant_id	bigint	NOT NULL PRIMARY KEY AUTO_INCREMENT,
+#     owner_id	bigint	NOT NULL,
+#     name	varchar(50)	NOT NULL,
+#     phone	varchar(15)	NOT NULL,
+#     road_address	varchar(255)	NOT NULL,
+#     detail_address	varchar(255)	NOT NULL,
+#     status	varchar(50)	NOT NULL	DEFAULT 'OPEN' COMMENT 'OPEN, CLOSED, DELETED',
+#     description	text	NULL,
+#     avg_main_price	int	NOT NULL,
+#     reservation_limit	int	NOT NULL,
+#     holiday_available	boolean	NOT NULL	DEFAULT false,
+#     preorder_available	boolean	NOT NULL	DEFAULT false,
+#     open_time	time	NOT NULL,
+#     close_time	time	NOT NULL,
+#     open_date	date	NOT NULL,
+#     created_at	datetime	NOT NULL	DEFAULT current_timestamp,
+#     updated_at	datetime	NOT NULL	DEFAULT current_timestamp
+# );
 
 # 03. 예약 테이블
 DROP TABLE IF EXISTS reservations;
