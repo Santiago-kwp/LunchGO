@@ -1,4 +1,4 @@
-package com.example.LunchGo.config;
+package com.example.LunchGo.common.config;
 
 import org.apache.ibatis.session.Configuration;
 import org.mybatis.spring.boot.autoconfigure.ConfigurationCustomizer;
