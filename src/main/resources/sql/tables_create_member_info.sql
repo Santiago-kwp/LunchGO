@@ -1,5 +1,16 @@
 use lunchgo;
 
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS owners;
+DROP TABLE IF EXISTS reviews;
+DROP TABLE IF EXISTS review_tag_maps;
+DROP TABLE IF EXISTS receipts;
+DROP TABLE IF EXISTS review_tags;
+DROP TABLE IF EXISTS comments;
+DROP TABLE IF EXISTS receipt_items;
+DROP TABLE IF EXISTS review_images;
+DROP TABLE IF EXISTS search_tags;
+
 CREATE TABLE users (
                        user_id BIGINT PRIMARY KEY AUTO_INCREMENT,
                        email VARCHAR(100) NOT NULL UNIQUE,
@@ -81,30 +92,6 @@ CREATE TABLE Speciality_mappings (
                                      FOREIGN KEY (speciality_id) REFERENCES specialities(speciality_id)
 );
 
--- 식당 테이블 있어야함
-# CREATE TABLE restaurants
-# (
-#     restaurant_id      BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '식당 ID',
-#     owner_id           BIGINT       NOT NULL COMMENT '사업자(점주) ID',
-#     name               VARCHAR(50)  NOT NULL COMMENT '식당명',
-#     phone              VARCHAR(13)  NOT NULL COMMENT '식당전화번호',
-#     road_address       VARCHAR(255) NOT NULL COMMENT '도로명주소',
-#     detail_address     VARCHAR(255) NOT NULL COMMENT '상세주소',
-#     status             VARCHAR(50) DEFAULT 'OPEN' COMMENT '운영상태',
-#     description        VARCHAR(255) COMMENT '식당소개문',
-#     avg_main_price     INT          NOT NULL COMMENT '주메뉴 평균가',
-#     reservation_limit  INT          NOT NULL COMMENT '예약가능인원 상한',
-#     holiday_available  TINYINT(1)  DEFAULT 0 COMMENT '공휴일 운영 여부 (0:false, 1:true)',
-#     preorder_available TINYINT(1)  DEFAULT 0 COMMENT '선주문/선결제 여부 (0:false, 1:true)',
-#     open_time          TIME         NOT NULL COMMENT '영업시작시간',
-#     close_time         TIME         NOT NULL COMMENT '영업종료시간',
-#     open_date          DATE         NOT NULL COMMENT '개업일',
-#     created_at         DATETIME    DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
-#     updated_at         DATETIME    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일시',
-#
-#     CONSTRAINT chk_phone_format CHECK (phone REGEXP '^[0-9]{2,3}-[0-9]{3,4}-[0-9]{4}$'),
-#     CONSTRAINT chk_restaurant_status CHECK (status IN ('OPEN', 'CLOSED', 'DELETED'))
-# ) COMMENT '식당 정보';
 
 CREATE TABLE bookmarks (
                            bookmark_id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -113,7 +100,5 @@ CREATE TABLE bookmarks (
                            promotion_agree TINYINT NOT NULL DEFAULT 0,
                            FOREIGN KEY (user_id) REFERENCES Users(user_id)
 );
-
-alter table bookmarks add constraint fk_bookmarks_restaurants foreign key (restaurant_id) references restaurants(restaurant_id) on delete cascade ;
 
 

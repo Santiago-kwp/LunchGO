@@ -43,3 +43,6 @@ ALTER TABLE regular_holidays
 ALTER TABLE temporary_holidays
     ADD CONSTRAINT fk_temporary_holiday_restaurant
         FOREIGN KEY (restaurant_id) REFERENCES restaurants(restaurant_id) ON DELETE CASCADE;
+
+-- 10. 사용자 즐겨찾기
+alter table bookmarks add constraint fk_bookmarks_restaurants foreign key (restaurant_id) references restaurants(restaurant_id) on delete cascade ;
