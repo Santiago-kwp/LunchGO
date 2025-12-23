@@ -265,6 +265,12 @@ const router = createRouter({
       props: true,
       alias: '/reservations/:id',
     },
+    //예약 취소 페이지
+    {
+      path: "/my-reservations/:id/cancel",
+      name: "reservation-cancel",
+      component: () => import("@/views/my-reservations/ReservationCancelView.vue"),
+    },
     {
       path: '/staff/list',
       name : 'staff-list',
