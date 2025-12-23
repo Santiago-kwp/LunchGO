@@ -8,13 +8,16 @@ import com.example.LunchGo.review.dto.ReceiptItemResponse;
 import com.example.LunchGo.review.dto.RestaurantReviewListResponse;
 import com.example.LunchGo.review.dto.ReviewEditResponse;
 import com.example.LunchGo.review.dto.ReviewDetailResponse;
+import com.example.LunchGo.review.dto.ReviewImageRow;
 import com.example.LunchGo.review.dto.ReviewItemResponse;
 import com.example.LunchGo.review.dto.ReviewListQuery;
 import com.example.LunchGo.review.dto.ReviewSummary;
+import com.example.LunchGo.review.dto.ReviewTagRow;
 import com.example.LunchGo.review.dto.TagResponse;
 import com.example.LunchGo.review.dto.UpdateReviewRequest;
 import com.example.LunchGo.review.dto.UpdateReviewResponse;
 import com.example.LunchGo.review.dto.VisitInfo;
+import com.example.LunchGo.image.service.ObjectStorageService;
 import com.example.LunchGo.review.entity.Review;
 import com.example.LunchGo.review.entity.ReviewImage;
 import com.example.LunchGo.review.entity.ReviewTagMap;
@@ -24,7 +27,10 @@ import com.example.LunchGo.review.repository.ReviewRepository;
 import com.example.LunchGo.review.repository.ReviewTagMapRepository;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +44,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewTagMapRepository reviewTagMapRepository;
     private final ReviewImageRepository reviewImageRepository;
     private final ReviewReadMapper reviewReadMapper;
+    private final ObjectStorageService objectStorageService;
 
     @Override
     @Transactional
@@ -88,15 +95,38 @@ public class ReviewServiceImpl implements ReviewService {
             summary.setTopTags(reviewReadMapper.selectTopTags(restaurantId));
         }
 
-        List<ReviewItemResponse> items = reviewReadMapper.selectReviewItems(query);
-        if (items == null) {
+        List<Long> reviewIds = reviewReadMapper.selectReviewPageIds(query);
+        List<ReviewItemResponse> items;
+        if (reviewIds == null || reviewIds.isEmpty()) {
             items = Collections.emptyList();
         } else {
+            items = reviewReadMapper.selectReviewItemsByIds(reviewIds);
+            if (items == null) {
+                items = Collections.emptyList();
+            }
+
+            Map<Long, List<TagResponse>> tagMap = new HashMap<>();
+            List<ReviewTagRow> tagRows = reviewReadMapper.selectReviewTagsByReviewIds(reviewIds);
+            if (tagRows != null) {
+                for (ReviewTagRow row : tagRows) {
+                    tagMap.computeIfAbsent(row.getReviewId(), key -> new ArrayList<>())
+                        .add(new TagResponse(row.getTagId(), row.getName()));
+                }
+            }
+
+            Map<Long, List<String>> imageMap = new HashMap<>();
+            List<ReviewImageRow> imageRows = reviewReadMapper.selectReviewImagesByReviewIds(reviewIds);
+            if (imageRows != null) {
+                for (ReviewImageRow row : imageRows) {
+                    imageMap.computeIfAbsent(row.getReviewId(), key -> new ArrayList<>())
+                        .add(row.getImageUrl());
+                }
+            }
+
             for (ReviewItemResponse item : items) {
-                List<TagResponse> tags = reviewReadMapper.selectReviewTags(item.getReviewId());
-                List<String> images = reviewReadMapper.selectReviewImages(item.getReviewId());
-                item.setTags(tags);
-                item.setImages(images);
+                Long reviewId = item.getReviewId();
+                item.setTags(tagMap.getOrDefault(reviewId, Collections.emptyList()));
+                item.setImages(imageMap.getOrDefault(reviewId, Collections.emptyList()));
             }
         }
 
@@ -123,6 +153,7 @@ public class ReviewServiceImpl implements ReviewService {
 
         VisitInfo visitInfo = reviewReadMapper.selectVisitInfo(reviewId);
         if (visitInfo != null) {
+            applyReceiptImagePresign(visitInfo);
             List<ReceiptItemResponse> items = reviewReadMapper.selectReceiptItemsByReviewId(reviewId);
             visitInfo.setMenuItems(items);
         }
@@ -149,6 +180,7 @@ public class ReviewServiceImpl implements ReviewService {
 
         VisitInfo visitInfo = reviewReadMapper.selectVisitInfo(reviewId);
         if (visitInfo != null) {
+            applyReceiptImagePresign(visitInfo);
             List<ReceiptItemResponse> items = reviewReadMapper.selectReceiptItemsByReviewId(reviewId);
             visitInfo.setMenuItems(items);
         }
@@ -231,5 +263,18 @@ public class ReviewServiceImpl implements ReviewService {
         if (request.getRating() == null || request.getRating() < 1 || request.getRating() > 5) {
             throw new IllegalArgumentException("rating must be between 1 and 5");
         }
+    }
+
+    private void applyReceiptImagePresign(VisitInfo visitInfo) {
+        String storedValue = visitInfo.getReceiptImageUrl();
+        if (storedValue == null || storedValue.isBlank()) {
+            return;
+        }
+        String key = objectStorageService.normalizeKey(storedValue);
+        if (key == null || !key.startsWith("receipts/")) {
+            return;
+        }
+        String presigned = objectStorageService.createPresignedUrl(key, Duration.ofMinutes(5));
+        visitInfo.setReceiptImageUrl(presigned);
     }
 }

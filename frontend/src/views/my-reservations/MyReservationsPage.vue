@@ -82,7 +82,7 @@ const allReservations = ref([
     reservationStatus: "completed", // 이용완료 -> 리뷰 작성 가능
     status: "past",
     review: {
-      id: "review-1",
+      id: 1,
       rating: 5,
       content: "회식하기 정말 좋았어요...",
       tags: ["인테리어가 세련돼요", "재료가 신선해요"],
@@ -133,6 +133,22 @@ const allReservations = ref([
     visitCount: 2,
     daysSinceLastVisit: 70,
     payment: { amount: 85000 },
+    reservationStatus: "completed", // 이용완료 -> 리뷰 작성 가능
+    status: "past",
+    review: null,
+  },
+  {
+    id: 7,
+    confirmationNumber: "LG2024111600004",
+    restaurant: {
+      id: 2,
+      name: "바다향기 횟집",
+      address: "서울시 강남구 테헤란로 140",
+    },
+    booking: { date: "2024년 11월 16일 (토)", time: "19:30", partySize: 3 },
+    visitCount: 1,
+    daysSinceLastVisit: 10,
+    payment: { amount: 95000 },
     reservationStatus: "completed", // 이용완료 -> 리뷰 작성 가능
     status: "past",
     review: null,

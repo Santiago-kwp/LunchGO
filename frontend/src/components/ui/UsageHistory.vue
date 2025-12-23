@@ -10,6 +10,7 @@ import {
   Edit,
   Trash2,
 } from "lucide-vue-next";
+import axios from "axios";
 import Button from "@/components/ui/Button.vue";
 import Card from "@/components/ui/Card.vue";
 
@@ -97,11 +98,18 @@ const handleEditReview = (reservation) => {
 
 // 리뷰 삭제 핸들러
 const handleDeleteReview = (reservation) => {
-  if (confirm("리뷰를 삭제하시겠습니까?")) {
-    // 실제 구현 시에는 emit으로 부모에게 알리거나 API 호출 필요
-    console.log("리뷰 삭제 요청:", reservation.review.id);
-    reservation.review = null;
-  }
+  if (!confirm("리뷰를 삭제하시겠습니까?")) return;
+  axios
+    .delete(
+      `/api/restaurants/${reservation.restaurant.id}/reviews/${reservation.review.id}`
+    )
+    .then(() => {
+      reservation.review = null;
+    })
+    .catch((error) => {
+      console.error("리뷰 삭제 실패:", error);
+      alert("리뷰 삭제에 실패했습니다.");
+    });
   activeReviewMenu.value = null;
 };
 </script>
@@ -220,7 +228,10 @@ const handleDeleteReview = (reservation) => {
           <!-- 리뷰가 없을 때: 리뷰 쓰기 버튼 -->
           <RouterLink
             v-if="!reservation.review"
-            :to="`/restaurant/${reservation.restaurant.id}/reviews/write`"
+            :to="{
+              path: `/restaurant/${reservation.restaurant.id}/reviews/write`,
+              query: { reservationId: reservation.id },
+            }"
             class="block"
           >
             <Button

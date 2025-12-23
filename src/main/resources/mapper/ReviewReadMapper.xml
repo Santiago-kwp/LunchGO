@@ -90,6 +90,72 @@
         LIMIT #{size} OFFSET #{offset}
     </select>
 
+    <select id="selectReviewPageIds" parameterType="com.example.LunchGo.review.dto.ReviewListQuery" resultType="long">
+        SELECT t.review_id
+        FROM (
+            SELECT DISTINCT
+                r.review_id,
+                r.created_at,
+                r.rating
+            FROM reviews r
+            <if test="tagIds != null and tagIds.size() &gt; 0">
+                JOIN review_tag_maps m ON m.review_id = r.review_id
+            </if>
+            WHERE r.restaurant_id = #{restaurantId}
+              AND r.status IN ('PUBLIC', 'BLINDED')
+              <if test="tagIds != null and tagIds.size() &gt; 0">
+                AND m.tag_id IN
+                <foreach collection="tagIds" item="tagId" open="(" separator="," close=")">
+                    #{tagId}
+                </foreach>
+              </if>
+        ) t
+        <choose>
+            <when test="sort != null and sort.name() == 'LATEST'">
+                ORDER BY t.created_at DESC
+            </when>
+            <when test="sort != null and sort.name() == 'RATING_DESC'">
+                ORDER BY t.rating DESC, t.created_at DESC
+            </when>
+            <when test="sort != null and sort.name() == 'RATING_ASC'">
+                ORDER BY t.rating ASC, t.created_at DESC
+            </when>
+            <otherwise>
+                ORDER BY t.created_at DESC
+            </otherwise>
+        </choose>
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="selectReviewItemsByIds" resultType="com.example.LunchGo.review.dto.ReviewItemResponse">
+        SELECT
+            r.review_id AS reviewId,
+            CONCAT(LEFT(u.name, 1), '**') AS author,
+            u.company_name AS company,
+            rus.visit_cnt AS visitCount,
+            r.rating AS rating,
+            r.content AS content,
+            DATE(r.created_at) AS createdAt,
+            r.created_at AS createdAtTs,
+            r.status AS status,
+            CASE WHEN r.status = 'BLINDED' THEN 1 ELSE 0 END AS isBlinded,
+            NULL AS blindReason
+        FROM reviews r
+        JOIN users u ON u.user_id = r.user_id
+        LEFT JOIN restaurant_user_stats rus
+            ON rus.restaurant_id = r.restaurant_id
+           AND rus.user_id = r.user_id
+        WHERE r.review_id IN
+        <foreach collection="reviewIds" item="reviewId" open="(" separator="," close=")">
+            #{reviewId}
+        </foreach>
+        ORDER BY FIELD(r.review_id,
+        <foreach collection="reviewIds" item="reviewId" separator=",">
+            #{reviewId}
+        </foreach>
+        )
+    </select>
+
     <select id="selectReviewDetail" parameterType="long" resultType="com.example.LunchGo.review.dto.ReviewDetailResponse">
         SELECT
             r.review_id AS reviewId,
@@ -149,7 +215,8 @@
         SELECT
             rs.reserved_date AS date,
             rs.party_size AS partySize,
-            rc.confirmed_amount AS totalAmount
+            rc.confirmed_amount AS totalAmount,
+            rc.image_url AS receiptImageUrl
         FROM reviews r
         JOIN receipts rc ON rc.receipt_id = r.receipt_id
         JOIN reservations rs ON rs.reservation_id = rc.reservation_id
@@ -178,6 +245,32 @@
         JOIN receipt_items ri ON ri.receipt_id = rc.receipt_id
         WHERE r.review_id = #{reviewId}
         ORDER BY ri.receipt_item_id ASC
+    </select>
+
+    <select id="selectReviewTagsByReviewIds" resultType="com.example.LunchGo.review.dto.ReviewTagRow">
+        SELECT
+            m.review_id AS reviewId,
+            t.tag_id AS tagId,
+            t.name AS name
+        FROM review_tag_maps m
+        JOIN review_tags t ON t.tag_id = m.tag_id
+        WHERE m.review_id IN
+        <foreach collection="reviewIds" item="reviewId" open="(" separator="," close=")">
+            #{reviewId}
+        </foreach>
+        ORDER BY m.review_id, t.tag_id
+    </select>
+
+    <select id="selectReviewImagesByReviewIds" resultType="com.example.LunchGo.review.dto.ReviewImageRow">
+        SELECT
+            review_id AS reviewId,
+            image_url AS imageUrl
+        FROM review_images
+        WHERE review_id IN
+        <foreach collection="reviewIds" item="reviewId" open="(" separator="," close=")">
+            #{reviewId}
+        </foreach>
+        ORDER BY review_id, sort_order ASC
     </select>
 
 </mapper>

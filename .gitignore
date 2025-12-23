@@ -14,6 +14,9 @@ AWSCLIV2.pkg
 **/.DS_Store
 **/._*
 
+## api 명세서
+api_specification.csv
+
 
 ### STS ###
 .apt_generated

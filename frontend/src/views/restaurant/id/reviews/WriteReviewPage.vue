@@ -1,16 +1,23 @@
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { ArrowLeft, X, Upload, Plus } from 'lucide-vue-next';
-import Button from '@/components/ui/Button.vue';
-import Card from '@/components/ui/Card.vue';
-import axios from 'axios';
-
+import { ref, computed, onMounted, nextTick } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { ArrowLeft, X, Upload, Plus, Star } from "lucide-vue-next";
+import Button from "@/components/ui/Button.vue";
+import Card from "@/components/ui/Card.vue";
+import axios from "axios";
 
 const route = useRoute();
 const router = useRouter();
-const restaurantId = route.params.id || '1';
+const restaurantId = route.params.id || "1";
 const reviewId = route.params.reviewId; // 수정 모드일 때 리뷰 ID
+const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const reservationId = computed(() => {
+  const value = route.query.reservationId;
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+});
 
 // 작성 모드 vs 수정 모드 판단
 const isEditMode = computed(() => !!reviewId);
@@ -27,23 +34,28 @@ const isPhotoModalOpen = ref(false);
 // 리뷰 등록 완료 모달
 const isReviewCompleteModalOpen = ref(false);
 const submittedReviewId = ref(null); // 등록된 리뷰 ID (API 응답에서 받아옴)
+const DEFAULT_USER_ID = 2;
+const rating = ref(0);
+const receiptId = ref(null);
+const selectedTagIds = ref([]);
+const tagIdByName = ref({});
 
 // 방문 정보
 const visitInfo = ref({
-  restaurantName: '식당명',
+  restaurantName: "식당명",
   visitNumber: 1, // n번째 방문
 });
 
 // 영수증 정보
 const receipt = ref({
-  date: '2025년 11월 15일 (금)',
+  date: "2025년 11월 15일 (금)",
   partySize: 8,
   totalAmount: 111000,
   uploaded: false, // 영수증 업로드 여부
   items: [
-    { name: '메뉴명1', quantity: 1, price: 18000 },
-    { name: '메뉴명2', quantity: 2, price: 9000 },
-    { name: '메뉴명3', quantity: 3, price: 11000 },
+    { name: "메뉴명1", quantity: 1, price: 18000 },
+    { name: "메뉴명2", quantity: 2, price: 9000 },
+    { name: "메뉴명3", quantity: 3, price: 11000 },
   ],
 });
 
@@ -53,166 +65,203 @@ const selectedTags = ref([]);
 // 태그 카테고리
 const tagCategories = ref([
   {
-    id: 'speed',
-    icon: '🏃',
-    name: '속도/효율성',
+    id: "speed",
+    icon: "🏃",
+    name: "속도/효율성",
     tags: [
-      '주문 즉시 조리 시작해요',
-      '계산이 빨라요',
-      '웨이팅 관리가 잘 돼요',
-      '음식이 동시에 나와요',
+      "주문 즉시 조리 시작해요",
+      "계산이 빨라요",
+      "웨이팅 관리가 잘 돼요",
+      "음식이 동시에 나와요",
     ],
   },
   {
-    id: 'space',
-    icon: '🪑',
-    name: '공간/분위기',
+    id: "space",
+    icon: "🪑",
+    name: "공간/분위기",
     tags: [
-      '인테리어가 세련돼요',
-      '조명이 아늑해요',
-      '아이 동반하기 좋아요',
-      '야외 테라스가 있어요',
-      '음악이 적당해요',
+      "인테리어가 세련돼요",
+      "조명이 아늑해요",
+      "아이 동반하기 좋아요",
+      "야외 테라스가 있어요",
+      "음악이 적당해요",
     ],
   },
   {
-    id: 'taste',
-    icon: '🍲',
-    name: '맛/가성비',
+    id: "taste",
+    icon: "🍲",
+    name: "맛/가성비",
     tags: [
-      '재료가 신선해요',
-      '가격 대비 만족스러워요',
-      '시그니처 메뉴가 있어요',
-      '디저트가 맛있어요',
-      '술과 안주 궁합이 좋아요',
+      "재료가 신선해요",
+      "가격 대비 만족스러워요",
+      "시그니처 메뉴가 있어요",
+      "디저트가 맛있어요",
+      "술과 안주 궁합이 좋아요",
     ],
   },
   {
-    id: 'service',
-    icon: '🤝',
-    name: '서비스/기타',
+    id: "service",
+    icon: "🤝",
+    name: "서비스/기타",
     tags: [
-      '직원들이 적극적으로 도와줘요',
-      '메뉴 설명을 잘 해줘요',
-      '결제 방식이 다양해요 (QR, 간편결제 등)',
-      '반려동물 동반 가능해요',
-      '청결 관리가 잘 돼요',
+      "직원들이 적극적으로 도와줘요",
+      "메뉴 설명을 잘 해줘요",
+      "결제 방식이 다양해요 (QR, 간편결제 등)",
+      "반려동물 동반 가능해요",
+      "청결 관리가 잘 돼요",
     ],
   },
 ]);
 
 // 리뷰 작성 데이터
 const reviewPhotos = ref([]);
-const reviewText = ref('');
+const reviewText = ref("");
 
 // Mock 기존 리뷰 데이터 (API에서 가져올 데이터)
 const existingReviews = {
-  'review-1': {
-    id: 'review-1',
+  1: {
+    id: 1,
     restaurantId: 1,
-    restaurantName: '식당명',
+    restaurantName: "식당명",
     visitNumber: 2,
     receipt: {
-      date: '2024년 11월 15일 (금)',
+      date: "2024년 11월 15일 (금)",
       partySize: 8,
       totalAmount: 111000,
       uploaded: true,
       items: [
-        { name: '메뉴명1', quantity: 1, price: 18000 },
-        { name: '메뉴명2', quantity: 2, price: 9000 },
-        { name: '메뉴명3', quantity: 3, price: 11000 },
+        { name: "메뉴명1", quantity: 1, price: 18000 },
+        { name: "메뉴명2", quantity: 2, price: 9000 },
+        { name: "메뉴명3", quantity: 3, price: 11000 },
       ],
     },
     selectedTags: [
-      '인테리어가 세련돼요', // space 카테고리
-      '재료가 신선해요', // taste 카테고리
-      '직원들이 적극적으로 도와줘요', // service 카테고리
+      "인테리어가 세련돼요", // space 카테고리
+      "재료가 신선해요", // taste 카테고리
+      "직원들이 적극적으로 도와줘요", // service 카테고리
     ],
     photos: [
       {
         id: 1,
-        url: '/korean-appetizer-main-dessert.jpg',
+        url: "/korean-appetizer-main-dessert.jpg",
         file: null,
       },
       {
         id: 2,
-        url: '/premium-course-meal-with-wine.jpg',
+        url: "/premium-course-meal-with-wine.jpg",
         file: null,
       },
     ],
-    text: '회식하기 정말 좋았어요. 음식도 맛있고 분위기도 최고였습니다! 특히 룸이 프라이빗해서 회사 동료들과 편하게 대화할 수 있었고, 음식 양도 정말 푸짐해서 배불리 먹었습니다.',
+    text: "회식하기 정말 좋았어요. 음식도 맛있고 분위기도 최고였습니다! 특히 룸이 프라이빗해서 회사 동료들과 편하게 대화할 수 있었고, 음식 양도 정말 푸짐해서 배불리 먹었습니다.",
   },
-  'review-2': {
-    id: 'review-2',
+  2: {
+    id: 2,
     restaurantId: 1,
-    restaurantName: '식당명',
+    restaurantName: "식당명",
     visitNumber: 3,
     receipt: {
-      date: '2024년 11월 10일 (금)',
+      date: "2024년 11월 10일 (금)",
       partySize: 2,
       totalAmount: 42000,
       uploaded: false,
       items: [
-        { name: '까르보나라', quantity: 1, price: 18000 },
-        { name: '알리오올리오', quantity: 1, price: 16000 },
-        { name: '타파스', quantity: 2, price: 4000 },
+        { name: "까르보나라", quantity: 1, price: 18000 },
+        { name: "알리오올리오", quantity: 1, price: 16000 },
+        { name: "타파스", quantity: 2, price: 4000 },
       ],
     },
-    selectedTags: ['가격 대비 만족스러워요', '청결 관리가 잘 돼요'],
+    selectedTags: ["가격 대비 만족스러워요", "청결 관리가 잘 돼요"],
     photos: [
       {
         id: 3,
-        url: '/italian-pasta-dish.png',
+        url: "/italian-pasta-dish.png",
         file: null,
       },
     ],
-    text: '가격 대비 훌륭한 퀄리티입니다. 다음에 또 방문할게요.',
+    text: "가격 대비 훌륭한 퀄리티입니다. 다음에 또 방문할게요.",
   },
-  'review-3': {
-    id: 'review-3',
+  3: {
+    id: 3,
     restaurantId: 2,
-    restaurantName: '맛있는집',
+    restaurantName: "맛있는집",
     visitNumber: 1,
     receipt: {
-      date: '2024년 11월 10일 (금)',
+      date: "2024년 11월 10일 (금)",
       partySize: 2,
       totalAmount: 42000,
       uploaded: true,
       items: [
-        { name: '까르보나라', quantity: 1, price: 18000 },
-        { name: '알리오올리오', quantity: 1, price: 16000 },
-        { name: '타파스', quantity: 2, price: 4000 },
+        { name: "까르보나라", quantity: 1, price: 18000 },
+        { name: "알리오올리오", quantity: 1, price: 16000 },
+        { name: "타파스", quantity: 2, price: 4000 },
       ],
     },
-    selectedTags: ['메뉴 설명을 잘 해줘요', '시그니처 메뉴가 있어요'],
+    selectedTags: ["메뉴 설명을 잘 해줘요", "시그니처 메뉴가 있어요"],
     images: [],
-    text: '',
+    text: "",
   },
 };
 
 // 수정 모드일 때 기존 리뷰 데이터 로드
-const loadExistingReview = () => {
+const loadExistingReview = async () => {
   if (isEditMode.value && reviewId) {
-    const existingReview = existingReviews[reviewId];
-    if (existingReview) {
-      // 방문 정보 로드
-      visitInfo.value.restaurantName = existingReview.restaurantName;
-      visitInfo.value.visitNumber = existingReview.visitNumber;
+    try {
+      const response = await axios.get(
+        `/api/restaurants/${restaurantId}/reviews/${reviewId}/edit`
+      );
+      const data = response.data;
 
-      // 영수증 정보 로드
-      receipt.value = { ...existingReview.receipt };
+      receiptId.value = data.receiptId || null;
+      rating.value = data.rating ?? 0;
+      reviewText.value = data.content || "";
 
-      // 선택된 태그 로드
-      selectedTags.value = [...existingReview.selectedTags];
+      const tags = data.tags || [];
+      selectedTags.value = tags.map((tag) => tag.name);
+      selectedTagIds.value = tags.map((tag) => tag.tagId);
+      tagIdByName.value = tags.reduce((acc, tag) => {
+        acc[tag.name] = tag.tagId;
+        return acc;
+      }, {});
 
-      // 사진 로드
-      reviewPhotos.value = existingReview.photos.map((photo) => ({ ...photo }));
+      reviewPhotos.value = (data.images || []).map((url, index) => ({
+        id: `${Date.now()}-${index}`,
+        url,
+        file: null,
+      }));
 
-      // 리뷰 텍스트 로드
-      reviewText.value = existingReview.text;
+      if (data.visitInfo) {
+        receipt.value.date = formatOcrDate(data.visitInfo.date);
+        receipt.value.partySize = data.visitInfo.partySize || 0;
+        receipt.value.totalAmount = data.visitInfo.totalAmount || 0;
+        receipt.value.items = (data.visitInfo.menuItems || []).map((item) => ({
+          name: item.name,
+          quantity: item.qty,
+          price: item.unitPrice,
+        }));
+        receipt.value.uploaded = !!data.receiptId;
+      }
+    } catch (error) {
+      console.error("리뷰 수정 데이터 로드 실패:", error);
+      const existingReview = existingReviews[reviewId];
+      if (existingReview) {
+        // 방문 정보 로드
+        visitInfo.value.restaurantName = existingReview.restaurantName;
+        visitInfo.value.visitNumber = existingReview.visitNumber;
 
-      // 수정 모드에서는 바로 Step 2로 이동 (또는 Step 1부터 시작)
-      // currentStep.value = 2; // 필요시 주석 해제
+        // 영수증 정보 로드
+        receipt.value = { ...existingReview.receipt };
+
+        // 선택된 태그 로드
+        selectedTags.value = [...existingReview.selectedTags];
+
+        // 사진 로드
+        reviewPhotos.value = existingReview.photos.map((photo) => ({
+          ...photo,
+        }));
+
+        // 리뷰 텍스트 로드
+        reviewText.value = existingReview.text;
+      }
     }
   }
 };
@@ -222,9 +271,17 @@ const toggleTag = (tag) => {
   const index = selectedTags.value.indexOf(tag);
   if (index > -1) {
     selectedTags.value.splice(index, 1);
+    const tagId = tagIdByName.value[tag];
+    if (tagId) {
+      selectedTagIds.value = selectedTagIds.value.filter((id) => id !== tagId);
+    }
   } else {
     if (selectedTags.value.length < 7) {
       selectedTags.value.push(tag);
+      const tagId = tagIdByName.value[tag];
+      if (tagId) {
+        selectedTagIds.value.push(tagId);
+      }
     }
   }
 };
@@ -250,6 +307,14 @@ const handlePhotoAdd = (event) => {
   if (!files || files.length === 0) return;
 
   Array.from(files).forEach((file) => {
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      alert("JPG, PNG, WEBP 파일만 업로드할 수 있습니다.");
+      return;
+    }
+    if (file.size > MAX_UPLOAD_SIZE) {
+      alert("파일 용량은 10MB 이하만 업로드할 수 있습니다.");
+      return;
+    }
     if (reviewPhotos.value.length < 5) {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -287,34 +352,56 @@ const goToPreviousStep = () => {
   }
 };
 
+const extractImageUrls = () => {
+  return reviewPhotos.value
+    .map((photo) => photo.url)
+    .filter((url) => typeof url === "string" && url.startsWith("http"));
+};
+
+const setRating = (value) => {
+  rating.value = value;
+};
+
 // 리뷰 등록 또는 수정
-const submitReview = () => {
+const submitReview = async () => {
   if (isEditMode.value) {
-    // 수정 모드: API 호출하여 리뷰 업데이트
-    console.log('리뷰 수정:', {
-      reviewId: reviewId,
-      tags: selectedTags.value,
-      photos: reviewPhotos.value,
-      text: reviewText.value,
-    });
-    // TODO: PUT /api/reviews/:reviewId
-
-    // 수정 완료 후 리뷰 상세 페이지로 이동
-    router.push(`/restaurant/${restaurantId}/reviews/${reviewId}`);
+    try {
+      const response = await axios.put(
+        `/api/restaurants/${restaurantId}/reviews/${reviewId}`,
+        {
+          receiptId: receiptId.value,
+          rating: rating.value,
+          content: reviewText.value,
+          tagIds: selectedTagIds.value,
+          imageUrls: extractImageUrls(),
+        }
+      );
+      const updatedId = response.data.reviewId || reviewId;
+      router.push(`/restaurant/${restaurantId}/reviews/${updatedId}`);
+    } catch (error) {
+      console.error("리뷰 수정 실패:", error);
+      alert("리뷰 수정에 실패했습니다.");
+    }
   } else {
-    // 작성 모드: API 호출하여 새 리뷰 등록
-    console.log('리뷰 등록:', {
-      tags: selectedTags.value,
-      photos: reviewPhotos.value,
-      text: reviewText.value,
-    });
-    // TODO: POST /api/restaurants/:id/reviews
-
-    // API 응답으로 받은 리뷰 ID 설정 (실제 구현 시 API 응답 사용)
-    submittedReviewId.value = Date.now(); // 임시 ID (실제로는 API 응답의 reviewId 사용)
-
-    // 리뷰 등록 완료 모달 열기
-    isReviewCompleteModalOpen.value = true;
+    try {
+      const response = await axios.post(
+        `/api/restaurants/${restaurantId}/reviews`,
+        {
+          userId: DEFAULT_USER_ID,
+          reservationId: reservationId.value,
+          receiptId: receiptId.value,
+          rating: rating.value,
+          content: reviewText.value,
+          tagIds: selectedTagIds.value,
+          imageUrls: extractImageUrls(),
+        }
+      );
+      submittedReviewId.value = response.data.reviewId;
+      isReviewCompleteModalOpen.value = true;
+    } catch (error) {
+      console.error("리뷰 등록 실패:", error);
+      alert("리뷰 등록에 실패했습니다.");
+    }
   }
 };
 
@@ -332,13 +419,13 @@ const goToMyReview = () => {
 // 지난 예약 페이지로 가기
 const goToMyReservations = () => {
   closeReviewCompleteModal();
-  router.push({ path: '/my-reservations', query: { tab: 'past' } });
+  router.push({ path: "/my-reservations", query: { tab: "past" } });
 };
 
 // 홈으로 가기
 const goToHome = () => {
   closeReviewCompleteModal();
-  router.push('/');
+  router.push("/");
 };
 
 // 영수증 업로드 모달 열기
@@ -355,21 +442,31 @@ const closeReceiptModal = () => {
 const handleReceiptUpload = async (event) => {
   const file = event.target.files[0];
   if (!file) return;
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    alert("JPG, PNG, WEBP 파일만 업로드할 수 있습니다.");
+    return;
+  }
+  if (file.size > MAX_UPLOAD_SIZE) {
+    alert("파일 용량은 10MB 이하만 업로드할 수 있습니다.");
+    return;
+  }
 
   // 로딩 표시를 해주면 좋습니다.
   console.log("OCR 처리 시작...");
 
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append("file", file);
 
   try {
-    const response = await axios.post('/api/ocr/receipt', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+    const response = await axios.post("/api/ocr/receipt", formData, {
+      params: { reservationId: reservationId.value },
+      headers: { "Content-Type": "multipart/form-data" },
     });
 
     const data = response.data;
 
     // 2. 영수증 데이터 UI에 매핑
+    receiptId.value = data.receiptId || null;
     receipt.value.date = formatOcrDate(data.date); // 날짜 포맷팅 함수 필요시 적용
     receipt.value.totalAmount = data.totalAmount;
     receipt.value.items = data.items; // 서버에서 받아온 메뉴 리스트
@@ -384,41 +481,43 @@ const handleReceiptUpload = async (event) => {
 };
 // 날짜 형식 예쁘게 바꾸는 헬퍼 함수 (선택)
 const formatOcrDate = (dateStr) => {
-  if(!dateStr) return '';
+  if (!dateStr) return "";
   // '2023-07-11' -> '2023년 07월 11일'
   const date = new Date(dateStr);
-  const days = ['일', '월', '화', '수', '목', '금', '토'];
-  return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 (${days[date.getDay()]})`;
+  const days = ["일", "월", "화", "수", "목", "금", "토"];
+  return `${date.getFullYear()}년 ${
+    date.getMonth() + 1
+  }월 ${date.getDate()}일 (${days[date.getDay()]})`;
 };
 
 // 마우스 드래그 스크롤 설정
 const setupDragScroll = () => {
   nextTick(() => {
-    const scrollContainers = document.querySelectorAll('.tag-category-scroll');
+    const scrollContainers = document.querySelectorAll(".tag-category-scroll");
 
     scrollContainers.forEach((container) => {
       let isDown = false;
       let startX;
       let scrollLeft;
 
-      container.addEventListener('mousedown', (e) => {
+      container.addEventListener("mousedown", (e) => {
         isDown = true;
-        container.classList.add('cursor-grabbing');
+        container.classList.add("cursor-grabbing");
         startX = e.pageX - container.offsetLeft;
         scrollLeft = container.scrollLeft;
       });
 
-      container.addEventListener('mouseleave', () => {
+      container.addEventListener("mouseleave", () => {
         isDown = false;
-        container.classList.remove('cursor-grabbing');
+        container.classList.remove("cursor-grabbing");
       });
 
-      container.addEventListener('mouseup', () => {
+      container.addEventListener("mouseup", () => {
         isDown = false;
-        container.classList.remove('cursor-grabbing');
+        container.classList.remove("cursor-grabbing");
       });
 
-      container.addEventListener('mousemove', (e) => {
+      container.addEventListener("mousemove", (e) => {
         if (!isDown) return;
         e.preventDefault();
         const x = e.pageX - container.offsetLeft;
@@ -443,7 +542,7 @@ onMounted(() => {
         class="max-w-[500px] mx-auto px-4 h-14 flex items-center justify-between"
       >
         <h1 class="font-semibold text-[#1e3a5f] text-base">
-          {{ isEditMode ? '리뷰 수정' : '리뷰 작성' }}
+          {{ isEditMode ? "리뷰 수정" : "리뷰 작성" }}
         </h1>
         <button @click="isEditMode ? router.back() : goToMyReservations()">
           <X class="w-6 h-6 text-[#1e3a5f]" />
@@ -607,6 +706,31 @@ onMounted(() => {
           </div>
         </div>
 
+        <!-- 별점 선택 -->
+        <Card class="mb-3 p-4 rounded-2xl border-[#e9ecef]">
+          <h3 class="text-sm font-semibold text-[#1e3a5f] mb-2">
+            별점을 선택해주세요
+          </h3>
+          <div class="flex items-center gap-1">
+            <button
+              v-for="value in [1, 2, 3, 4, 5]"
+              :key="value"
+              type="button"
+              @click="setRating(value)"
+              class="transition-transform hover:scale-105"
+              :aria-label="`별점 ${value}점`"
+            >
+              <Star
+                :class="[
+                  'w-7 h-7',
+                  value <= rating ? 'fill-orange-400 text-orange-400' : 'text-gray-300',
+                ]"
+              />
+            </button>
+            <span class="ml-2 text-sm text-[#495057]">{{ rating }}점</span>
+          </div>
+        </Card>
+
         <!-- 사진 추가 영역 -->
         <Card class="mb-3 p-4 rounded-2xl border-[#e9ecef]">
           <h3 class="text-sm font-semibold text-[#1e3a5f] mb-2">
@@ -690,12 +814,12 @@ onMounted(() => {
             <Upload class="w-12 h-12 text-[#6c757d] mb-2" />
             <span class="text-sm text-[#495057]">클릭하여 파일 선택</span>
             <span class="text-xs text-[#6c757d] mt-1"
-              >JPG, PNG (최대 10MB)</span
+              >JPG, PNG, WEBP (최대 10MB)</span
             >
             <input
               type="file"
               class="hidden"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               @change="handleReceiptUpload"
             />
           </label>
@@ -739,12 +863,12 @@ onMounted(() => {
             <Upload class="w-12 h-12 text-green-600 mb-2" />
             <span class="text-sm text-[#495057]">클릭하여 사진 선택</span>
             <span class="text-xs text-[#6c757d] mt-1"
-              >JPG, PNG (최대 5장, 각 10MB)</span
+              >JPG, PNG, WEBP (최대 5장, 각 10MB)</span
             >
             <input
               type="file"
               class="hidden"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               multiple
               @change="handlePhotoAdd"
             />
@@ -850,15 +974,15 @@ onMounted(() => {
         </button>
         <button
           @click="submitReview"
-          :disabled="reviewText.trim().length === 0"
+          :disabled="rating < 1"
           :class="[
             'flex-1 h-12 rounded-lg font-medium transition-colors',
-            reviewText.trim().length > 0
+            rating >= 1
               ? 'bg-blue-600 text-white hover:bg-blue-700'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed',
           ]"
         >
-          {{ isEditMode ? '수정 완료' : '등록' }}
+          {{ isEditMode ? "수정 완료" : "등록" }}
         </button>
       </div>
     </div>

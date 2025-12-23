@@ -1,0 +1,11 @@
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: true
+    lazy-loading-enabled: true
+    aggressive-lazy-loading: false
+    default-fetch-size: 100
+  # 매퍼 XML 위치 지정 (보통 아래 경로 많이 사용)
+  mapper-locations: classpath:mapper/*.xml
+  # DTO 패키지 별칭 지정 (XML에서 패키지명 생략 가능)
+  type-aliases-package: com.example.LunchGo.dto

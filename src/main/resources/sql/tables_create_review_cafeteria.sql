@@ -13,7 +13,7 @@ CREATE TABLE reviews (
     content	text	NULL,
     created_at	datetime	NOT NULL DEFAULT current_timestamp,
     updated_at	datetime	NULL DEFAULT current_timestamp,
-    status	varchar(20)	NOT NULL	DEFAULT 'PUBLIC'
+    status	varchar(20)	NOT NULL	DEFAULT 'PUBLIC' COMMENT 'PUBLIC, BLINDED'
 );
 
 # 02. 리뷰 태그 테이블 생성
