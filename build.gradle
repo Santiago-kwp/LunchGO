@@ -43,6 +43,9 @@ dependencies {
 	// Thymeleaf (HTML 템플릿 엔진)
 	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 	implementation 'software.amazon.awssdk:s3:2.25.63'
+
+	//coolSMS 의존성 주입
+	implementation 'net.nurigo:sdk:4.3.0'
 }
 
 tasks.named('test') {
