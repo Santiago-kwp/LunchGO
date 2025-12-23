@@ -6,16 +6,22 @@ import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 
 const route = useRoute();
-const bookingType = route.query.type || 'reservation'; // 'reservation' or 'preorder'
+const bookingType = route.query.type || 'reservation';
 const isPreorder = computed(() => bookingType === 'preorder');
-const restaurantId = route.params.id; // Access the dynamic ID
+const restaurantId = route.params.id;
 
-const selectedDateIndex = ref(null); // Changed from selectedDate to selectedDateIndex to match React's use of index
+const selectedDateIndex = ref(null);
 const selectedTime = ref(null);
 const partySize = ref(4);
 const requestNote = ref('');
 
-// Generate dates for the next 30 days
+const onInputRequestNote = (e) => {
+  const v = e.target.value ?? '';
+  if (v.length > 50) {
+    requestNote.value = v.slice(0, 50);
+  }
+};
+
 const dates = computed(() => {
   return Array.from({ length: 30 }, (_, i) => {
     const date = new Date();
@@ -33,32 +39,26 @@ const timeSlots = ref(['11:00', '12:00', '13:00', '14:00']);
 
 const canProceed = computed(() => selectedDateIndex.value !== null && selectedTime.value !== null);
 
-//예약금 * 인원수 계산식 + 선주문/선결제 플로우 포함
 const nextPage = computed(() => {
   if (isPreorder.value) {
-  return {
-    path: `/restaurant/${restaurantId}/menu`,
-    query: {
-      type: 'preorder',
-      partySize: partySize.value,
-      requestNote: requestNote.value,
-      dateIndex: selectedDateIndex.value,
-      time: selectedTime.value,
-    },
-  };
-}
+    return {
+      path: `/restaurant/${restaurantId}/menu`,
+      query: {
+        type: 'preorder',
+        partySize: partySize.value,
+        requestNote: requestNote.value,
+        dateIndex: selectedDateIndex.value,
+        time: selectedTime.value,
+      },
+    };
+  }
 
-  // 예약금 결제 페이지로 partySize 전달
   return {
     path: `/restaurant/${restaurantId}/payment`,
     query: {
       type: 'deposit',
       partySize: partySize.value,
-      // 원하면 요청사항도 같이 넘김 (백엔드 붙기 전 임시로라도 UI 반영 가능)
       requestNote: requestNote.value,
-      // 날짜/시간도 넘기고 싶으면 같이:
-      // dateIndex: selectedDateIndex.value,
-      // time: selectedTime.value,
     },
   };
 });
@@ -70,7 +70,6 @@ const selectDate = (idx) => {
 
 <template>
   <div class="min-h-screen bg-[#f8f9fa]">
-    <!-- Header -->
     <header class="sticky top-0 z-50 bg-white border-b border-[#e9ecef]">
       <div class="max-w-[500px] mx-auto px-4 h-14 flex items-center">
         <RouterLink :to="`/restaurant/${restaurantId}`" class="mr-3">
@@ -83,7 +82,6 @@ const selectDate = (idx) => {
     </header>
 
     <main class="max-w-[500px] mx-auto pb-24">
-      <!-- Date Selection -->
       <div class="bg-white px-4 py-5 border-b border-[#e9ecef]">
         <div class="flex items-center gap-2 mb-4">
           <CalendarIcon class="w-5 h-5 text-[#ff6b4a]" />
@@ -116,7 +114,6 @@ const selectDate = (idx) => {
         </div>
       </div>
 
-      <!-- Time Selection -->
       <div class="bg-white px-4 py-5 border-b border-[#e9ecef]">
         <h2 class="text-base font-semibold text-[#1e3a5f] mb-4">시간 선택</h2>
 
@@ -136,7 +133,6 @@ const selectDate = (idx) => {
         </div>
       </div>
 
-      <!-- Party Size Selection -->
       <div class="bg-white px-4 py-5">
         <div class="flex items-center gap-2 mb-4">
           <Users class="w-5 h-5 text-[#ff6b4a]" />
@@ -171,21 +167,24 @@ const selectDate = (idx) => {
         </p>
       </div>
 
-      <!-- Request Note -->
-      <div v-if="canProceed" class="bg-white px-4 py-5 border-t border-[#e9ecef]">
-        <h2 class="text-base font-semibold text-[#1e3a5f] mb-3">요청사항</h2>
+      <div v-if="canProceed" class="bg-white px-4 py-5 border-b border-[#e9ecef]">
+        <h2 class="text-base font-semibold text-[#1e3a5f] mb-4">요청사항 (선택)</h2>
+
         <textarea
           v-model="requestNote"
-          rows="4"
-          placeholder="예: 유아용 의자 부탁드려요 등"
-          class="w-full rounded-xl border-2 border-[#dee2e6] px-3 py-3 text-sm text-[#1e3a5f] placeholder:text-[#adb5bd] focus:outline-none focus:border-[#ff6b4a]"
-        />
-        <p class="mt-2 text-xs text-[#6c757d] leading-relaxed">
-        요청사항은 매장의 참고 용이며, 예약내역 변경 사항은 취소 후 재예약 혹은 매장으로 직접 문의 하시길 바랍니다.
-        </p>
+          :maxlength="50"
+          @input="onInputRequestNote"
+          placeholder="요청사항이 있다면 입력해주세요 (최대 50자)"
+          class="w-full border-2 border-[#dee2e6] rounded-lg p-3 text-sm text-[#495057] resize-none bg-white
+                focus:outline-none focus:border-[#ffc4b8] transition-all"
+          rows="3"
+        ></textarea>
+
+        <div class="mt-2 text-xs text-right text-[#6c757d]">
+          {{ requestNote.length }}/50
+        </div>
       </div>
 
-      <!-- Booking Summary -->
       <div v-if="canProceed" class="mx-4 mt-4">
         <Card class="p-4 border-[#e9ecef] rounded-xl bg-white shadow-card">
           <h3 class="font-semibold text-[#1e3a5f] mb-3">{{ isPreorder ? '선주문 정보' : '예약 정보' }}</h3>
@@ -195,8 +194,8 @@ const selectDate = (idx) => {
               <span class="text-[#1e3a5f] font-medium">식당명</span>
             </div>
             <div class="flex justify-between">
-            <span class="text-[#6c757d]">요청사항</span>
-            <span class="text-[#1e3a5f] font-medium">{{ requestNote?.trim() || '-' }}</span>
+              <span class="text-[#6c757d]">요청사항</span>
+              <span class="text-[#1e3a5f] font-medium">{{ requestNote?.trim() || '-' }}</span>
             </div>
             <div class="flex justify-between">
               <span class="text-[#6c757d]">예약 날짜</span>
@@ -219,7 +218,6 @@ const selectDate = (idx) => {
       </div>
     </main>
 
-    <!-- Fixed Bottom Button -->
     <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e9ecef] z-50 shadow-lg">
       <div class="max-w-[500px] mx-auto px-4 py-3">
         <RouterLink :to="canProceed ? nextPage : '#'">
@@ -235,6 +233,4 @@ const selectDate = (idx) => {
   </div>
 </template>
 
-<style scoped>
-/* No specific styles needed here as Tailwind handles most of it. */
-</style>
+<style scoped></style>

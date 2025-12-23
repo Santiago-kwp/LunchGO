@@ -1,5 +1,5 @@
 <script setup>
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRouter } from 'vue-router';
 import { Calendar, Clock, Users, MapPin } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
@@ -30,6 +30,12 @@ const getStatusInfo = (reservationStatus) => {
     },
   };
   return statusMap[reservationStatus] || statusMap.confirmed;
+};
+
+const router = useRouter();
+
+const goCancel = (id) => {
+  router.push({ name: "reservation-cancel", params: { id: String(id) } });
 };
 </script>
 
@@ -105,6 +111,7 @@ const getStatusInfo = (reservationStatus) => {
           <Button
             variant="outline"
             class="flex-1 h-10 border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] rounded-lg text-sm font-medium"
+            @click="goCancel(reservation.id)"
           >
             예약 취소
           </Button>

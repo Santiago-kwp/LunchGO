@@ -32,6 +32,12 @@ const toggleFavorite = (restaurantId) => {
   }
 };
 
+//취소 버튼
+const goCancel = (id) => {
+  router.push({ name: "reservation-cancel", params: { id: String(id) } });
+};
+
+
 // 통합 예약 데이터
 const allReservations = ref([
   // 1. 예정된 예약 (ReservationHistory로 감)
