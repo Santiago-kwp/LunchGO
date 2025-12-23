@@ -1,9 +1,6 @@
 package com.example.LunchGo.account.helper;
 
-import com.example.LunchGo.account.dto.OwnerFindRequest;
-import com.example.LunchGo.account.dto.OwnerJoinRequest;
-import com.example.LunchGo.account.dto.UserFindRequest;
-import com.example.LunchGo.account.dto.UserJoinRequest;
+import com.example.LunchGo.account.dto.*;
 
 public interface AccountHelper {
 
@@ -18,4 +15,8 @@ public interface AccountHelper {
     String getEmail(UserFindRequest userReq);
 
     String getLoginId(OwnerFindRequest ownerReq);
+
+    void checkMember(FindPwdRequest findPwdReq);
+
+    void changePwd(FindPwdRequest findPwdReq);
 }

@@ -1,5 +1,6 @@
 package com.example.LunchGo.member.service;
 
+import com.example.LunchGo.account.dto.FindPwdRequest;
 import com.example.LunchGo.account.dto.OwnerJoinRequest;
 import com.example.LunchGo.account.dto.UserJoinRequest;
 import com.example.LunchGo.member.domain.CustomRole;
@@ -11,8 +12,11 @@ import com.example.LunchGo.member.repository.OwnerRepository;
 import com.example.LunchGo.member.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.boot.autoconfigure.graphql.GraphQlProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
@@ -82,5 +86,40 @@ public class BaseMemberService implements MemberService {
     public Owner find(String name, String businessNum, String phone) {
         return ownerRepository.findByNameAndBusinessNumAndPhone(name, businessNum, phone)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "해당 아이디를 가진 사업자가 없습니다."));
+    }
+
+    @Override
+    public void check(FindPwdRequest findPwdReq) {
+        if(StringUtils.hasLength(findPwdReq.getEmail())) { //사용자인 경우
+            if(!userRepository.existsByEmailAndNameAndPhone(findPwdReq.getEmail(), findPwdReq.getName(), findPwdReq.getPhone())) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다.");
+            }
+            return;
+        }
+        if(StringUtils.hasLength(findPwdReq.getLoginId())) { //사업자인 경우
+            if(!ownerRepository.existsByLoginIdAndNameAndPhone(findPwdReq.getLoginId(), findPwdReq.getName(), findPwdReq.getPhone())) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사업자를 찾을 수 없습니다.");
+            }
+            return;
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST); //아이디나 이메일을 입력하지 않은 경우
+    }
+
+    @Override
+    @Transactional
+    public void updatePwd(FindPwdRequest findPwdReq) { //비밀번호 암호화 필수
+        if(StringUtils.hasLength(findPwdReq.getEmail())) { //사용자인 경우
+            if(userRepository.updatePassword(findPwdReq.getEmail(), findPwdReq.getPassword()) == 0){
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다.");
+            }
+            return;
+        }
+        if(StringUtils.hasLength(findPwdReq.getLoginId())) { //사업자인 경우
+            if(ownerRepository.updatePassword(findPwdReq.getLoginId(), findPwdReq.getPassword()) == 0){
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사업자를 찾을 수 없습니다.");
+            }
+            return;
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST); //아이디나 이메일이 없는 경우
     }
 }

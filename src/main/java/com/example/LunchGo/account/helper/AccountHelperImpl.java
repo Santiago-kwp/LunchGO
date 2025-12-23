@@ -1,9 +1,6 @@
 package com.example.LunchGo.account.helper;
 
-import com.example.LunchGo.account.dto.OwnerFindRequest;
-import com.example.LunchGo.account.dto.OwnerJoinRequest;
-import com.example.LunchGo.account.dto.UserFindRequest;
-import com.example.LunchGo.account.dto.UserJoinRequest;
+import com.example.LunchGo.account.dto.*;
 import com.example.LunchGo.member.entity.Owner;
 import com.example.LunchGo.member.entity.User;
 import com.example.LunchGo.member.service.MemberService;
@@ -54,5 +51,17 @@ public class AccountHelperImpl implements AccountHelper {
 
         Owner owner = memberService.find(ownerReq.getName(), ownerReq.getBusinessNum(), ownerReq.getPhone());
         return owner.getLoginId();
+    }
+
+    @Override
+    public void checkMember(FindPwdRequest findPwdReq) {
+        //인증번호 전송 및 확인 로직
+
+        memberService.check(findPwdReq);
+    }
+
+    @Override
+    public void changePwd(FindPwdRequest findPwdReq) {
+        memberService.updatePwd(findPwdReq);
     }
 }

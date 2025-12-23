@@ -1,9 +1,6 @@
 package com.example.LunchGo.account.controller;
 
-import com.example.LunchGo.account.dto.OwnerFindRequest;
-import com.example.LunchGo.account.dto.OwnerJoinRequest;
-import com.example.LunchGo.account.dto.UserFindRequest;
-import com.example.LunchGo.account.dto.UserJoinRequest;
+import com.example.LunchGo.account.dto.*;
 import com.example.LunchGo.account.helper.AccountHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -88,5 +85,23 @@ public class AccountController {
         Map<String, String> response = Collections.singletonMap("loginId", findLoginId); //찾은 아이디 객체에 담아 보내기
 
         return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @PostMapping("/auth/search/pwd")
+    public ResponseEntity<?> searchPwd(@RequestBody FindPwdRequest findPwdReq) {
+        if(!StringUtils.hasLength(findPwdReq.getPhone()) || !StringUtils.hasLength(findPwdReq.getVerifyCode()) || !StringUtils.hasLength(findPwdReq.getName())){
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+
+        accountHelper.checkMember(findPwdReq); //사용자나 사업자가 없으면 404, 이메일이나 아이디를 입력하지 않았으면 400 던짐
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @PutMapping("/auth/pwd")
+    public ResponseEntity<?> changePwd(@RequestBody FindPwdRequest findPwdReq) {
+        if(!StringUtils.hasLength(findPwdReq.getPassword())) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+
+        accountHelper.changePwd(findPwdReq); //update 시 문제 404, 이메일이나 아이디가 전달되지 않았으면 400 던짐
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 }
