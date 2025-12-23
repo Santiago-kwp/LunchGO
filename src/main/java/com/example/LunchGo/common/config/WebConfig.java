@@ -1,4 +1,4 @@
-package com.example.LunchGo.config;
+package com.example.LunchGo.common.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
