@@ -8,6 +8,8 @@ import com.example.LunchGo.member.domain.OwnerStatus;
 import com.example.LunchGo.member.domain.UserStatus;
 import com.example.LunchGo.member.dto.MemberInfo;
 import com.example.LunchGo.member.dto.MemberUpdateInfo;
+import com.example.LunchGo.member.dto.OwnerInfo;
+import com.example.LunchGo.member.dto.OwnerUpdateInfo;
 import com.example.LunchGo.member.entity.Owner;
 import com.example.LunchGo.member.entity.User;
 import com.example.LunchGo.member.mapper.MemberMapper;
@@ -149,5 +151,27 @@ public class BaseMemberService implements MemberService {
         if(info.getSpecialities() != null && !info.getSpecialities().isEmpty()) {
             memberMapper.insertUserSpecialities(userId, info.getSpecialities()); //변경, 신규, 삭제로 인한 변경 추가
         }
+    }
+
+    @Override
+    public OwnerInfo getOwnerInfo(Long ownerId) {
+        Owner owner = ownerRepository.findByOwnerId(ownerId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사업자를 찾을 수 없습니다"));
+
+        return OwnerInfo.builder()
+                .loginId(owner.getLoginId())
+                .name(owner.getName())
+                .phone(owner.getPhone())
+                .businessNum(owner.getBusinessNum())
+                .startAt(owner.getStartAt())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void updateOwnerInfo(Long ownerId ,OwnerUpdateInfo ownerUpdateInfo) {
+        int result = ownerRepository.updateOwner(ownerId, ownerUpdateInfo.getPhone(), ownerUpdateInfo.getImage());
+
+        if(result <= 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사업자를 찾을 수 없습니다.");
     }
 }

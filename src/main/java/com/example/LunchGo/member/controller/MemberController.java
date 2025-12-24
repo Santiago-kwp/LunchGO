@@ -2,10 +2,14 @@ package com.example.LunchGo.member.controller;
 
 import com.example.LunchGo.member.dto.MemberInfo;
 import com.example.LunchGo.member.dto.MemberUpdateInfo;
+import com.example.LunchGo.member.dto.OwnerInfo;
+import com.example.LunchGo.member.dto.OwnerUpdateInfo;
+import com.example.LunchGo.member.entity.Owner;
 import com.example.LunchGo.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -25,6 +29,22 @@ public class MemberController {
     public ResponseEntity<?> updateUser(@PathVariable Long userId, @RequestBody MemberUpdateInfo memberUpdateInfo) {
         memberService.updateMemberInfo(userId, memberUpdateInfo); //예외 발생시 404 발생
 
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @GetMapping("/info/business/{ownerId}")
+    public ResponseEntity<?> ownerDetail(@PathVariable Long ownerId) {
+        OwnerInfo owner = memberService.getOwnerInfo(ownerId);
+
+        return new ResponseEntity<>(owner, HttpStatus.OK);
+    }
+
+    @PutMapping("/info/business/{ownerId}")
+    public ResponseEntity<?> updateOwner(@PathVariable Long ownerId, @RequestBody OwnerUpdateInfo ownerUpdateInfo) {
+        if(!StringUtils.hasLength(ownerUpdateInfo.getPhone()) && !StringUtils.hasLength(ownerUpdateInfo.getImage())) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST); //아무 변경없이 수정하기 남발 금지
+        }
+        memberService.updateOwnerInfo(ownerId, ownerUpdateInfo);
         return new ResponseEntity<>(HttpStatus.OK);
     }
 }
