@@ -55,6 +55,7 @@ CREATE TABLE menus
     restaurant_id BIGINT      NOT NULL COMMENT '식당ID',
     name          VARCHAR(50) NOT NULL COMMENT '식당메뉴명',
     category      VARCHAR(50) DEFAULT 'MAIN' COMMENT '식당메뉴종류',
+    description   TEXT NOT NULL COMMENT '메뉴 설명',
     price         INT         NOT NULL COMMENT '가격(1인분 기준)',
     is_deleted    TINYINT(1)  DEFAULT 0 COMMENT '삭제여부',
 
