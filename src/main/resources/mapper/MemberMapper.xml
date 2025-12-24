@@ -49,4 +49,10 @@
         </foreach>
     </insert>
 
+    <select id="getPromotionEmails" parameterType="long" resultType="string" statementType="CALLABLE">
+        { call getRestaurantIdFromOwnerID(
+                #{ownerId, mode=IN, jdbcType=BIGINT}
+        )}
+    </select>
+
 </mapper>

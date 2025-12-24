@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -149,5 +150,14 @@ public class BaseMemberService implements MemberService {
         if(info.getSpecialities() != null && !info.getSpecialities().isEmpty()) {
             memberMapper.insertUserSpecialities(userId, info.getSpecialities()); //변경, 신규, 삭제로 인한 변경 추가
         }
+    }
+
+    @Override
+    public List<String> getEmails(Long ownerId) {
+        List<String> emails = memberMapper.getPromotionEmails(ownerId);
+
+        if(emails == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사업자를 찾을 수 없습니다.");
+
+        return emails;
     }
 }
