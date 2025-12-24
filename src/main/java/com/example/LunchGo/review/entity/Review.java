@@ -47,6 +47,15 @@ public class Review {
     @Column(name = "status", nullable = false)
     private String status;
 
+    @Column(name = "blind_request_tag_id")
+    private Long blindRequestTagId;
+
+    @Column(name = "blind_request_reason")
+    private String blindRequestReason;
+
+    @Column(name = "blind_requested_at")
+    private LocalDateTime blindRequestedAt;
+
     public Review(Long restaurantId, Long userId, Long receiptId, Integer rating, String content) {
         this.restaurantId = restaurantId;
         this.userId = userId;
@@ -62,6 +71,17 @@ public class Review {
 
     public void updateReceiptId(Long receiptId) {
         this.receiptId = receiptId;
+    }
+
+    public void requestBlind(Long tagId, String reason) {
+        this.status = "BLIND_REQUEST";
+        this.blindRequestTagId = tagId;
+        this.blindRequestReason = reason;
+        this.blindRequestedAt = LocalDateTime.now();
+    }
+
+    public void decideBlind(boolean approve) {
+        this.status = approve ? "BLINDED" : "BLIND_REJECTED";
     }
 
     @PrePersist

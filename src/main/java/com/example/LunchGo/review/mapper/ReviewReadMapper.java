@@ -2,6 +2,7 @@ package com.example.LunchGo.review.mapper;
 
 import com.example.LunchGo.review.dto.CommentResponse;
 import com.example.LunchGo.review.dto.ReceiptItemResponse;
+import com.example.LunchGo.review.dto.ReviewAdminItemResponse;
 import com.example.LunchGo.review.dto.ReviewDetailResponse;
 import com.example.LunchGo.review.dto.ReviewImageRow;
 import com.example.LunchGo.review.dto.ReviewItemResponse;
@@ -43,7 +44,11 @@ public interface ReviewReadMapper {
 
     List<CommentResponse> selectReviewComments(@Param("reviewId") Long reviewId);
 
+    CommentResponse selectReviewCommentById(@Param("commentId") Long commentId);
+
     List<ReviewTagRow> selectReviewTagsByReviewIds(@Param("reviewIds") List<Long> reviewIds);
 
     List<ReviewImageRow> selectReviewImagesByReviewIds(@Param("reviewIds") List<Long> reviewIds);
+
+    List<ReviewAdminItemResponse> selectAdminReviews();
 }

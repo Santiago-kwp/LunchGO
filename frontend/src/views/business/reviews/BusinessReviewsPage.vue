@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { RouterLink } from 'vue-router';
+import { ref, computed, onMounted } from "vue";
+import { RouterLink } from "vue-router";
+import axios from "axios";
 import {
   Star,
   MessageSquare,
@@ -15,196 +16,87 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-} from 'lucide-vue-next';
-import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
-import BusinessHeader from '@/components/ui/BusinessHeader.vue';
+} from "lucide-vue-next";
+import BusinessSidebar from "@/components/ui/BusinessSideBar.vue";
+import BusinessHeader from "@/components/ui/BusinessHeader.vue";
+import Pagination from "@/components/ui/Pagination.vue";
 
 // 필터 상태
-const selectedRating = ref('all'); // 'all', '5', '4', '3', '2', '1'
-const searchQuery = ref('');
-const selectedSort = ref('latest'); // 'latest', 'most-commented'
-const selectedResponseStatus = ref('all'); // 'all', 'need-response', 'responded'
-const selectedReportStatus = ref('all'); // 'all', 'none', 'pending', 'approved', 'rejected'
+const selectedRating = ref("all"); // 'all', '5', '4', '3', '2', '1'
+const searchQuery = ref("");
+const selectedSort = ref("latest"); // 'latest', 'most-commented'
+const selectedResponseStatus = ref("all"); // 'all', 'need-response', 'responded'
+const selectedReportStatus = ref("all"); // 'all', 'none', 'pending', 'approved', 'rejected'
 
 // 댓글 입력 상태
 const commentInputs = ref({});
 const showCommentInput = ref({});
+
+// 페이지네이션
+const pageSize = 10;
+const currentPage = ref(1);
+const totalReviews = ref(0);
+const reviewSummary = ref(null);
+const statsReviews = ref([]);
 
 // 모달 상태
 const isImageModalOpen = ref(false);
 const modalImages = ref([]);
 const modalImageIndex = ref(0);
 
+// 리뷰 상세 모달
+const isDetailModalOpen = ref(false);
+const selectedReview = ref(null);
+
 // 블라인드 요청 모달
 const isReportModalOpen = ref(false);
 const reportReviewId = ref(null);
-const reportReason = ref('');
+const reportTag = ref("");
+const reportReason = ref("");
 
-// Mock 데이터 - 실제로는 API에서 가져옴
-const reviews = ref([
-  {
-    id: 'review-1',
-    author: {
-      name: '김철수',
-      company: 'ABC 회사',
-      isBlind: false,
-    },
-    rating: 5,
-    visitCount: 3,
-    visitInfo: {
-      date: '2025년 11월 15일 (금)',
-      partySize: 8,
-      totalAmount: 111000,
-      menuItems: [
-        { name: '김치찌개', quantity: 4, price: 12000 },
-        { name: '된장찌개', quantity: 2, price: 11000 },
-        { name: '제육볶음', quantity: 2, price: 15000 },
-      ],
-    },
-    images: [
-      'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800&h=600&fit=crop',
-    ],
-    tags: ['양이 푸짐해요', '가성비가 좋아요', '재방문 의사 있어요'],
-    content:
-      '회식하기 정말 좋은 곳이에요! 음식 양도 푸짐하고 맛도 좋아서 직원들 모두 만족했습니다. 특히 김치찌개가 일품이었어요.',
-    createdAt: '2025-11-15T19:30:00',
-    reportStatus: 'none', // 'none', 'pending', 'approved', 'rejected'
-    reportReason: '',
-    reportedAt: null,
-    comments: [
-      {
-        id: 'comment-1',
-        authorType: 'owner',
-        authorName: '런치고 한식당',
-        content: '소중한 리뷰 감사합니다! 다음에도 맛있게 해드릴게요 😊',
-        createdAt: '2025-11-16T10:00:00',
-      },
-    ],
-  },
-  {
-    id: 'review-2',
-    author: {
-      name: '이영희',
-      company: 'XYZ 기업',
-      isBlind: false,
-    },
-    rating: 4,
-    visitCount: 1,
-    visitInfo: {
-      date: '2025년 11월 10일 (일)',
-      partySize: 4,
-      totalAmount: 68000,
-      menuItems: [
-        { name: '비빔밥', quantity: 3, price: 13000 },
-        { name: '불고기', quantity: 1, price: 18000 },
-        { name: '공기밥', quantity: 1, price: 2000 },
-      ],
-    },
-    images: [
-      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&h=600&fit=crop',
-    ],
-    tags: ['분위기가 좋아요', '주차가 편해요'],
-    content:
-      '음식이 깔끔하고 맛있어요. 다만 대기 시간이 좀 길었던 점은 아쉬웠습니다. 그래도 전반적으로 만족스러웠어요.',
-    createdAt: '2025-11-10T14:20:00',
-    reportStatus: 'none',
-    reportReason: '',
-    reportedAt: null,
-    comments: [],
-  },
-  {
-    id: 'review-3',
-    author: {
-      name: '블라인드',
-      company: '블라인드',
-      isBlind: true,
-    },
-    rating: 3,
-    visitCount: 2,
-    visitInfo: null,
-    images: [],
-    tags: [],
-    content: '',
-    blindReason: '부적절한 내용이 포함되어 블라인드 처리되었습니다.',
-    createdAt: '2025-11-08T18:45:00',
-    reportStatus: 'approved',
-    reportReason: '허위 사실 유포',
-    reportedAt: '2025-11-08T10:00:00',
-    comments: [],
-  },
-  {
-    id: 'review-4',
-    author: {
-      name: '박민수',
-      company: 'DEF 그룹',
-      isBlind: false,
-    },
-    rating: 5,
-    visitCount: 5,
-    visitInfo: {
-      date: '2025년 11월 05일 (화)',
-      partySize: 10,
-      totalAmount: 185000,
-      menuItems: [
-        { name: '삼겹살', quantity: 5, price: 16000 },
-        { name: '목살', quantity: 3, price: 15000 },
-        { name: '공기밥', quantity: 10, price: 2000 },
-        { name: '된장찌개', quantity: 5, price: 5000 },
-      ],
-    },
-    images: [
-      'https://images.unsplash.com/photo-1529042410759-befb1204b468?w=800&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&h=600&fit=crop',
-    ],
-    tags: [
-      '양이 푸짐해요',
-      '직원이 친절해요',
-      '재방문 의사 있어요',
-      '법카 쓰기 좋은 가격대에요',
-    ],
-    content:
-      '단골 맛집입니다! 벌써 다섯 번째 방문인데 항상 만족스러워요. 고기 질도 좋고 직원분들도 친절하세요. 회식 장소로 강추합니다!',
-    createdAt: '2025-11-05T20:15:00',
-    comments: [
-      {
-        id: 'comment-2',
-        authorType: 'owner',
-        authorName: '런치고 한식당',
-        content: '항상 찾아주셔서 감사합니다! 앞으로도 최선을 다하겠습니다 🙏',
-        createdAt: '2025-11-06T09:30:00',
-      },
-    ],
-    reportStatus: 'pending',
-    reportReason: '욕설 포함',
-    reportedAt: '2025-11-06T15:00:00',
-  },
-]);
+const restaurantId = ref(1); // 일단 식당 1로  고정 : 추후 수정
+const reviews = ref([]);
+
+const reportTagOptions = [
+  { id: 21, name: "욕설/비속어 포함" },
+  { id: 22, name: "인신공격/명예훼손" },
+  { id: 23, name: "허위 사실 유포" },
+  { id: 24, name: "도배/스팸/광고" },
+  { id: 25, name: "경쟁 업체 비방" },
+];
+
+const getReportStatusFromReviewStatus = (status) => {
+  if (status === "BLIND_REQUEST") return "pending";
+  if (status === "BLIND_REJECTED") return "rejected";
+  if (status === "BLINDED") return "approved";
+  return "none";
+};
 
 // 통계 계산
 const stats = computed(() => {
-  const validReviews = reviews.value.filter((r) => !r.author.isBlind);
-  const totalReviews = validReviews.length;
-  const avgRating =
-    totalReviews > 0
-      ? (
-          validReviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews
-        ).toFixed(1)
-      : 0;
-  const totalComments = reviews.value.reduce(
-    (sum, r) => sum + r.comments.length,
-    0
-  );
-  const needsResponse = reviews.value.filter(
+  const baseReviews =
+    statsReviews.value.length > 0 ? statsReviews.value : reviews.value;
+  const validReviews = baseReviews.filter((r) => !r.author.isBlind);
+  const summary = reviewSummary.value;
+  const totalReviewCount =
+    summary?.reviewCount ?? totalReviews.value ?? validReviews.length;
+  const avgValue =
+    summary?.avgRating ??
+    (validReviews.length > 0
+      ? validReviews.reduce((sum, r) => sum + r.rating, 0) /
+        validReviews.length
+      : 0);
+  const avgRating = Number(avgValue).toFixed(1);
+  const totalComments = baseReviews.filter((r) => r.comments.length > 0).length;
+  const needsResponse = baseReviews.filter(
     (r) => !r.author.isBlind && r.comments.length === 0
   ).length;
-  const reportedReviews = reviews.value.filter(
-    (r) => r.reportStatus === 'pending'
+  const reportedReviews = baseReviews.filter(
+    (r) => r.reportStatus === "pending"
   ).length;
 
   return {
-    totalReviews,
+    totalReviews: totalReviewCount,
     avgRating,
     totalComments,
     needsResponse,
@@ -217,27 +109,27 @@ const filteredReviews = computed(() => {
   let result = [...reviews.value];
 
   // 평점 필터
-  if (selectedRating.value !== 'all') {
+  if (selectedRating.value !== "all") {
     const rating = parseInt(selectedRating.value);
     result = result.filter((r) => r.rating === rating);
   }
 
   // 답변 상태 필터
-  if (selectedResponseStatus.value === 'need-response') {
+  if (selectedResponseStatus.value === "need-response") {
     result = result.filter((r) => !r.author.isBlind && r.comments.length === 0);
-  } else if (selectedResponseStatus.value === 'responded') {
+  } else if (selectedResponseStatus.value === "responded") {
     result = result.filter((r) => r.comments.length > 0);
   }
 
   // 신고 상태 필터
-  if (selectedReportStatus.value === 'none') {
-    result = result.filter((r) => r.reportStatus === 'none');
-  } else if (selectedReportStatus.value === 'pending') {
-    result = result.filter((r) => r.reportStatus === 'pending');
-  } else if (selectedReportStatus.value === 'approved') {
-    result = result.filter((r) => r.reportStatus === 'approved');
-  } else if (selectedReportStatus.value === 'rejected') {
-    result = result.filter((r) => r.reportStatus === 'rejected');
+  if (selectedReportStatus.value === "none") {
+    result = result.filter((r) => r.reportStatus === "none");
+  } else if (selectedReportStatus.value === "pending") {
+    result = result.filter((r) => r.reportStatus === "pending");
+  } else if (selectedReportStatus.value === "approved") {
+    result = result.filter((r) => r.reportStatus === "approved");
+  } else if (selectedReportStatus.value === "rejected") {
+    result = result.filter((r) => r.reportStatus === "rejected");
   }
 
   // 검색어 필터
@@ -245,30 +137,34 @@ const filteredReviews = computed(() => {
     const query = searchQuery.value.toLowerCase();
     result = result.filter(
       (r) =>
-        r.content.toLowerCase().includes(query) ||
-        r.author.name.toLowerCase().includes(query) ||
-        r.author.company.toLowerCase().includes(query)
+        (r.content || "").toLowerCase().includes(query) ||
+        (r.author?.name || "").toLowerCase().includes(query) ||
+        (r.author?.company || "").toLowerCase().includes(query)
     );
   }
 
   // 정렬
-  if (selectedSort.value === 'latest') {
+  if (selectedSort.value === "latest") {
     result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  } else if (selectedSort.value === 'most-commented') {
+  } else if (selectedSort.value === "most-commented") {
     result.sort((a, b) => b.comments.length - a.comments.length);
   }
 
   return result;
 });
 
+const totalPages = computed(() => {
+  return Math.max(1, Math.ceil(totalReviews.value / pageSize));
+});
+
 // 날짜 포맷팅
 const formatDate = (dateString) => {
   const date = new Date(dateString);
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
   return `${year}.${month}.${day} ${hours}:${minutes}`;
 };
 
@@ -277,6 +173,16 @@ const openImageModal = (images, index) => {
   modalImages.value = images;
   modalImageIndex.value = index;
   isImageModalOpen.value = true;
+};
+
+const openDetailModal = (review) => {
+  selectedReview.value = review;
+  isDetailModalOpen.value = true;
+};
+
+const closeDetailModal = () => {
+  isDetailModalOpen.value = false;
+  selectedReview.value = null;
 };
 
 // 이미지 모달 닫기
@@ -302,43 +208,211 @@ const prevImage = () => {
 const toggleCommentInput = (reviewId) => {
   showCommentInput.value[reviewId] = !showCommentInput.value[reviewId];
   if (!commentInputs.value[reviewId]) {
-    commentInputs.value[reviewId] = '';
+    commentInputs.value[reviewId] = "";
   }
 };
 
+const mapCommentResponse = (comment) => ({
+  id: comment.commentId,
+  authorType: comment.writerType === "OWNER" ? "owner" : "admin",
+  authorName: comment.writerName,
+  content: comment.content,
+  createdAt: comment.createdAt,
+});
+
+const mapVisitInfo = (visitInfo) => {
+  if (!visitInfo) return null;
+  return {
+    date: visitInfo.date,
+    partySize: visitInfo.partySize,
+    totalAmount: visitInfo.totalAmount,
+    menuItems: (visitInfo.menuItems || []).map((item) => ({
+      name: item.name,
+      quantity: item.qty ?? item.quantity ?? 0,
+      price: item.unitPrice ?? item.price ?? 0,
+    })),
+  };
+};
+
+const mapReviewDetail = (detail) => ({
+  id: detail.reviewId,
+  restaurantId: restaurantId.value,
+  author: {
+    name: detail.author || "익명",
+    company: detail.company || "",
+    isBlind: Boolean(detail.isBlinded),
+  },
+  rating: detail.rating ?? 0,
+  visitCount: detail.visitCount ?? null,
+  visitInfo: mapVisitInfo(detail.visitInfo),
+  images: detail.images || [],
+  tags: (detail.tags || []).map((tag) => tag.name),
+  content: detail.isBlinded ? "" : detail.content || "",
+  blindReason: detail.blindReason || "",
+  createdAt: detail.createdAt,
+  status: detail.status || "PUBLIC",
+  reportStatus: getReportStatusFromReviewStatus(detail.status),
+  reportTag: "",
+  reportReason: "",
+  reportedAt: null,
+  comments: (detail.comments || []).map(mapCommentResponse),
+});
+
+// 로그인 이후 수정 예정
+// const loadRestaurantInfo = async () => {
+//   const response = await axios.get('/api/my-restaurant');
+//   const data = response.data?.data ?? response.data;
+//   restaurantId.value =
+//     data?.restaurantId ?? data?.id ?? data?.restaurant?.restaurantId ?? null;
+//   if (!restaurantId.value) {
+//     throw new Error('식당 ID를 조회하지 못했습니다.');
+//   }
+// };
+
+const loadReviews = async () => {
+  if (!restaurantId.value) return;
+  const response = await axios.get(
+    `/api/restaurants/${restaurantId.value}/reviews`,
+    {
+      params: {
+        page: currentPage.value,
+        size: pageSize,
+        sort: "LATEST",
+      },
+    }
+  );
+  const data = response.data?.data ?? response.data;
+  const items = data?.items || [];
+  reviewSummary.value = data?.summary ?? null;
+  totalReviews.value = data?.page?.total ?? items.length;
+  const details = await Promise.all(
+    items.map((item) =>
+      axios.get(
+        `/api/restaurants/${restaurantId.value}/reviews/${item.reviewId}`
+      )
+    )
+  );
+  reviews.value = details.map((detail) => mapReviewDetail(detail.data));
+};
+
+const loadReviewStats = async () => {
+  if (!restaurantId.value) return;
+  const statsPageSize = 50;
+  const response = await axios.get(
+    `/api/restaurants/${restaurantId.value}/reviews`,
+    {
+      params: {
+        page: 1,
+        size: statsPageSize,
+        sort: "LATEST",
+      },
+    }
+  );
+  const data = response.data?.data ?? response.data;
+  const initialItems = data?.items || [];
+  reviewSummary.value = data?.summary ?? reviewSummary.value;
+  const total = data?.page?.total ?? initialItems.length;
+  const totalPagesForStats = Math.max(
+    1,
+    Math.ceil(total / statsPageSize)
+  );
+
+  let allItems = [...initialItems];
+  if (totalPagesForStats > 1) {
+    const morePages = await Promise.all(
+      Array.from({ length: totalPagesForStats - 1 }, (_, idx) =>
+        axios.get(`/api/restaurants/${restaurantId.value}/reviews`, {
+          params: {
+            page: idx + 2,
+            size: statsPageSize,
+            sort: "LATEST",
+          },
+        })
+      )
+    );
+    morePages.forEach((pageResponse) => {
+      const pageData = pageResponse.data?.data ?? pageResponse.data;
+      const pageItems = pageData?.items || [];
+      allItems = allItems.concat(pageItems);
+    });
+  }
+
+  if (allItems.length === 0) {
+    statsReviews.value = [];
+    return;
+  }
+
+  const details = await Promise.all(
+    allItems.map((item) =>
+      axios.get(
+        `/api/restaurants/${restaurantId.value}/reviews/${item.reviewId}`
+      )
+    )
+  );
+  statsReviews.value = details.map((detail) =>
+    mapReviewDetail(detail.data)
+  );
+};
+
+const handlePageChange = async (page) => {
+  if (page < 1 || page > totalPages.value) return;
+  currentPage.value = page;
+  await loadReviews();
+};
+
 // 댓글 추가
-const addComment = (reviewId) => {
+const addComment = async (reviewId) => {
   const content = commentInputs.value[reviewId]?.trim();
   if (!content) return;
+  if (!restaurantId.value) {
+    alert("식당 정보를 불러온 후 다시 시도해주세요.");
+    return;
+  }
 
   const review = reviews.value.find((r) => r.id === reviewId);
-  if (review) {
-    review.comments.push({
-      id: `comment-${Date.now()}`,
-      authorType: 'owner',
-      authorName: '런치고 한식당',
-      content,
-      createdAt: new Date().toISOString(),
-    });
+  if (!review) return;
+
+  try {
+    const response = await axios.post(
+      `/api/owners/restaurants/${restaurantId.value}/reviews/${reviewId}/comments`,
+      { content }
+    );
+    review.comments.push(mapCommentResponse(response.data));
 
     // 입력 초기화
-    commentInputs.value[reviewId] = '';
+    commentInputs.value[reviewId] = "";
     showCommentInput.value[reviewId] = false;
+  } catch (error) {
+    console.error("댓글 등록 실패:", error);
+    alert("댓글 등록에 실패했습니다. 잠시 후 다시 시도해주세요.");
   }
 };
 
 // 댓글 삭제
-const deleteComment = (reviewId, commentId) => {
+const deleteComment = async (reviewId, commentId) => {
+  if (!restaurantId.value) {
+    alert("식당 정보를 불러온 후 다시 시도해주세요.");
+    return;
+  }
   const review = reviews.value.find((r) => r.id === reviewId);
-  if (review) {
+  if (!review) return;
+
+  try {
+    await axios.delete(
+      `/api/owners/restaurants/${restaurantId.value}/reviews/${reviewId}/comments/${commentId}`
+    );
     review.comments = review.comments.filter((c) => c.id !== commentId);
+  } catch (error) {
+    console.error("댓글 삭제 실패:", error);
+    alert("댓글 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.");
   }
 };
 
 // 블라인드 요청 모달 열기
 const openReportModal = (reviewId) => {
   reportReviewId.value = reviewId;
-  reportReason.value = '';
+  reportTag.value = "";
+  reportReason.value = "";
   isReportModalOpen.value = true;
 };
 
@@ -346,44 +420,69 @@ const openReportModal = (reviewId) => {
 const closeReportModal = () => {
   isReportModalOpen.value = false;
   reportReviewId.value = null;
-  reportReason.value = '';
+  reportTag.value = "";
+  reportReason.value = "";
 };
 
 // 블라인드 요청 제출
-const submitReport = () => {
+const submitReport = async () => {
+  if (!reportTag.value) {
+    alert("신고 태그를 선택해주세요.");
+    return;
+  }
   if (!reportReason.value.trim()) {
-    alert('신고 사유를 입력해주세요.');
+    alert("신고 사유를 입력해주세요.");
     return;
   }
 
   const review = reviews.value.find((r) => r.id === reportReviewId.value);
-  if (review) {
-    review.reportStatus = 'pending';
-    review.reportReason = reportReason.value;
-    review.reportedAt = new Date().toISOString();
-  }
+  if (!review || !restaurantId.value) return;
 
-  closeReportModal();
-  alert('블라인드 요청이 접수되었습니다. 관리자 검토 후 처리됩니다.');
+  try {
+    const tag = reportTagOptions.find((item) => item.name === reportTag.value);
+    if (!tag) {
+      alert("신고 태그를 다시 선택해주세요.");
+      return;
+    }
+    const response = await axios.post(
+      `/api/owners/restaurants/${restaurantId.value}/reviews/${reportReviewId.value}/blind-requests`,
+      {
+        tagId: tag.id,
+        reason: reportReason.value.trim(),
+      }
+    );
+    const data = response.data?.data ?? response.data;
+    review.status = data?.status || "BLIND_REQUEST";
+    review.reportStatus = "pending";
+    review.reportTag = reportTag.value;
+    review.reportReason = reportReason.value;
+    review.reportedAt = data?.blindRequestedAt || new Date().toISOString();
+
+    closeReportModal();
+    alert("블라인드 요청이 접수되었습니다. 관리자 검토 후 처리됩니다.");
+  } catch (error) {
+    console.error("블라인드 요청 실패:", error);
+    alert("블라인드 요청에 실패했습니다. 잠시 후 다시 시도해주세요.");
+  }
 };
 
 // 신고 상태 텍스트 및 스타일
 const getReportStatusInfo = (status) => {
   const statusMap = {
-    none: { text: '', color: '', icon: null },
+    none: { text: "", color: "", icon: null },
     pending: {
-      text: '검토 중',
-      color: 'text-yellow-600 bg-yellow-50',
+      text: "검토 중",
+      color: "text-yellow-600 bg-yellow-50",
       icon: Clock,
     },
     approved: {
-      text: '승인됨',
-      color: 'text-green-600 bg-green-50',
+      text: "승인됨",
+      color: "text-green-600 bg-green-50",
       icon: CheckCircle,
     },
     rejected: {
-      text: '거부됨',
-      color: 'text-red-600 bg-red-50',
+      text: "거부됨",
+      color: "text-red-600 bg-red-50",
       icon: XCircle,
     },
   };
@@ -393,13 +492,27 @@ const getReportStatusInfo = (status) => {
 // 키보드 이벤트 (모달)
 onMounted(() => {
   const handleKeydown = (e) => {
+    if (isDetailModalOpen.value && e.key === "Escape") {
+      closeDetailModal();
+      return;
+    }
     if (!isImageModalOpen.value) return;
-    if (e.key === 'ArrowLeft') prevImage();
-    if (e.key === 'ArrowRight') nextImage();
-    if (e.key === 'Escape') closeImageModal();
+    if (e.key === "ArrowLeft") prevImage();
+    if (e.key === "ArrowRight") nextImage();
+    if (e.key === "Escape") closeImageModal();
   };
-  window.addEventListener('keydown', handleKeydown);
-  return () => window.removeEventListener('keydown', handleKeydown);
+  window.addEventListener("keydown", handleKeydown);
+  return () => window.removeEventListener("keydown", handleKeydown);
+});
+
+onMounted(async () => {
+  try {
+    // 로그인 이후
+    // await loadRestaurantInfo();
+    await Promise.all([loadReviews(), loadReviewStats()]);
+  } catch (error) {
+    console.error("리뷰 데이터를 불러오지 못했습니다:", error);
+  }
 });
 </script>
 
@@ -560,7 +673,7 @@ onMounted(() => {
                         {{ review.author.company }}
                       </span>
                       <span
-                        v-if="!review.author.isBlind"
+                        v-if="!review.author.isBlind && review.visitCount"
                         class="text-xs px-2 py-0.5 rounded-full bg-gradient-to-r from-[#ff6b4a] to-[#ffc4b8] text-white"
                       >
                         {{ review.visitCount }}번째 방문
@@ -602,14 +715,12 @@ onMounted(() => {
 
                 <!-- Actions -->
                 <div class="flex items-center gap-2">
-                  <RouterLink
-                    :to="`/restaurant/${review.restaurantId || '1'}/reviews/${
-                      review.id
-                    }`"
+                  <button
+                    @click="openDetailModal(review)"
                     class="text-sm text-[#ff6b4a] hover:underline"
                   >
                     상세보기
-                  </RouterLink>
+                  </button>
                   <!-- 블라인드 요청 버튼 (아직 신고하지 않은 경우만) -->
                   <button
                     v-if="
@@ -680,30 +791,6 @@ onMounted(() => {
                   </div>
                 </div>
 
-                <!-- Images -->
-                <div
-                  v-if="review.images.length > 0"
-                  class="mb-4 flex gap-2 overflow-x-auto pb-2"
-                >
-                  <div
-                    v-for="(image, idx) in review.images"
-                    :key="idx"
-                    class="relative flex-shrink-0 w-32 h-32 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
-                    @click="openImageModal(review.images, idx)"
-                  >
-                    <img
-                      :src="image"
-                      :alt="`리뷰 이미지 ${idx + 1}`"
-                      class="w-full h-full object-cover"
-                    />
-                    <div
-                      class="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded"
-                    >
-                      {{ idx + 1 }}/{{ review.images.length }}
-                    </div>
-                  </div>
-                </div>
-
                 <!-- Tags -->
                 <div
                   v-if="review.tags.length > 0"
@@ -744,7 +831,7 @@ onMounted(() => {
                           ]"
                         >
                           {{
-                            comment.authorType === 'owner' ? '사장님' : '관리자'
+                            comment.authorType === "owner" ? "사장님" : "관리자"
                           }}
                         </span>
                         <span class="font-semibold text-[#1e3a5f]">
@@ -816,6 +903,14 @@ onMounted(() => {
                 필터 조건을 변경하거나 검색어를 확인해주세요.
               </p>
             </div>
+
+            <div v-if="totalPages > 1" class="flex justify-center pt-2">
+              <Pagination
+                :current-page="currentPage"
+                :total-pages="totalPages"
+                @change-page="handlePageChange"
+              />
+            </div>
           </div>
         </div>
       </main>
@@ -878,6 +973,242 @@ onMounted(() => {
       </div>
     </Teleport>
 
+    <!-- Review Detail Modal -->
+    <Teleport to="body">
+      <div
+        v-if="isDetailModalOpen && selectedReview"
+        class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        @click="closeDetailModal"
+      >
+        <div
+          class="bg-white rounded-2xl max-w-5xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto"
+          @click.stop
+        >
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-bold text-[#1e3a5f]">리뷰 상세</h3>
+            <button
+              @click="closeDetailModal"
+              class="text-[#6c757d] hover:text-[#1e3a5f] transition-colors"
+            >
+              <svg
+                class="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-[#e9ecef] p-6">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex items-start gap-4">
+                <div
+                  class="w-12 h-12 rounded-full bg-gradient-to-br from-[#ff6b4a] to-[#ffc4b8] flex items-center justify-center text-white font-semibold"
+                >
+                  <User class="w-6 h-6" />
+                </div>
+                <div>
+                  <div class="flex items-center gap-2 mb-1">
+                    <span
+                      :class="[
+                        'font-semibold',
+                        selectedReview.author.isBlind
+                          ? 'text-[#6c757d]'
+                          : 'text-[#1e3a5f]',
+                      ]"
+                    >
+                      {{ selectedReview.author.name }}
+                    </span>
+                    <span class="text-sm text-[#6c757d]">
+                      {{ selectedReview.author.company }}
+                    </span>
+                    <span
+                      v-if="!selectedReview.author.isBlind && selectedReview.visitCount"
+                      class="text-xs px-2 py-0.5 rounded-full bg-gradient-to-r from-[#ff6b4a] to-[#ffc4b8] text-white"
+                    >
+                      {{ selectedReview.visitCount }}번째 방문
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-1">
+                      <Star
+                        v-for="i in 5"
+                        :key="i"
+                        :class="[
+                          'w-4 h-4',
+                          i <= selectedReview.rating
+                            ? 'fill-[#ff6b4a] text-[#ff6b4a]'
+                            : 'fill-[#dee2e6] text-[#dee2e6]',
+                        ]"
+                      />
+                    </div>
+                    <span class="text-sm text-[#6c757d]">
+                      {{ formatDate(selectedReview.createdAt) }}
+                    </span>
+                    <span
+                      v-if="selectedReview.reportStatus !== 'none'"
+                      :class="[
+                        'flex items-center gap-1 text-xs px-2 py-1 rounded-full font-semibold',
+                        getReportStatusInfo(selectedReview.reportStatus).color,
+                      ]"
+                    >
+                      <component
+                        :is="
+                          getReportStatusInfo(selectedReview.reportStatus).icon
+                        "
+                        class="w-3 h-3"
+                      />
+                      {{ getReportStatusInfo(selectedReview.reportStatus).text }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              v-if="selectedReview.author.isBlind"
+              class="bg-[#f8f9fa] rounded-lg p-4 text-center opacity-60"
+            >
+              <p class="text-sm text-[#6c757d]">
+                {{ selectedReview.blindReason }}
+              </p>
+            </div>
+
+            <template v-else>
+              <div v-if="selectedReview.visitInfo" class="mb-4">
+                <div class="bg-[#f8f9fa] border border-[#e9ecef] rounded-xl p-4">
+                  <div class="flex items-center gap-6 text-sm mb-3">
+                    <div class="flex items-center gap-2">
+                      <Calendar class="w-4 h-4 text-[#6c757d]" />
+                      <span class="text-[#1e3a5f]">{{
+                        selectedReview.visitInfo.date
+                      }}</span>
+                    </div>
+                    <div class="text-[#6c757d]">
+                      {{ selectedReview.visitInfo.partySize }}명
+                    </div>
+                    <div class="font-semibold text-[#ff6b4a]">
+                      {{
+                        selectedReview.visitInfo.totalAmount.toLocaleString()
+                      }}원
+                    </div>
+                  </div>
+                  <div class="border-t border-[#dee2e6] pt-3">
+                    <table class="w-full text-sm">
+                      <thead class="text-[#6c757d] text-xs">
+                        <tr>
+                          <th class="text-left pb-2">메뉴명</th>
+                          <th class="text-center pb-2">수량</th>
+                          <th class="text-right pb-2">단가</th>
+                        </tr>
+                      </thead>
+                      <tbody class="text-[#1e3a5f]">
+                        <tr
+                          v-for="(item, idx) in selectedReview.visitInfo.menuItems"
+                          :key="idx"
+                          class="border-t border-[#e9ecef]"
+                        >
+                          <td class="py-1">{{ item.name }}</td>
+                          <td class="text-center">{{ item.quantity }}개</td>
+                          <td class="text-right">
+                            {{ item.price.toLocaleString() }}원
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                v-if="selectedReview.images.length > 0"
+                class="mb-4 flex gap-2 overflow-x-auto pb-2"
+              >
+                <div
+                  v-for="(image, idx) in selectedReview.images"
+                  :key="idx"
+                  class="relative flex-shrink-0 w-32 h-32 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                  @click="openImageModal(selectedReview.images, idx)"
+                >
+                  <img
+                    :src="image"
+                    :alt="`리뷰 이미지 ${idx + 1}`"
+                    class="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+
+              <div
+                v-if="selectedReview.tags.length > 0"
+                class="mb-4 flex flex-wrap gap-2"
+              >
+                <span
+                  v-for="tag in selectedReview.tags"
+                  :key="tag"
+                  class="px-3 py-1 rounded-full text-sm bg-gradient-to-r from-[#ff6b4a]/10 to-[#ffc4b8]/10 text-[#ff6b4a] border border-[#ff6b4a]/20"
+                >
+                  {{ tag }}
+                </span>
+              </div>
+
+              <p class="text-[#1e3a5f] leading-relaxed mb-4">
+                {{ selectedReview.content }}
+              </p>
+
+              <div
+                v-if="selectedReview.comments.length > 0"
+                class="border-t border-[#e9ecef] pt-4 space-y-3"
+              >
+                <div
+                  v-for="comment in selectedReview.comments"
+                  :key="comment.id"
+                  class="bg-[#f8f9fa] rounded-lg p-4"
+                >
+                  <div class="flex items-start justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                      <span
+                        :class="[
+                          'text-xs px-2 py-1 rounded font-semibold',
+                          comment.authorType === 'owner'
+                            ? 'bg-[#007bff] text-white'
+                            : 'bg-[#6f42c1] text-white',
+                        ]"
+                      >
+                        {{
+                          comment.authorType === "owner" ? "사장님" : "관리자"
+                        }}
+                      </span>
+                      <span class="font-semibold text-[#1e3a5f]">
+                        {{ comment.authorName }}
+                      </span>
+                      <span class="text-xs text-[#6c757d]">
+                        {{ formatDate(comment.createdAt) }}
+                      </span>
+                    </div>
+                  </div>
+                  <p class="text-sm text-[#1e3a5f]">{{ comment.content }}</p>
+                </div>
+              </div>
+              <div
+                v-else
+                class="border-t border-[#e9ecef] pt-4 text-sm text-[#6c757d] flex items-center gap-2"
+              >
+                <MessageSquare class="w-4 h-4" />
+                아직 등록된 댓글이 없습니다.
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- Report Modal (블라인드 요청 모달) -->
     <Teleport to="body">
       <div
@@ -924,6 +1255,25 @@ onMounted(() => {
             <p class="text-xs text-[#dc3545]">
               ※ 허위 신고는 제재 대상이 될 수 있습니다.
             </p>
+          </div>
+
+          <div class="mb-6">
+            <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">
+              신고 태그 <span class="text-[#dc3545]">*</span>
+            </label>
+            <select
+              v-model="reportTag"
+              class="w-full px-4 py-2 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff6b4a] focus:border-transparent"
+            >
+              <option value="">신고 태그를 선택해주세요</option>
+              <option
+                v-for="tag in reportTagOptions"
+                :key="tag.id"
+                :value="tag.name"
+              >
+                {{ tag.name }}
+              </option>
+            </select>
           </div>
 
           <div class="mb-6">

@@ -17,7 +17,7 @@ public class MemberInfo {
     private String name;
     private String nickname;
     private String phone;
-    private LocalDate date;
+    private LocalDate birth;
     private String gender;
     private String image;
     private String companyName;

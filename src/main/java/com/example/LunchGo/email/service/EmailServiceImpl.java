@@ -1,16 +1,22 @@
 package com.example.LunchGo.email.service;
 
 import com.example.LunchGo.common.util.RedisUtil;
+import com.example.LunchGo.email.dto.PromotionDTO;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 
+import java.util.List;
 import java.util.Random;
 
 @Log4j2
@@ -81,5 +87,56 @@ public class EmailServiceImpl implements EmailService {
         log.info("code found by email: "+ codeFoundByEmail);
         if(codeFoundByEmail == null) return false; //코드가 null인 경우
         return codeFoundByEmail.equals(code);
+    }
+
+    /**
+     * 프로모션 보내기
+     * */
+
+    //프로모션 내용 설정
+    @Override
+    public String setPromotionContext(String promotionContext) {
+        Context context = new Context();
+
+        context.setVariable("promotionContext", promotionContext);
+
+        return templateEngine.process("promotion", context);
+    }
+
+    //프로모션 내용 등록
+    @Override
+    public MimeMessage createPromotionEmail(String title, String content, String email) throws MessagingException {
+        MimeMessage message = javaMailSender.createMimeMessage();
+        message.addRecipients(MimeMessage.RecipientType.TO, email); //보낼 사람
+        message.setSubject(title); //제목
+        message.setFrom(senderEmail);
+        message.setText(content, "utf-8", "html");
+
+        return message;
+    }
+
+    @Override
+    @Transactional
+    public void checkAndLockPromotion(PromotionDTO promotionDTO) {
+        if(redisUtil.existData(String.valueOf(promotionDTO.getOwnerId()))) { //이미 프로모션을 보낸 경우
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "프로모션은 6시간마다 한번 입력 가능합니다");
+        }
+
+        redisUtil.setDataExpire(String.valueOf(promotionDTO.getOwnerId()), "promotion", 1000 * 60 * 60 * 6L);
+    }
+
+    @Override
+    @Async("taskExecutor")
+    public void sendPromotionAsync(List<String> emails, PromotionDTO promotionDTO) {
+        try{
+            String htmlContent = setPromotionContext(promotionDTO.getContent());
+
+            for(String email : emails) {
+                MimeMessage emailForm = createPromotionEmail(promotionDTO.getTitle(), htmlContent, email);
+                javaMailSender.send(emailForm);
+            }
+        }catch(Exception e){
+            log.error("메일 발송 중 오류 발생, 해당 ownerId: "+ promotionDTO.getOwnerId());
+        }
     }
 }

@@ -29,4 +29,9 @@ public interface MemberMapper {
     void deleteUserSpecialities(@Param("userId") Long userId);
 
     void insertUserSpecialities(@Param("userId") Long userId, @Param("specialityIds") List<Long> specialityIds);
+
+    /**
+     * 사업자가 프로모션 보낼 시, 즐겨찾기 등록한 사용자 email 알아야함
+     * */
+    List<String> getPromotionEmails(@Param("ownerId") Long ownerId);
 }

@@ -11,6 +11,10 @@ ALTER TABLE reviews
     ADD CONSTRAINT FK_Reviews_receipts
         FOREIGN KEY (receipt_id) REFERENCES Receipts (receipt_id);
 
+ALTER TABLE reviews
+    ADD CONSTRAINT fk_reviews_blind_request_tag
+        FOREIGN KEY (blind_request_tag_id) REFERENCES review_tags (tag_id);
+
 # 03. 리뷰 태그 매핑 외래키 관계
 ALTER TABLE review_tag_maps
     ADD CONSTRAINT PK_review_tag_maps
@@ -55,7 +59,6 @@ ALTER TABLE cafeteria_menus
     ADD CONSTRAINT fk_cafeteria_menus_users
         FOREIGN KEY (user_id) REFERENCES users(user_id)
             ON DELETE CASCADE ON UPDATE CASCADE;
-
 
 
 

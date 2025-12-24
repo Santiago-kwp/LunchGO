@@ -101,4 +101,17 @@ CREATE TABLE bookmarks (
                            FOREIGN KEY (user_id) REFERENCES Users(user_id)
 );
 
+-- 프로모션 받기 등록한 사용자 email 찾는 방법
+delimiter ##
+create procedure getRestaurantIdFromOwnerID(in in_ownerId bigint)
+begin
+SELECT u.email
+FROM bookmarks b
+         JOIN users u ON b.user_id = u.user_id
+         JOIN restaurants r ON b.restaurant_id = r.restaurant_id
+WHERE r.owner_id = in_ownerId
+  AND b.promotion_agree = 1;
+end ##
+delimiter ;
+
 

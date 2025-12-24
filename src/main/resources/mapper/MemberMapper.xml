@@ -10,7 +10,7 @@
         <result property="name" column="name"/>
         <result property="nickname" column="nickname"/>
         <result property="phone" column="phone"/>
-        <result property="date" column="birth"/> <result property="gender" column="gender"/>
+        <result property="birth" column="birth"/> <result property="gender" column="gender"/>
         <result property="image" column="image"/>
         <result property="companyName" column="company_name"/>
         <result property="companyAddress" column="company_address"/>
@@ -32,7 +32,7 @@
 
     <update id="updateUser">
         UPDATE users set nickname = #{nickname}, birth = #{birth}, gender=#{gender}, phone= #{phone}, company_name=#{companyName},
-                         company_address = #{companyAddress}, email_authentication = #{emailAuthentication}, image = #{image}
+                         company_address = #{companyAddress}, email_authentication = #{emailAuthentication}, image = #{image}, updated_at = now()
         WHERE user_id = #{userId}
     </update>
 
@@ -48,5 +48,11 @@
             (#{userId}, #{spId})
         </foreach>
     </insert>
+
+    <select id="getPromotionEmails" parameterType="long" resultType="string" statementType="CALLABLE">
+        { call getRestaurantIdFromOwnerID(
+                #{ownerId, mode=IN, jdbcType=BIGINT}
+        )}
+    </select>
 
 </mapper>
