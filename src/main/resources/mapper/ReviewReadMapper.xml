@@ -211,15 +211,32 @@
         ORDER BY c.created_at ASC
     </select>
 
+    <select id="selectReviewCommentById" parameterType="long" resultType="com.example.LunchGo.review.dto.CommentResponse">
+        SELECT
+            c.comment_id AS commentId,
+            c.writer_type AS writerType,
+            CASE
+                WHEN c.writer_type = 'OWNER' THEN res.name
+                ELSE 'LunchGo Admin'
+            END AS writerName,
+            c.content AS content,
+            c.created_at AS createdAt
+        FROM comments c
+        JOIN reviews r ON r.review_id = c.review_id
+        JOIN restaurants res ON res.restaurant_id = r.restaurant_id
+        WHERE c.comment_id = #{commentId}
+    </select>
+
     <select id="selectVisitInfo" parameterType="long" resultType="com.example.LunchGo.review.dto.VisitInfo">
         SELECT
-            rs.reserved_date AS date,
+            slot.slot_date AS date,
             rs.party_size AS partySize,
             rc.confirmed_amount AS totalAmount,
             rc.image_url AS receiptImageUrl
         FROM reviews r
         JOIN receipts rc ON rc.receipt_id = r.receipt_id
         JOIN reservations rs ON rs.reservation_id = rc.reservation_id
+        JOIN restaurant_reservation_slots slot ON slot.slot_id = rs.slot_id
         WHERE r.review_id = #{reviewId}
     </select>
 

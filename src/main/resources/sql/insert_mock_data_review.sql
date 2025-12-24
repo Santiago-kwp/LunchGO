@@ -17,12 +17,9 @@ SET FOREIGN_KEY_CHECKS = 1;
    1. 기초 데이터 (예약, 영수증)
    ================================================== */
 
--- 1-1. 예약 (Reservations)
-INSERT INTO reservations (reservation_id, restaurant_id, owner_id, type, status, reserved_date, reserved_time, party_size, request_message, visit_confirm_status, assumed_deposit_amount, total_prepay_amount, created_at, updated_at) VALUES
-    (1, 1, 1, 'DINING', 'COMPLETED', DATE_SUB(CURDATE(), INTERVAL 3 DAY), CURDATE(), 4, '조용한 자리로 부탁드립니다.', 'CONFIRMED', 40000, 0, NOW(), NOW()),
-    (2, 1, 1, 'DINING', 'COMPLETED', DATE_SUB(CURDATE(), INTERVAL 2 DAY), CURDATE(), 8, '회식입니다. 세팅 미리 부탁드려요.', 'CONFIRMED', 80000, 0, NOW(), NOW());
 
 -- 1-2. 영수증 (Receipts)
+truncate receipts;
 INSERT INTO receipts (receipt_id, reservation_id, confirmed_amount, image_url, created_at) VALUES
     (1, 1, 120000, 'https://s3-bucket.com/receipts/receipt_001.jpg', DATE_SUB(NOW(), INTERVAL 2 DAY));
 
@@ -38,7 +35,8 @@ INSERT INTO receipt_items (receipt_item_id, receipt_id, menu_name, qty, unit_pri
    2. 리뷰 태그 (Review Tags) - ID 명시적 지정
    - 중복 제거 및 카테고리별 정렬
    ================================================== */
-INSERT INTO review_tags (tag_id, name, category, tag_type) VALUES
+INSERT INTO review_tags (tag_id, name, category, tag_type)
+VALUES
 -- EFFICIENT
 (1, '주문 즉시 조리 시작해요', 'EFFICIENT', 'USER'),
 (2, '계산이 빨라요', 'EFFICIENT', 'USER'),
@@ -75,6 +73,7 @@ INSERT INTO review_tags (tag_id, name, category, tag_type) VALUES
 (25, '경쟁 업체 비방', 'BLINDED', 'ADMIN');
 
 
+
 /* ==================================================
    3. 리뷰 데이터 (Reviews)
    ================================================== */
@@ -98,6 +97,18 @@ INSERT INTO reviews (review_id, restaurant_id, user_id, receipt_id, rating, cont
 
 INSERT INTO reviews (review_id, restaurant_id, user_id, receipt_id, rating, content, created_at, updated_at, status) VALUES
     (6, 1, 2, 2, 3, '영수증 이미지 테스트용 리뷰', DATE_SUB(NOW(), INTERVAL 5 DAY), NOW(), 'BLINDED');
+
+INSERT INTO reviews (review_id, restaurant_id, user_id, receipt_id, rating, content, created_at, updated_at, status) VALUES
+    (7, 1, 2, 2, 3, '테스트 리뷰', DATE_SUB(NOW(), INTERVAL 5 DAY), NOW(), 'PUBLIC');
+INSERT INTO reviews (review_id, restaurant_id, user_id, receipt_id, rating, content, created_at, updated_at, status) VALUES
+    (8, 1, 2, 2, 3, '테스트 리뷰', DATE_SUB(NOW(), INTERVAL 5 DAY), NOW(), 'PUBLIC');
+INSERT INTO reviews (review_id, restaurant_id, user_id, receipt_id, rating, content, created_at, updated_at, status) VALUES
+    (9, 1, 2, 2, 3, '테스트 리뷰', DATE_SUB(NOW(), INTERVAL 5 DAY), NOW(), 'PUBLIC');
+INSERT INTO reviews (review_id, restaurant_id, user_id, receipt_id, rating, content, created_at, updated_at, status) VALUES
+    (10, 1, 2, 2, 3, '테스트 리뷰', DATE_SUB(NOW(), INTERVAL 5 DAY), NOW(), 'PUBLIC');
+
+select * from comments;
+select * from reviews;
 
 
 /* ==================================================
