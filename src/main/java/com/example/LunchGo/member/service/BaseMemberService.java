@@ -6,8 +6,11 @@ import com.example.LunchGo.account.dto.UserJoinRequest;
 import com.example.LunchGo.member.domain.CustomRole;
 import com.example.LunchGo.member.domain.OwnerStatus;
 import com.example.LunchGo.member.domain.UserStatus;
+import com.example.LunchGo.member.dto.MemberInfo;
+import com.example.LunchGo.member.dto.MemberUpdateInfo;
 import com.example.LunchGo.member.entity.Owner;
 import com.example.LunchGo.member.entity.User;
+import com.example.LunchGo.member.mapper.MemberMapper;
 import com.example.LunchGo.member.repository.OwnerRepository;
 import com.example.LunchGo.member.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +30,7 @@ import java.util.Optional;
 public class BaseMemberService implements MemberService {
     private final UserRepository userRepository;
     private final OwnerRepository ownerRepository;
+    private final MemberMapper memberMapper;
 
     @Override
     public void save(UserJoinRequest userReq) {
@@ -121,5 +125,29 @@ public class BaseMemberService implements MemberService {
             return;
         }
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST); //아이디나 이메일이 없는 경우
+    }
+
+    @Override
+    public MemberInfo getMemberInfo(Long userId) {
+        MemberInfo member = memberMapper.selectUser(userId);
+
+        if(member == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다.");
+        return member;
+    }
+
+    @Override
+    @Transactional
+    public void updateMemberInfo(Long userId, MemberUpdateInfo info) {
+        Integer result = memberMapper.updateUser(userId, info.getNickname(), info.getBirth(),
+                info.getGender(), info.getPhone(), info.getCompanyName(),
+                info.getCompanyAddress(), info.getEmailAuthentication(), info.getImage());
+
+        if(result <= 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다.");
+
+        memberMapper.deleteUserSpecialities(userId); //먼저 기존 것 삭제 후
+
+        if(info.getSpecialities() != null && !info.getSpecialities().isEmpty()) {
+            memberMapper.insertUserSpecialities(userId, info.getSpecialities()); //변경, 신규, 삭제로 인한 변경 추가
+        }
     }
 }
