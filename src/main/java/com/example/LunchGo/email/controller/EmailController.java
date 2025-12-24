@@ -1,7 +1,9 @@
 package com.example.LunchGo.email.controller;
 
 import com.example.LunchGo.email.dto.EmailDTO;
+import com.example.LunchGo.email.dto.PromotionDTO;
 import com.example.LunchGo.email.service.EmailService;
+import com.example.LunchGo.member.service.MemberService;
 import jakarta.mail.MessagingException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -9,11 +11,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api")
 public class EmailController {
     private final EmailService emailService;
+    private final MemberService memberService;
 
     @PostMapping("/email/send")
     public ResponseEntity<?> sendEmail(@RequestBody EmailDTO emailDTO) {
@@ -33,5 +38,18 @@ public class EmailController {
         }
         boolean isVerify = emailService.verifyEmailCode(emailDTO.getMail(), emailDTO.getVerifyCode());
         return ResponseEntity.ok(isVerify);
+    }
+
+    @PostMapping("/business/promotion")
+    public ResponseEntity<?> promotion(@RequestBody PromotionDTO promotionDTO) {
+        if(!StringUtils.hasLength(promotionDTO.getTitle()) || !StringUtils.hasLength(promotionDTO.getContent())) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+
+        emailService.checkAndLockPromotion(promotionDTO); //6시간 안에 프로모션 보내면 에러 발생
+        //프로모션 보내려면 즐겨찾기한 사용자 email 필수
+        List<String> emails = memberService.getEmails(promotionDTO.getOwnerId()); //사업자 ID 잘못되면 404
+        emailService.sendPromotionAsync(emails ,promotionDTO); //개발자 로그 확인 필수
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 }
