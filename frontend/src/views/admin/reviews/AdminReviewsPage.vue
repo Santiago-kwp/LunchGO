@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
+import axios from "axios";
 import AdminSidebar from "@/components/ui/AdminSideBar.vue";
 import AdminHeader from "@/components/ui/AdminHeader.vue";
 import Pagination from "@/components/ui/Pagination.vue";
@@ -47,8 +48,10 @@ const statusOptions = [
   { value: "all", label: "전체" },
   { value: "pending", label: "답변 대기" },
   { value: "answered", label: "답변 완료" },
-  { value: "reported", label: "신고 접수" },
-  { value: "hidden", label: "블라인드" },
+  { value: "PUBLIC", label: "공개" },
+  { value: "BLIND_REQUEST", label: "블라인드 요청" },
+  { value: "BLINDED", label: "블라인드" },
+  { value: "BLIND_REJECTED", label: "블라인드 거부" },
 ];
 
 // 리뷰 상태별 배지 색상
@@ -56,8 +59,10 @@ const getStatusBadgeColor = (status) => {
   const colors = {
     pending: "bg-yellow-100 text-yellow-800",
     answered: "bg-green-100 text-green-800",
-    reported: "bg-red-100 text-red-800",
-    hidden: "bg-gray-100 text-gray-800",
+    PUBLIC: "bg-blue-100 text-blue-800",
+    BLIND_REQUEST: "bg-red-100 text-red-800",
+    BLINDED: "bg-gray-100 text-gray-800",
+    BLIND_REJECTED: "bg-orange-100 text-orange-800",
   };
   return colors[status] || "bg-gray-100 text-gray-800";
 };
@@ -67,8 +72,10 @@ const getStatusLabel = (status) => {
   const labels = {
     pending: "답변 대기",
     answered: "답변 완료",
-    reported: "신고 접수",
-    hidden: "블라인드",
+    PUBLIC: "공개",
+    BLIND_REQUEST: "블라인드 요청",
+    BLINDED: "블라인드",
+    BLIND_REJECTED: "블라인드 거부",
   };
   return labels[status] || status;
 };
@@ -99,226 +106,37 @@ const formatDate = (dateString) => {
   return `${year}.${month}.${day} ${hours}:${minutes}`;
 };
 
-// Mock 데이터 (총 65개)
-const allReviews = ref([
-  {
-    id: "RV001",
-    reviewerName: "김민수",
-    restaurantName: "한신포차 강남점",
-    rating: 4.5,
-    content:
-      "음식이 맛있고 분위기도 좋았습니다. 직원분들도 친절하셔서 다시 방문하고 싶네요.",
-    totalAmount: 85000,
-    createdAt: "2024-12-15",
-    status: "answered",
-    visitCount: 3,
-    visitInfo: {
-      date: "2024-12-15",
-      partySize: 8,
-      totalAmount: 85000,
-      menuItems: [
-        { name: "숙성 삼겹살", quantity: 2, price: 18000 },
-        { name: "김치찌개", quantity: 1, price: 8000 },
-      ],
-    },
-    images: [
-      "https://images.unsplash.com/photo-1529692236671-f1dc1f1b0c35?w=800&h=600&fit=crop",
-    ],
-    tags: ["재료가 신선해요", "직원들이 적극적으로 도와줘요"],
-    comments: [
-      {
-        id: "CM001",
-        authorType: "owner",
-        authorName: "한신포차 강남점",
-        content: "리뷰 감사합니다. 다음 방문도 잘 모시겠습니다!",
-        createdAt: "2024-12-16T10:10:00",
-      },
-    ],
-    isTempHidden: false,
-  },
-  {
-    id: "RV002",
-    reviewerName: "이영희",
-    restaurantName: "본죽&비빔밥 서초점",
-    rating: 5.0,
-    content: "건강한 한 끼 식사로 딱 좋았어요. 깔끔하고 맛있습니다.",
-    totalAmount: 12000,
-    createdAt: "2024-12-14",
-    status: "answered",
-    tags: ["가격 대비 만족스러워요"],
-    images: [],
-    comments: [],
-    isTempHidden: false,
-  },
-  {
-    id: "RV003",
-    reviewerName: "박철수",
-    restaurantName: "스시로 판교점",
-    rating: 1.0,
-    content: "음식에서 이물질이 나왔어요. 너무 실망입니다.",
-    totalAmount: 45000,
-    createdAt: "2024-12-13",
-    status: "reported",
-    tags: [],
-    images: [],
-    comments: [],
-    isTempHidden: false,
-  },
-  {
-    id: "RV004",
-    reviewerName: "정다은",
-    restaurantName: "아웃백 스테이크하우스 홍대점",
-    rating: 4.0,
-    content: "스테이크가 적당히 익어서 좋았고, 샐러드바도 신선했습니다.",
-    totalAmount: 68000,
-    createdAt: "2024-12-12",
-    status: "pending",
-    tags: ["인테리어가 세련돼요"],
-    images: [],
-    comments: [],
-    isTempHidden: false,
-  },
-  {
-    id: "RV005",
-    reviewerName: "최지훈",
-    restaurantName: "청년다방 신논현점",
-    rating: 3.5,
-    content: "평범한 맛이었어요. 가격 대비 괜찮은 편입니다.",
-    totalAmount: 18000,
-    createdAt: "2024-12-11",
-    status: "answered",
-    tags: ["가격 대비 만족스러워요"],
-    images: [],
-    comments: [],
-    isTempHidden: false,
-  },
-  {
-    id: "RV006",
-    reviewerName: "강서연",
-    restaurantName: "곱창이야기 강남점",
-    rating: 5.0,
-    content: "곱창이 정말 신선하고 맛있었어요! 소스도 환상적이었습니다.",
-    totalAmount: 52000,
-    createdAt: "2024-12-10",
-    status: "answered",
-    tags: ["재료가 신선해요"],
-    images: [],
-    comments: [],
-    isTempHidden: false,
-  },
-  {
-    id: "RV007",
-    reviewerName: "윤준호",
-    restaurantName: "교촌치킨 역삼점",
-    rating: 4.0,
-    content: "치킨이 바삭하고 맛있었습니다. 배달도 빨랐어요.",
-    totalAmount: 24000,
-    createdAt: "2024-12-09",
-    status: "pending",
-    tags: [],
-    images: [],
-    comments: [],
-    isTempHidden: false,
-  },
-  {
-    id: "RV008",
-    reviewerName: "임수진",
-    restaurantName: "도쿄스테이크 압구정점",
-    rating: 2.0,
-    content: "주문한 음식이 너무 늦게 나왔고, 온도도 미지근했습니다.",
-    totalAmount: 75000,
-    createdAt: "2024-12-08",
-    status: "reported",
-    tags: [],
-    images: [],
-    comments: [],
-    isTempHidden: false,
-  },
-  {
-    id: "RV009",
-    reviewerName: "송민재",
-    restaurantName: "한신포차 신촌점",
-    rating: 4.5,
-    content: "분위기 좋고 안주도 푸짐해요. 회식 장소로 추천합니다.",
-    totalAmount: 120000,
-    createdAt: "2024-12-07",
-    status: "answered",
-    tags: ["분위기가 좋아요"],
-    images: [],
-    comments: [],
-    isTempHidden: false,
-  },
-  {
-    id: "RV010",
-    reviewerName: "한지우",
-    restaurantName: "본죽&비빔밥 잠실점",
-    rating: 3.0,
-    content: "무난했어요. 특별히 나쁘지도 좋지도 않았습니다.",
-    totalAmount: 14000,
-    createdAt: "2024-12-06",
-    status: "pending",
-    tags: [],
-    images: [],
-    comments: [],
-    isTempHidden: false,
-  },
-  // 추가 데이터 생성 (RV011 ~ RV065)
-  ...Array.from({ length: 55 }, (_, i) => {
-    const idx = i + 11;
-    const ratings = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0];
-    const rating = ratings[i % ratings.length];
-    const statusList = [
-      "pending",
-      "answered",
-      "answered",
-      "answered",
-      "reported",
-      "hidden",
-    ];
-    const status = statusList[i % statusList.length];
+const allReviews = ref([]);
 
-    const monthOffset = Math.floor(i / 11);
-    const now = new Date();
-    const targetMonth = now.getMonth() - monthOffset;
-    const targetYear = now.getFullYear() + Math.floor(targetMonth / 12);
-    const finalMonth = (((targetMonth % 12) + 12) % 12) + 1;
-    const day = 1 + (i % 28);
-
-    return {
-      id: `RV${String(idx).padStart(3, "0")}`,
-      reviewerName:
-        ["김", "이", "박", "정", "최", "강", "윤", "임", "송"][i % 9] +
-        ["민수", "영희", "철수", "다은", "지훈"][i % 5],
-      restaurantName:
-        [
-          "한신포차",
-          "본죽&비빔밥",
-          "스시로",
-          "아웃백 스테이크하우스",
-          "청년다방",
-          "곱창이야기",
-        ][i % 6] +
-        " " +
-        ["강남점", "서초점", "판교점", "홍대점"][i % 4],
-      rating: rating,
-      content:
-        rating >= 4
-          ? "음식이 맛있고 서비스도 좋았습니다. 재방문 의사 있습니다."
-          : rating >= 2.5
-          ? "보통 수준이었어요. 가격 대비 괜찮은 편입니다."
-          : "기대에 못 미쳤습니다. 개선이 필요해 보입니다.",
-      totalAmount: 10000 + i * 3000,
-      createdAt: `${targetYear}-${String(finalMonth).padStart(2, "0")}-${String(
-        day
-      ).padStart(2, "0")}`,
-      status: status,
+const loadAdminReviews = async () => {
+  try {
+    const response = await axios.get("/api/admin/reviews");
+    const data = response.data?.data ?? response.data;
+    const items = Array.isArray(data) ? data : [];
+    allReviews.value = items.map((item) => ({
+      id: item.reviewId,
+      restaurantId: item.restaurantId,
+      reviewerName: item.reviewerName || "",
+      restaurantName: item.restaurantName || "",
+      rating: item.rating ?? 0,
+      content: item.content || "",
+      totalAmount: item.totalAmount ?? 0,
+      createdAt: item.createdAt,
+      status: item.status,
+      commentCount: item.commentCount ?? 0,
+      blindRequestTagName: item.blindRequestTagName || "",
+      blindRequestReason: item.blindRequestReason || "",
+      blindRequestedAt: item.blindRequestedAt,
       tags: [],
       images: [],
       comments: [],
       isTempHidden: false,
-    };
-  }),
-]);
+    }));
+  } catch (error) {
+    console.error("관리자 리뷰 데이터를 불러오지 못했습니다:", error);
+    allReviews.value = [];
+  }
+};
 
 // 필터링된 리뷰 목록
 const filteredReviews = computed(() => {
@@ -337,7 +155,13 @@ const filteredReviews = computed(() => {
 
   // 상태 필터
   if (selectedStatus.value !== "all") {
-    filtered = filtered.filter((r) => r.status === selectedStatus.value);
+    if (selectedStatus.value === "pending") {
+      filtered = filtered.filter((r) => (r.commentCount || 0) === 0);
+    } else if (selectedStatus.value === "answered") {
+      filtered = filtered.filter((r) => (r.commentCount || 0) > 0);
+    } else {
+      filtered = filtered.filter((r) => r.status === selectedStatus.value);
+    }
   }
 
   // 날짜 범위 필터
@@ -385,12 +209,12 @@ const stats = computed(() => {
 
   // 신고 리뷰
   const reportedReviews = allReviewsList.filter(
-    (r) => r.status === "reported"
+    (r) => r.status === "BLIND_REQUEST"
   ).length;
 
   // 답변 대기 리뷰
   const pendingReviews = allReviewsList.filter(
-    (r) => r.status === "pending"
+    (r) => (r.commentCount || 0) === 0
   ).length;
 
   // 높은 평점 리뷰 (4점 이상)
@@ -444,13 +268,21 @@ const paginatedReviews = computed(() => {
 
 // 총 페이지 수
 const totalPages = computed(() => {
-  return Math.ceil(filteredReviews.value.length / itemsPerPage);
+  return Math.max(1, Math.ceil(filteredReviews.value.length / itemsPerPage));
 });
 
 // 페이지 변경 핸들러
 const handlePageChange = (page) => {
   currentPage.value = page;
 };
+
+watch([searchQuery, selectedStatus, startDate, endDate], () => {
+  currentPage.value = 1;
+});
+
+onMounted(() => {
+  loadAdminReviews();
+});
 
 // 필터 값 업데이트 핸들러
 const handleFilterUpdate = ({ model, value }) => {
@@ -487,7 +319,7 @@ const selectedReviewDetail = computed(() => {
     author: {
       name: selectedReview.value.reviewerName,
       company: "",
-      isBlind: selectedReview.value.status === "hidden",
+      isBlind: selectedReview.value.status === "BLINDED",
     },
     rating: selectedReview.value.rating,
     visitCount: selectedReview.value.visitCount,
@@ -495,12 +327,17 @@ const selectedReviewDetail = computed(() => {
     images: selectedReview.value.images || [],
     tags: selectedReview.value.tags || [],
     content:
-      selectedReview.value.status === "hidden" ? "" : selectedReview.value.content,
+      selectedReview.value.status === "BLINDED"
+        ? ""
+        : selectedReview.value.content,
     blindReason:
-      selectedReview.value.status === "hidden"
+      selectedReview.value.status === "BLINDED"
         ? "관리자에 의해 숨김 처리된 리뷰입니다."
         : "",
     createdAt: selectedReview.value.createdAt,
+    blindRequestTagName: selectedReview.value.blindRequestTagName,
+    blindRequestReason: selectedReview.value.blindRequestReason,
+    blindRequestedAt: selectedReview.value.blindRequestedAt,
     comments: selectedReview.value.comments || [],
   };
 });
@@ -553,7 +390,7 @@ const closeReportModal = () => {
   reportReason.value = "";
 };
 
-const submitReportProcess = () => {
+const submitReportProcess = async (decision) => {
   if (!reportTagId.value) {
     alert("신고 태그를 선택해주세요.");
     return;
@@ -563,14 +400,31 @@ const submitReportProcess = () => {
     return;
   }
 
-  if (selectedReview.value) {
-    selectedReview.value.status = "hidden";
-    selectedReview.value.reportTagId = reportTagId.value;
-    selectedReview.value.reportReason = reportReason.value.trim();
-  }
+  if (!selectedReview.value) return;
 
-  alert("신고 처리가 완료되었습니다.");
-  closeReportModal();
+  try {
+    const response = await axios.patch(
+      `/api/admin/reviews/${selectedReview.value.id}/blind-requests`,
+      {
+        decision: decision === "approve" ? "APPROVE" : "REJECT",
+        tagId: reportTagId.value,
+        reason: reportReason.value.trim(),
+      }
+    );
+    const data = response.data?.data ?? response.data;
+    selectedReview.value.status =
+      data?.status || (decision === "approve" ? "BLINDED" : "BLIND_REJECTED");
+
+    alert(
+      decision === "approve"
+        ? "블라인드 승인이 완료되었습니다."
+        : "블라인드 거부가 완료되었습니다."
+    );
+    closeReportModal();
+  } catch (error) {
+    console.error("블라인드 처리 실패:", error);
+    alert("블라인드 처리에 실패했습니다. 잠시 후 다시 시도해주세요.");
+  }
 };
 </script>
 
@@ -639,7 +493,7 @@ const submitReportProcess = () => {
                   <AlertTriangle class="w-6 h-6 text-red-600" />
                 </div>
               </div>
-              <p class="text-sm text-[#6c757d] mb-1">신고 리뷰</p>
+              <p class="text-sm text-[#6c757d] mb-1">블라인드 요청</p>
               <p class="text-2xl font-bold mb-2">
                 {{ stats.reported.toLocaleString() }}
               </p>
@@ -834,9 +688,9 @@ const submitReportProcess = () => {
                           variant="destructive"
                           size="sm"
                           @click="handleProcessReport(review)"
-                          v-if="review.status === 'reported'"
+                          v-if="review.status === 'BLIND_REQUEST'"
                         >
-                          신고 처리
+                          요청 처리
                         </Button>
                         <Button
                           variant="secondary"
@@ -1082,9 +936,7 @@ const submitReportProcess = () => {
                           : 'bg-[#6f42c1] text-white',
                       ]"
                     >
-                      {{
-                        comment.authorType === "owner" ? "사장님" : "관리자"
-                      }}
+                      {{ comment.authorType === "owner" ? "사장님" : "관리자" }}
                     </span>
                     <span class="font-semibold text-[#1e3a5f]">
                       {{ comment.authorName }}
@@ -1124,7 +976,7 @@ const submitReportProcess = () => {
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-xl font-bold text-[#1e3a5f] flex items-center gap-2">
             <AlertTriangle class="w-6 h-6 text-[#dc3545]" />
-            신고 처리
+            블라인드 요청 처리
           </h3>
           <button
             @click="closeReportModal"
@@ -1148,13 +1000,44 @@ const submitReportProcess = () => {
 
         <div class="mb-4">
           <p class="text-sm text-[#6c757d] mb-2">
-            신고된 리뷰에 적용할 태그와 사유를 입력해주세요.
+            블라인드 요청에 대한 처리 결과를 입력해주세요.
           </p>
         </div>
 
+          <div
+            v-if="selectedReview"
+            class="mb-4 bg-[#f8f9fa] border border-[#e9ecef] rounded-lg p-4 text-sm"
+          >
+            <p class="font-semibold text-[#1e3a5f] mb-2">
+              사업자 블라인드 요청 내용
+            </p>
+            <p class="text-[#6c757d]">
+              태그:
+              <span class="text-[#1e3a5f] font-medium">
+              {{ selectedReview.blindRequestTagName || "미입력" }}
+              </span>
+            </p>
+            <p class="text-[#6c757d] mt-1">
+              사유:
+              <span class="text-[#1e3a5f] font-medium">
+              {{ selectedReview.blindRequestReason || "미입력" }}
+              </span>
+            </p>
+            <p class="text-[#6c757d] mt-1">
+              접수 시각:
+              <span class="text-[#1e3a5f] font-medium">
+              {{
+                selectedReview.blindRequestedAt
+                  ? formatDate(selectedReview.blindRequestedAt)
+                  : "미입력"
+              }}
+              </span>
+            </p>
+          </div>
+
         <div class="mb-4">
           <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">
-            신고 태그 <span class="text-[#dc3545]">*</span>
+            관리자 처리 태그 <span class="text-[#dc3545]">*</span>
           </label>
           <select
             v-model="reportTagId"
@@ -1173,7 +1056,7 @@ const submitReportProcess = () => {
 
         <div class="mb-6">
           <label class="block text-sm font-semibold text-[#1e3a5f] mb-2">
-            신고 사유 <span class="text-[#dc3545]">*</span>
+            관리자 처리 사유 <span class="text-[#dc3545]">*</span>
           </label>
           <textarea
             v-model="reportReason"
@@ -1191,10 +1074,16 @@ const submitReportProcess = () => {
             취소
           </button>
           <button
-            @click="submitReportProcess"
+            @click="submitReportProcess('reject')"
+            class="flex-1 px-4 py-2 border border-[#dee2e6] rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] transition-colors"
+          >
+            거부
+          </button>
+          <button
+            @click="submitReportProcess('approve')"
             class="flex-1 px-4 py-2 bg-gradient-to-r from-[#dc3545] to-[#c82333] text-white rounded-lg hover:opacity-90 transition-opacity"
           >
-            처리 완료
+            승인
           </button>
         </div>
       </div>

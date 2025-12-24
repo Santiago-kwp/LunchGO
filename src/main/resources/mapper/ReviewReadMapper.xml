@@ -10,7 +10,7 @@
             COUNT(*) AS reviewCount
         FROM reviews r
         WHERE r.restaurant_id = #{restaurantId}
-          AND r.status IN ('PUBLIC', 'BLINDED')
+          AND r.status IN ('PUBLIC', 'BLINDED', 'BLIND_REQUEST', 'BLIND_REJECTED')
     </select>
 
     <select id="selectTopTags" parameterType="long" resultType="com.example.LunchGo.review.dto.TagCount">
@@ -22,7 +22,7 @@
         JOIN review_tags t ON t.tag_id = m.tag_id
         JOIN reviews r ON r.review_id = m.review_id
         WHERE r.restaurant_id = #{restaurantId}
-          AND r.status IN ('PUBLIC', 'BLINDED')
+          AND r.status IN ('PUBLIC', 'BLINDED', 'BLIND_REQUEST', 'BLIND_REJECTED')
         GROUP BY t.tag_id, t.name
         ORDER BY count DESC
         LIMIT 3
@@ -35,7 +35,7 @@
             JOIN review_tag_maps m ON m.review_id = r.review_id
         </if>
         WHERE r.restaurant_id = #{restaurantId}
-          AND r.status IN ('PUBLIC', 'BLINDED')
+          AND r.status IN ('PUBLIC', 'BLINDED', 'BLIND_REQUEST', 'BLIND_REJECTED')
           <if test="tagIds != null and tagIds.size() &gt; 0">
             AND m.tag_id IN
             <foreach collection="tagIds" item="tagId" open="(" separator="," close=")">
@@ -56,17 +56,22 @@
             r.created_at AS createdAtTs,
             r.status AS status,
             CASE WHEN r.status = 'BLINDED' THEN 1 ELSE 0 END AS isBlinded,
-            NULL AS blindReason
+            NULL AS blindReason,
+            r.blind_request_tag_id AS blindRequestTagId,
+            brt.name AS blindRequestTagName,
+            r.blind_request_reason AS blindRequestReason,
+            r.blind_requested_at AS blindRequestedAt
         FROM reviews r
         JOIN users u ON u.user_id = r.user_id
         LEFT JOIN restaurant_user_stats rus
             ON rus.restaurant_id = r.restaurant_id
            AND rus.user_id = r.user_id
+        LEFT JOIN review_tags brt ON brt.tag_id = r.blind_request_tag_id
         <if test="tagIds != null and tagIds.size() &gt; 0">
             JOIN review_tag_maps m ON m.review_id = r.review_id
         </if>
         WHERE r.restaurant_id = #{restaurantId}
-          AND r.status IN ('PUBLIC', 'BLINDED')
+          AND r.status IN ('PUBLIC', 'BLINDED', 'BLIND_REQUEST', 'BLIND_REJECTED')
           <if test="tagIds != null and tagIds.size() &gt; 0">
             AND m.tag_id IN
             <foreach collection="tagIds" item="tagId" open="(" separator="," close=")">
@@ -102,7 +107,7 @@
                 JOIN review_tag_maps m ON m.review_id = r.review_id
             </if>
             WHERE r.restaurant_id = #{restaurantId}
-              AND r.status IN ('PUBLIC', 'BLINDED')
+              AND r.status IN ('PUBLIC', 'BLINDED', 'BLIND_REQUEST', 'BLIND_REJECTED')
               <if test="tagIds != null and tagIds.size() &gt; 0">
                 AND m.tag_id IN
                 <foreach collection="tagIds" item="tagId" open="(" separator="," close=")">
@@ -139,12 +144,17 @@
             r.created_at AS createdAtTs,
             r.status AS status,
             CASE WHEN r.status = 'BLINDED' THEN 1 ELSE 0 END AS isBlinded,
-            NULL AS blindReason
+            NULL AS blindReason,
+            r.blind_request_tag_id AS blindRequestTagId,
+            brt.name AS blindRequestTagName,
+            r.blind_request_reason AS blindRequestReason,
+            r.blind_requested_at AS blindRequestedAt
         FROM reviews r
         JOIN users u ON u.user_id = r.user_id
         LEFT JOIN restaurant_user_stats rus
             ON rus.restaurant_id = r.restaurant_id
            AND rus.user_id = r.user_id
+        LEFT JOIN review_tags brt ON brt.tag_id = r.blind_request_tag_id
         WHERE r.review_id IN
         <foreach collection="reviewIds" item="reviewId" open="(" separator="," close=")">
             #{reviewId}
@@ -167,12 +177,17 @@
             DATE(r.created_at) AS createdAt,
             r.status AS status,
             CASE WHEN r.status = 'BLINDED' THEN 1 ELSE 0 END AS isBlinded,
-            NULL AS blindReason
+            NULL AS blindReason,
+            r.blind_request_tag_id AS blindRequestTagId,
+            brt.name AS blindRequestTagName,
+            r.blind_request_reason AS blindRequestReason,
+            r.blind_requested_at AS blindRequestedAt
         FROM reviews r
         JOIN users u ON u.user_id = r.user_id
         LEFT JOIN restaurant_user_stats rus
             ON rus.restaurant_id = r.restaurant_id
            AND rus.user_id = r.user_id
+        LEFT JOIN review_tags brt ON brt.tag_id = r.blind_request_tag_id
         WHERE r.review_id = #{reviewId}
     </select>
 
@@ -288,6 +303,29 @@
             #{reviewId}
         </foreach>
         ORDER BY review_id, sort_order ASC
+    </select>
+
+    <select id="selectAdminReviews" resultType="com.example.LunchGo.review.dto.ReviewAdminItemResponse">
+        SELECT
+            r.review_id AS reviewId,
+            r.restaurant_id AS restaurantId,
+            u.name AS reviewerName,
+            res.name AS restaurantName,
+            r.rating AS rating,
+            r.content AS content,
+            COALESCE(rc.confirmed_amount, 0) AS totalAmount,
+            r.created_at AS createdAt,
+            r.status AS status,
+            (SELECT COUNT(*) FROM comments c WHERE c.review_id = r.review_id) AS commentCount,
+            brt.name AS blindRequestTagName,
+            r.blind_request_reason AS blindRequestReason,
+            r.blind_requested_at AS blindRequestedAt
+        FROM reviews r
+        JOIN users u ON u.user_id = r.user_id
+        JOIN restaurants res ON res.restaurant_id = r.restaurant_id
+        LEFT JOIN receipts rc ON rc.receipt_id = r.receipt_id
+        LEFT JOIN review_tags brt ON brt.tag_id = r.blind_request_tag_id
+        ORDER BY r.created_at DESC
     </select>
 
 </mapper>

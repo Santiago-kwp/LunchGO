@@ -8,6 +8,8 @@ import com.example.LunchGo.review.dto.ReviewEditResponse;
 import com.example.LunchGo.review.dto.ReviewDetailResponse;
 import com.example.LunchGo.review.dto.UpdateReviewRequest;
 import com.example.LunchGo.review.dto.UpdateReviewResponse;
+import com.example.LunchGo.review.dto.ReviewBlindRequest;
+import com.example.LunchGo.review.dto.ReviewBlindResponse;
 import java.util.List;
 
 public interface ReviewService {
@@ -20,6 +22,8 @@ public interface ReviewService {
     ReviewEditResponse getReviewEdit(Long restaurantId, Long reviewId);
 
     UpdateReviewResponse updateReview(Long restaurantId, Long reviewId, UpdateReviewRequest request);
+
+    ReviewBlindResponse requestReviewBlind(Long restaurantId, Long reviewId, ReviewBlindRequest request);
 
     boolean deleteReview(Long restaurantId, Long reviewId);
 }

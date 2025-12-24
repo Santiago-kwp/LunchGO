@@ -1,6 +1,7 @@
 package com.example.LunchGo.review.dto;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
@@ -22,4 +23,8 @@ public class ReviewDetailResponse {
     private String blindReason;
     private VisitInfo visitInfo;
     private List<CommentResponse> comments;
+    private Long blindRequestTagId;
+    private String blindRequestTagName;
+    private String blindRequestReason;
+    private LocalDateTime blindRequestedAt;
 }

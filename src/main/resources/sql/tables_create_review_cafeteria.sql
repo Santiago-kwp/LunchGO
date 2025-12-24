@@ -13,7 +13,10 @@ CREATE TABLE reviews (
     content	text	NULL,
     created_at	datetime	NOT NULL DEFAULT current_timestamp,
     updated_at	datetime	NULL DEFAULT current_timestamp,
-    status	varchar(20)	NOT NULL	DEFAULT 'PUBLIC' COMMENT 'PUBLIC, BLINDED'
+    status	varchar(20)	NOT NULL	DEFAULT 'PUBLIC' COMMENT 'PUBLIC, BLIND_REQUEST, BLINDED, BLIND_REJECTED',
+    blind_request_tag_id	bigint	NULL COMMENT '사업자 신고 태그',
+    blind_request_reason	text	NULL COMMENT '사업자 신고 사유',
+    blind_requested_at	datetime	NULL COMMENT '사업자 신고 시각'
 );
 
 # 02. 리뷰 태그 테이블 생성
@@ -84,84 +87,3 @@ CREATE TABLE cafeteria_menus (
     raw_text	text	NULL,
     image_url	varchar(500)	NULL
 );
-
-
-
-#### 아래는 유닛테스트를 위한 연관 테이블 생성
-# 01. 사용자 => tables_create_member_info.sql꺼 사용!
-# DROP TABLE IF EXISTS users;
-# CREATE TABLE users (
-#     user_id	bigint	NOT NULL PRIMARY KEY AUTO_INCREMENT,
-#     email	varchar(100)	NOT NULL,
-#     password	varchar(255)	NOT NULL,
-#     name	varchar(50)	NOT NULL,
-#     nickname	varchar(100)	NULL,
-#     phone	varchar(20)	NOT NULL,
-#     birth	date	NULL,
-#     gender	varchar(10)	NULL,
-#     image	varchar(255)	NULL,
-#     status	varchar(20)	NOT NULL	DEFAULT 'ACTIVE'	COMMENT 'ACTIVE, DORMANT, WITHDRAWAL',
-#     created_at	datetime	NOT NULL	DEFAULT current_timestamp,
-#     updated_at	datetime	NULL	DEFAULT current_timestamp,
-#     last_login_at	datetime	NULL,
-#     withdrawal_at	datetime	NULL,
-#     marketing_agree	tinyint	NOT NULL	DEFAULT 0,
-#     email_authentication	tinyint	NOT NULL	DEFAULT 0,
-#     role	char(20)	NOT NULL	DEFAULT 'ROLE_USER',
-#     company_address	varchar(255)	NULL,
-#     company_name	varchar(50)	NULL
-# );
-
-# 02. 식당 테이블 => tables_create_restaurant_info.sql 사용
-# DROP TABLE IF EXISTS restaurants;
-# CREATE TABLE restaurants (
-#     restaurant_id	bigint	NOT NULL PRIMARY KEY AUTO_INCREMENT,
-#     owner_id	bigint	NOT NULL,
-#     name	varchar(50)	NOT NULL,
-#     phone	varchar(15)	NOT NULL,
-#     road_address	varchar(255)	NOT NULL,
-#     detail_address	varchar(255)	NOT NULL,
-#     status	varchar(50)	NOT NULL	DEFAULT 'OPEN' COMMENT 'OPEN, CLOSED, DELETED',
-#     description	text	NULL,
-#     avg_main_price	int	NOT NULL,
-#     reservation_limit	int	NOT NULL,
-#     holiday_available	boolean	NOT NULL	DEFAULT false,
-#     preorder_available	boolean	NOT NULL	DEFAULT false,
-#     open_time	time	NOT NULL,
-#     close_time	time	NOT NULL,
-#     open_date	date	NOT NULL,
-#     created_at	datetime	NOT NULL	DEFAULT current_timestamp,
-#     updated_at	datetime	NOT NULL	DEFAULT current_timestamp
-# );
-
-# 03. 예약 테이블
-# DROP TABLE IF EXISTS reservations;
-# CREATE TABLE reservations
-# (
-#     reservation_id           bigint      NOT NULL PRIMARY KEY AUTO_INCREMENT,
-#     restaurant_id            bigint      NOT NULL,
-#     owner_id                 bigint      NOT NULL,
-#     type                     varchar(20) NOT NULL,
-#     status                   varchar(20) NOT NULL,
-#     reserved_date            date        NOT NULL,
-#     reserved_time            date        NOT NULL,
-#     party_size               int         NOT NULL,
-#     request_message          text        NULL,
-#     slot_hold_expires_at     datetime    NULL,
-#     payment_deadline_at      datetime    NULL,
-#     visit_confirm_status     varchar(20) NOT NULL,
-#     visit_confirm_sent_at    datetime    NULL,
-#     visit_confirm_replied_at datetime    NULL,
-#     cancelled_at             datetime    NULL,
-#     cancelled_by             varchar(20) NULL,
-#     cancel_reason            text        NULL,
-#     no_show_at               datetime    NULL,
-#     completed_at             datetime    NULL,
-#     assumed_deposit_amount   int         NOT NULL,
-#     total_prepay_amount      int         NOT NULL,
-#     created_at               datetime    NOT NULL,
-#     updated_at               datetime    NOT NULL
-# );
-
-
-

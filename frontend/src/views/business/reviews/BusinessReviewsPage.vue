@@ -19,6 +19,7 @@ import {
 } from "lucide-vue-next";
 import BusinessSidebar from "@/components/ui/BusinessSideBar.vue";
 import BusinessHeader from "@/components/ui/BusinessHeader.vue";
+import Pagination from "@/components/ui/Pagination.vue";
 
 // 필터 상태
 const selectedRating = ref("all"); // 'all', '5', '4', '3', '2', '1'
@@ -31,10 +32,21 @@ const selectedReportStatus = ref("all"); // 'all', 'none', 'pending', 'approved'
 const commentInputs = ref({});
 const showCommentInput = ref({});
 
+// 페이지네이션
+const pageSize = 10;
+const currentPage = ref(1);
+const totalReviews = ref(0);
+const reviewSummary = ref(null);
+const statsReviews = ref([]);
+
 // 모달 상태
 const isImageModalOpen = ref(false);
 const modalImages = ref([]);
 const modalImageIndex = ref(0);
+
+// 리뷰 상세 모달
+const isDetailModalOpen = ref(false);
+const selectedReview = ref(null);
 
 // 블라인드 요청 모달
 const isReportModalOpen = ref(false);
@@ -53,29 +65,38 @@ const reportTagOptions = [
   { id: 25, name: "경쟁 업체 비방" },
 ];
 
+const getReportStatusFromReviewStatus = (status) => {
+  if (status === "BLIND_REQUEST") return "pending";
+  if (status === "BLIND_REJECTED") return "rejected";
+  if (status === "BLINDED") return "approved";
+  return "none";
+};
+
 // 통계 계산
 const stats = computed(() => {
-  const validReviews = reviews.value.filter((r) => !r.author.isBlind);
-  const totalReviews = validReviews.length;
-  const avgRating =
-    totalReviews > 0
-      ? (
-          validReviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews
-        ).toFixed(1)
-      : 0;
-  const totalComments = reviews.value.reduce(
-    (sum, r) => sum + r.comments.length,
-    0
-  );
-  const needsResponse = reviews.value.filter(
+  const baseReviews =
+    statsReviews.value.length > 0 ? statsReviews.value : reviews.value;
+  const validReviews = baseReviews.filter((r) => !r.author.isBlind);
+  const summary = reviewSummary.value;
+  const totalReviewCount =
+    summary?.reviewCount ?? totalReviews.value ?? validReviews.length;
+  const avgValue =
+    summary?.avgRating ??
+    (validReviews.length > 0
+      ? validReviews.reduce((sum, r) => sum + r.rating, 0) /
+        validReviews.length
+      : 0);
+  const avgRating = Number(avgValue).toFixed(1);
+  const totalComments = baseReviews.filter((r) => r.comments.length > 0).length;
+  const needsResponse = baseReviews.filter(
     (r) => !r.author.isBlind && r.comments.length === 0
   ).length;
-  const reportedReviews = reviews.value.filter(
+  const reportedReviews = baseReviews.filter(
     (r) => r.reportStatus === "pending"
   ).length;
 
   return {
-    totalReviews,
+    totalReviews: totalReviewCount,
     avgRating,
     totalComments,
     needsResponse,
@@ -132,6 +153,10 @@ const filteredReviews = computed(() => {
   return result;
 });
 
+const totalPages = computed(() => {
+  return Math.max(1, Math.ceil(totalReviews.value / pageSize));
+});
+
 // 날짜 포맷팅
 const formatDate = (dateString) => {
   const date = new Date(dateString);
@@ -148,6 +173,16 @@ const openImageModal = (images, index) => {
   modalImages.value = images;
   modalImageIndex.value = index;
   isImageModalOpen.value = true;
+};
+
+const openDetailModal = (review) => {
+  selectedReview.value = review;
+  isDetailModalOpen.value = true;
+};
+
+const closeDetailModal = () => {
+  isDetailModalOpen.value = false;
+  selectedReview.value = null;
 };
 
 // 이미지 모달 닫기
@@ -208,14 +243,15 @@ const mapReviewDetail = (detail) => ({
     isBlind: Boolean(detail.isBlinded),
   },
   rating: detail.rating ?? 0,
-  visitCount: detail.visitCount ?? 0,
+  visitCount: detail.visitCount ?? null,
   visitInfo: mapVisitInfo(detail.visitInfo),
   images: detail.images || [],
   tags: (detail.tags || []).map((tag) => tag.name),
   content: detail.isBlinded ? "" : detail.content || "",
   blindReason: detail.blindReason || "",
   createdAt: detail.createdAt,
-  reportStatus: "none",
+  status: detail.status || "PUBLIC",
+  reportStatus: getReportStatusFromReviewStatus(detail.status),
   reportTag: "",
   reportReason: "",
   reportedAt: null,
@@ -239,13 +275,16 @@ const loadReviews = async () => {
     `/api/restaurants/${restaurantId.value}/reviews`,
     {
       params: {
-        page: 1,
-        size: 50,
+        page: currentPage.value,
+        size: pageSize,
         sort: "LATEST",
       },
     }
   );
-  const items = response.data?.items || [];
+  const data = response.data?.data ?? response.data;
+  const items = data?.items || [];
+  reviewSummary.value = data?.summary ?? null;
+  totalReviews.value = data?.page?.total ?? items.length;
   const details = await Promise.all(
     items.map((item) =>
       axios.get(
@@ -254,6 +293,71 @@ const loadReviews = async () => {
     )
   );
   reviews.value = details.map((detail) => mapReviewDetail(detail.data));
+};
+
+const loadReviewStats = async () => {
+  if (!restaurantId.value) return;
+  const statsPageSize = 50;
+  const response = await axios.get(
+    `/api/restaurants/${restaurantId.value}/reviews`,
+    {
+      params: {
+        page: 1,
+        size: statsPageSize,
+        sort: "LATEST",
+      },
+    }
+  );
+  const data = response.data?.data ?? response.data;
+  const initialItems = data?.items || [];
+  reviewSummary.value = data?.summary ?? reviewSummary.value;
+  const total = data?.page?.total ?? initialItems.length;
+  const totalPagesForStats = Math.max(
+    1,
+    Math.ceil(total / statsPageSize)
+  );
+
+  let allItems = [...initialItems];
+  if (totalPagesForStats > 1) {
+    const morePages = await Promise.all(
+      Array.from({ length: totalPagesForStats - 1 }, (_, idx) =>
+        axios.get(`/api/restaurants/${restaurantId.value}/reviews`, {
+          params: {
+            page: idx + 2,
+            size: statsPageSize,
+            sort: "LATEST",
+          },
+        })
+      )
+    );
+    morePages.forEach((pageResponse) => {
+      const pageData = pageResponse.data?.data ?? pageResponse.data;
+      const pageItems = pageData?.items || [];
+      allItems = allItems.concat(pageItems);
+    });
+  }
+
+  if (allItems.length === 0) {
+    statsReviews.value = [];
+    return;
+  }
+
+  const details = await Promise.all(
+    allItems.map((item) =>
+      axios.get(
+        `/api/restaurants/${restaurantId.value}/reviews/${item.reviewId}`
+      )
+    )
+  );
+  statsReviews.value = details.map((detail) =>
+    mapReviewDetail(detail.data)
+  );
+};
+
+const handlePageChange = async (page) => {
+  if (page < 1 || page > totalPages.value) return;
+  currentPage.value = page;
+  await loadReviews();
 };
 
 // 댓글 추가
@@ -321,7 +425,7 @@ const closeReportModal = () => {
 };
 
 // 블라인드 요청 제출
-const submitReport = () => {
+const submitReport = async () => {
   if (!reportTag.value) {
     alert("신고 태그를 선택해주세요.");
     return;
@@ -332,15 +436,34 @@ const submitReport = () => {
   }
 
   const review = reviews.value.find((r) => r.id === reportReviewId.value);
-  if (review) {
+  if (!review || !restaurantId.value) return;
+
+  try {
+    const tag = reportTagOptions.find((item) => item.name === reportTag.value);
+    if (!tag) {
+      alert("신고 태그를 다시 선택해주세요.");
+      return;
+    }
+    const response = await axios.post(
+      `/api/owners/restaurants/${restaurantId.value}/reviews/${reportReviewId.value}/blind-requests`,
+      {
+        tagId: tag.id,
+        reason: reportReason.value.trim(),
+      }
+    );
+    const data = response.data?.data ?? response.data;
+    review.status = data?.status || "BLIND_REQUEST";
     review.reportStatus = "pending";
     review.reportTag = reportTag.value;
     review.reportReason = reportReason.value;
-    review.reportedAt = new Date().toISOString();
-  }
+    review.reportedAt = data?.blindRequestedAt || new Date().toISOString();
 
-  closeReportModal();
-  alert("블라인드 요청이 접수되었습니다. 관리자 검토 후 처리됩니다.");
+    closeReportModal();
+    alert("블라인드 요청이 접수되었습니다. 관리자 검토 후 처리됩니다.");
+  } catch (error) {
+    console.error("블라인드 요청 실패:", error);
+    alert("블라인드 요청에 실패했습니다. 잠시 후 다시 시도해주세요.");
+  }
 };
 
 // 신고 상태 텍스트 및 스타일
@@ -369,6 +492,10 @@ const getReportStatusInfo = (status) => {
 // 키보드 이벤트 (모달)
 onMounted(() => {
   const handleKeydown = (e) => {
+    if (isDetailModalOpen.value && e.key === "Escape") {
+      closeDetailModal();
+      return;
+    }
     if (!isImageModalOpen.value) return;
     if (e.key === "ArrowLeft") prevImage();
     if (e.key === "ArrowRight") nextImage();
@@ -382,7 +509,7 @@ onMounted(async () => {
   try {
     // 로그인 이후
     // await loadRestaurantInfo();
-    await loadReviews();
+    await Promise.all([loadReviews(), loadReviewStats()]);
   } catch (error) {
     console.error("리뷰 데이터를 불러오지 못했습니다:", error);
   }
@@ -546,7 +673,7 @@ onMounted(async () => {
                         {{ review.author.company }}
                       </span>
                       <span
-                        v-if="!review.author.isBlind"
+                        v-if="!review.author.isBlind && review.visitCount"
                         class="text-xs px-2 py-0.5 rounded-full bg-gradient-to-r from-[#ff6b4a] to-[#ffc4b8] text-white"
                       >
                         {{ review.visitCount }}번째 방문
@@ -588,14 +715,12 @@ onMounted(async () => {
 
                 <!-- Actions -->
                 <div class="flex items-center gap-2">
-                  <RouterLink
-                    :to="`/restaurant/${review.restaurantId || '1'}/reviews/${
-                      review.id
-                    }`"
+                  <button
+                    @click="openDetailModal(review)"
                     class="text-sm text-[#ff6b4a] hover:underline"
                   >
                     상세보기
-                  </RouterLink>
+                  </button>
                   <!-- 블라인드 요청 버튼 (아직 신고하지 않은 경우만) -->
                   <button
                     v-if="
@@ -662,30 +787,6 @@ onMounted(async () => {
                           </tr>
                         </tbody>
                       </table>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Images -->
-                <div
-                  v-if="review.images.length > 0"
-                  class="mb-4 flex gap-2 overflow-x-auto pb-2"
-                >
-                  <div
-                    v-for="(image, idx) in review.images"
-                    :key="idx"
-                    class="relative flex-shrink-0 w-32 h-32 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
-                    @click="openImageModal(review.images, idx)"
-                  >
-                    <img
-                      :src="image"
-                      :alt="`리뷰 이미지 ${idx + 1}`"
-                      class="w-full h-full object-cover"
-                    />
-                    <div
-                      class="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded"
-                    >
-                      {{ idx + 1 }}/{{ review.images.length }}
                     </div>
                   </div>
                 </div>
@@ -802,6 +903,14 @@ onMounted(async () => {
                 필터 조건을 변경하거나 검색어를 확인해주세요.
               </p>
             </div>
+
+            <div v-if="totalPages > 1" class="flex justify-center pt-2">
+              <Pagination
+                :current-page="currentPage"
+                :total-pages="totalPages"
+                @change-page="handlePageChange"
+              />
+            </div>
           </div>
         </div>
       </main>
@@ -861,6 +970,242 @@ onMounted(async () => {
         >
           <ChevronRight class="w-12 h-12" />
         </button>
+      </div>
+    </Teleport>
+
+    <!-- Review Detail Modal -->
+    <Teleport to="body">
+      <div
+        v-if="isDetailModalOpen && selectedReview"
+        class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        @click="closeDetailModal"
+      >
+        <div
+          class="bg-white rounded-2xl max-w-5xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto"
+          @click.stop
+        >
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-bold text-[#1e3a5f]">리뷰 상세</h3>
+            <button
+              @click="closeDetailModal"
+              class="text-[#6c757d] hover:text-[#1e3a5f] transition-colors"
+            >
+              <svg
+                class="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-[#e9ecef] p-6">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex items-start gap-4">
+                <div
+                  class="w-12 h-12 rounded-full bg-gradient-to-br from-[#ff6b4a] to-[#ffc4b8] flex items-center justify-center text-white font-semibold"
+                >
+                  <User class="w-6 h-6" />
+                </div>
+                <div>
+                  <div class="flex items-center gap-2 mb-1">
+                    <span
+                      :class="[
+                        'font-semibold',
+                        selectedReview.author.isBlind
+                          ? 'text-[#6c757d]'
+                          : 'text-[#1e3a5f]',
+                      ]"
+                    >
+                      {{ selectedReview.author.name }}
+                    </span>
+                    <span class="text-sm text-[#6c757d]">
+                      {{ selectedReview.author.company }}
+                    </span>
+                    <span
+                      v-if="!selectedReview.author.isBlind && selectedReview.visitCount"
+                      class="text-xs px-2 py-0.5 rounded-full bg-gradient-to-r from-[#ff6b4a] to-[#ffc4b8] text-white"
+                    >
+                      {{ selectedReview.visitCount }}번째 방문
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-1">
+                      <Star
+                        v-for="i in 5"
+                        :key="i"
+                        :class="[
+                          'w-4 h-4',
+                          i <= selectedReview.rating
+                            ? 'fill-[#ff6b4a] text-[#ff6b4a]'
+                            : 'fill-[#dee2e6] text-[#dee2e6]',
+                        ]"
+                      />
+                    </div>
+                    <span class="text-sm text-[#6c757d]">
+                      {{ formatDate(selectedReview.createdAt) }}
+                    </span>
+                    <span
+                      v-if="selectedReview.reportStatus !== 'none'"
+                      :class="[
+                        'flex items-center gap-1 text-xs px-2 py-1 rounded-full font-semibold',
+                        getReportStatusInfo(selectedReview.reportStatus).color,
+                      ]"
+                    >
+                      <component
+                        :is="
+                          getReportStatusInfo(selectedReview.reportStatus).icon
+                        "
+                        class="w-3 h-3"
+                      />
+                      {{ getReportStatusInfo(selectedReview.reportStatus).text }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              v-if="selectedReview.author.isBlind"
+              class="bg-[#f8f9fa] rounded-lg p-4 text-center opacity-60"
+            >
+              <p class="text-sm text-[#6c757d]">
+                {{ selectedReview.blindReason }}
+              </p>
+            </div>
+
+            <template v-else>
+              <div v-if="selectedReview.visitInfo" class="mb-4">
+                <div class="bg-[#f8f9fa] border border-[#e9ecef] rounded-xl p-4">
+                  <div class="flex items-center gap-6 text-sm mb-3">
+                    <div class="flex items-center gap-2">
+                      <Calendar class="w-4 h-4 text-[#6c757d]" />
+                      <span class="text-[#1e3a5f]">{{
+                        selectedReview.visitInfo.date
+                      }}</span>
+                    </div>
+                    <div class="text-[#6c757d]">
+                      {{ selectedReview.visitInfo.partySize }}명
+                    </div>
+                    <div class="font-semibold text-[#ff6b4a]">
+                      {{
+                        selectedReview.visitInfo.totalAmount.toLocaleString()
+                      }}원
+                    </div>
+                  </div>
+                  <div class="border-t border-[#dee2e6] pt-3">
+                    <table class="w-full text-sm">
+                      <thead class="text-[#6c757d] text-xs">
+                        <tr>
+                          <th class="text-left pb-2">메뉴명</th>
+                          <th class="text-center pb-2">수량</th>
+                          <th class="text-right pb-2">단가</th>
+                        </tr>
+                      </thead>
+                      <tbody class="text-[#1e3a5f]">
+                        <tr
+                          v-for="(item, idx) in selectedReview.visitInfo.menuItems"
+                          :key="idx"
+                          class="border-t border-[#e9ecef]"
+                        >
+                          <td class="py-1">{{ item.name }}</td>
+                          <td class="text-center">{{ item.quantity }}개</td>
+                          <td class="text-right">
+                            {{ item.price.toLocaleString() }}원
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                v-if="selectedReview.images.length > 0"
+                class="mb-4 flex gap-2 overflow-x-auto pb-2"
+              >
+                <div
+                  v-for="(image, idx) in selectedReview.images"
+                  :key="idx"
+                  class="relative flex-shrink-0 w-32 h-32 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                  @click="openImageModal(selectedReview.images, idx)"
+                >
+                  <img
+                    :src="image"
+                    :alt="`리뷰 이미지 ${idx + 1}`"
+                    class="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+
+              <div
+                v-if="selectedReview.tags.length > 0"
+                class="mb-4 flex flex-wrap gap-2"
+              >
+                <span
+                  v-for="tag in selectedReview.tags"
+                  :key="tag"
+                  class="px-3 py-1 rounded-full text-sm bg-gradient-to-r from-[#ff6b4a]/10 to-[#ffc4b8]/10 text-[#ff6b4a] border border-[#ff6b4a]/20"
+                >
+                  {{ tag }}
+                </span>
+              </div>
+
+              <p class="text-[#1e3a5f] leading-relaxed mb-4">
+                {{ selectedReview.content }}
+              </p>
+
+              <div
+                v-if="selectedReview.comments.length > 0"
+                class="border-t border-[#e9ecef] pt-4 space-y-3"
+              >
+                <div
+                  v-for="comment in selectedReview.comments"
+                  :key="comment.id"
+                  class="bg-[#f8f9fa] rounded-lg p-4"
+                >
+                  <div class="flex items-start justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                      <span
+                        :class="[
+                          'text-xs px-2 py-1 rounded font-semibold',
+                          comment.authorType === 'owner'
+                            ? 'bg-[#007bff] text-white'
+                            : 'bg-[#6f42c1] text-white',
+                        ]"
+                      >
+                        {{
+                          comment.authorType === "owner" ? "사장님" : "관리자"
+                        }}
+                      </span>
+                      <span class="font-semibold text-[#1e3a5f]">
+                        {{ comment.authorName }}
+                      </span>
+                      <span class="text-xs text-[#6c757d]">
+                        {{ formatDate(comment.createdAt) }}
+                      </span>
+                    </div>
+                  </div>
+                  <p class="text-sm text-[#1e3a5f]">{{ comment.content }}</p>
+                </div>
+              </div>
+              <div
+                v-else
+                class="border-t border-[#e9ecef] pt-4 text-sm text-[#6c757d] flex items-center gap-2"
+              >
+                <MessageSquare class="w-4 h-4" />
+                아직 등록된 댓글이 없습니다.
+              </div>
+            </template>
+          </div>
+        </div>
       </div>
     </Teleport>
 

@@ -13,6 +13,8 @@ import com.example.LunchGo.review.dto.ReviewItemResponse;
 import com.example.LunchGo.review.dto.ReviewListQuery;
 import com.example.LunchGo.review.dto.ReviewSummary;
 import com.example.LunchGo.review.dto.ReviewTagRow;
+import com.example.LunchGo.review.dto.ReviewBlindRequest;
+import com.example.LunchGo.review.dto.ReviewBlindResponse;
 import com.example.LunchGo.review.dto.TagResponse;
 import com.example.LunchGo.review.dto.UpdateReviewRequest;
 import com.example.LunchGo.review.dto.UpdateReviewResponse;
@@ -25,6 +27,7 @@ import com.example.LunchGo.review.mapper.ReviewReadMapper;
 import com.example.LunchGo.review.repository.ReviewImageRepository;
 import com.example.LunchGo.review.repository.ReviewRepository;
 import com.example.LunchGo.review.repository.ReviewTagMapRepository;
+import com.example.LunchGo.review.repository.ReviewTagRepository;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -45,6 +48,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewImageRepository reviewImageRepository;
     private final ReviewReadMapper reviewReadMapper;
     private final ObjectStorageService objectStorageService;
+    private final ReviewTagRepository reviewTagRepository;
 
     @Override
     @Transactional
@@ -225,6 +229,41 @@ public class ReviewServiceImpl implements ReviewService {
 
         Review saved = reviewRepository.save(review);
         return new UpdateReviewResponse(saved.getReviewId(), saved.getUpdatedAt(), saved.getStatus());
+    }
+
+    @Override
+    @Transactional
+    public ReviewBlindResponse requestReviewBlind(Long restaurantId, Long reviewId, ReviewBlindRequest request) {
+        if (restaurantId == null) {
+            throw new IllegalArgumentException("restaurantId is required");
+        }
+        if (request == null) {
+            throw new IllegalArgumentException("request is required");
+        }
+        if (request.getTagId() == null) {
+            throw new IllegalArgumentException("tagId is required");
+        }
+        if (request.getReason() == null || request.getReason().isBlank()) {
+            throw new IllegalArgumentException("reason is required");
+        }
+        if (!reviewTagRepository.existsById(request.getTagId())) {
+            throw new IllegalArgumentException("tagId is invalid");
+        }
+
+        Review review = reviewRepository.findById(reviewId).orElse(null);
+        if (review == null || !restaurantId.equals(review.getRestaurantId())) {
+            return null;
+        }
+
+        review.requestBlind(request.getTagId(), request.getReason().trim());
+        Review saved = reviewRepository.save(review);
+        return new ReviewBlindResponse(
+            saved.getReviewId(),
+            saved.getStatus(),
+            saved.getBlindRequestTagId(),
+            saved.getBlindRequestReason(),
+            saved.getBlindRequestedAt()
+        );
     }
 
     @Override
