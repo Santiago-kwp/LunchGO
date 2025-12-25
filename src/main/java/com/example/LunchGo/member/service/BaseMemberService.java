@@ -8,6 +8,8 @@ import com.example.LunchGo.member.domain.OwnerStatus;
 import com.example.LunchGo.member.domain.UserStatus;
 import com.example.LunchGo.member.dto.MemberInfo;
 import com.example.LunchGo.member.dto.MemberUpdateInfo;
+import com.example.LunchGo.member.dto.OwnerInfo;
+import com.example.LunchGo.member.dto.OwnerUpdateInfo;
 import com.example.LunchGo.member.entity.Owner;
 import com.example.LunchGo.member.entity.User;
 import com.example.LunchGo.member.mapper.MemberMapper;
@@ -22,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -167,7 +170,7 @@ public class BaseMemberService implements MemberService {
 
     @Override
     @Transactional
-    public void updateOwnerInfo(Long ownerId ,OwnerUpdateInfo ownerUpdateInfo) {
+    public void updateOwnerInfo(Long ownerId , OwnerUpdateInfo ownerUpdateInfo) {
         int result = ownerRepository.updateOwner(ownerId, ownerUpdateInfo.getPhone(), ownerUpdateInfo.getImage());
 
         if(result <= 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사업자를 찾을 수 없습니다.");
