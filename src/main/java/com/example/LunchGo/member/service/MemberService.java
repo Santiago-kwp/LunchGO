@@ -3,10 +3,7 @@ package com.example.LunchGo.member.service;
 import com.example.LunchGo.account.dto.FindPwdRequest;
 import com.example.LunchGo.account.dto.OwnerJoinRequest;
 import com.example.LunchGo.account.dto.UserJoinRequest;
-import com.example.LunchGo.member.dto.MemberInfo;
-import com.example.LunchGo.member.dto.MemberUpdateInfo;
-import com.example.LunchGo.member.dto.OwnerInfo;
-import com.example.LunchGo.member.dto.OwnerUpdateInfo;
+import com.example.LunchGo.member.dto.*;
 import com.example.LunchGo.member.entity.Owner;
 import com.example.LunchGo.member.entity.User;
 
@@ -38,4 +35,8 @@ public interface MemberService {
     void updateOwnerInfo(Long ownerId, OwnerUpdateInfo ownerUpdateInfo);
 
     List<String> getEmails(Long ownerId);
+
+    void save(StaffInfo staffInfo);
+
+    void delete(StaffInfo staffInfo);
 }

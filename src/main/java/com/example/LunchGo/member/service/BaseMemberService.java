@@ -6,14 +6,13 @@ import com.example.LunchGo.account.dto.UserJoinRequest;
 import com.example.LunchGo.member.domain.CustomRole;
 import com.example.LunchGo.member.domain.OwnerStatus;
 import com.example.LunchGo.member.domain.UserStatus;
-import com.example.LunchGo.member.dto.MemberInfo;
-import com.example.LunchGo.member.dto.MemberUpdateInfo;
-import com.example.LunchGo.member.dto.OwnerInfo;
-import com.example.LunchGo.member.dto.OwnerUpdateInfo;
+import com.example.LunchGo.member.dto.*;
 import com.example.LunchGo.member.entity.Owner;
+import com.example.LunchGo.member.entity.Staff;
 import com.example.LunchGo.member.entity.User;
 import com.example.LunchGo.member.mapper.MemberMapper;
 import com.example.LunchGo.member.repository.OwnerRepository;
+import com.example.LunchGo.member.repository.StaffRepository;
 import com.example.LunchGo.member.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -34,6 +33,7 @@ public class BaseMemberService implements MemberService {
     private final UserRepository userRepository;
     private final OwnerRepository ownerRepository;
     private final MemberMapper memberMapper;
+    private final StaffRepository staffRepository;
 
     @Override
     public void save(UserJoinRequest userReq) {
@@ -183,5 +183,27 @@ public class BaseMemberService implements MemberService {
         if(emails == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사업자를 찾을 수 없습니다.");
 
         return emails;
+    }
+
+    @Override
+    public void save(StaffInfo staffInfo) {
+        User user = userRepository.findByEmail(staffInfo.getEmail())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+
+        staffRepository.save(Staff.builder()
+                .email(user.getEmail())
+                .password(user.getPassword())
+                .name(user.getName())
+                .role(CustomRole.STAFF) //임직원 권한 주기
+                .ownerId(staffInfo.getOwnerId())
+                .build());
+    }
+
+    @Override
+    @Transactional
+    public void delete(StaffInfo staffInfo) {
+        int result = staffRepository.deleteByStaffId(staffInfo.getStaffId(), staffInfo.getOwnerId());
+
+        if(result <= 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "임직원을 찾을 수 없습니다.");
     }
 }

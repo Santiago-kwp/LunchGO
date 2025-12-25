@@ -35,4 +35,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Modifying(clearAutomatically = true)
     @Query("UPDATE User u SET u.status = 'DORMANT' WHERE u.lastLoginAt < :current AND u.status = 'ACTIVE'")
     int updateDormantUsers(@Param("current") LocalDateTime current);
+
+    /**
+     * email로 사용자 정보 뽑아내기 (임직원 등록 시 사용)
+     * */
+    Optional<User> findByEmail(String email);
 }

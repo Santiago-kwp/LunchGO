@@ -1,9 +1,6 @@
 package com.example.LunchGo.member.controller;
 
-import com.example.LunchGo.member.dto.MemberInfo;
-import com.example.LunchGo.member.dto.MemberUpdateInfo;
-import com.example.LunchGo.member.dto.OwnerInfo;
-import com.example.LunchGo.member.dto.OwnerUpdateInfo;
+import com.example.LunchGo.member.dto.*;
 import com.example.LunchGo.member.entity.Owner;
 import com.example.LunchGo.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +42,22 @@ public class MemberController {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST); //아무 변경없이 수정하기 남발 금지
         }
         memberService.updateOwnerInfo(ownerId, ownerUpdateInfo);
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @PostMapping("/business/staff")
+    public ResponseEntity<?> addStaff(@RequestBody StaffInfo staffInfo) {
+        if(!StringUtils.hasLength(staffInfo.getEmail())) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+
+        memberService.save(staffInfo); //해당 email을 가진 user 존재하지 않으면 404
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @DeleteMapping("/business/staff")
+    public ResponseEntity<?> deleteStaff(@RequestBody StaffInfo staffInfo) {
+        if(staffInfo.getStaffId() == null || staffInfo.getOwnerId() == null) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        //해당 점주가 관리하는 직원에 대해서만 삭제 가능하도록
+        memberService.delete(staffInfo); //delete 오류 발생시 404
         return new ResponseEntity<>(HttpStatus.OK);
     }
 }
