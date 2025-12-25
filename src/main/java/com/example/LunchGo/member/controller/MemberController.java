@@ -9,6 +9,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api")
@@ -49,7 +51,7 @@ public class MemberController {
     public ResponseEntity<?> addStaff(@RequestBody StaffInfo staffInfo) {
         if(!StringUtils.hasLength(staffInfo.getEmail())) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
 
-        memberService.save(staffInfo); //해당 email을 가진 user 존재하지 않으면 404
+        memberService.save(staffInfo); //해당 email을 가진 user 존재하지 않으면 404, 이미 등록한 email이면 409
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
@@ -59,5 +61,12 @@ public class MemberController {
         //해당 점주가 관리하는 직원에 대해서만 삭제 가능하도록
         memberService.delete(staffInfo); //delete 오류 발생시 404
         return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @GetMapping("/business/staff/{ownerId}")
+    public ResponseEntity<?> getStaffs (@PathVariable Long ownerId) {
+        List<StaffInfo> staffs = memberService.getStaffs(ownerId);
+
+        return new ResponseEntity<>(staffs, HttpStatus.OK);
     }
 }

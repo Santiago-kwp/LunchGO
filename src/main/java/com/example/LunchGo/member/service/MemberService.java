@@ -39,4 +39,6 @@ public interface MemberService {
     void save(StaffInfo staffInfo);
 
     void delete(StaffInfo staffInfo);
+
+    List<StaffInfo> getStaffs(Long ownerId);
 }

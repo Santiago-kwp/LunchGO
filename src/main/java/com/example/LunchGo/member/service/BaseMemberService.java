@@ -25,6 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -190,6 +191,10 @@ public class BaseMemberService implements MemberService {
         User user = userRepository.findByEmail(staffInfo.getEmail())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
+        if(staffRepository.existsByEmail(staffInfo.getEmail())){ //만약 이미 등록한 임직원이면
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 존재하는 임직원입니다.");
+        }
+
         staffRepository.save(Staff.builder()
                 .email(user.getEmail())
                 .password(user.getPassword())
@@ -205,5 +210,17 @@ public class BaseMemberService implements MemberService {
         int result = staffRepository.deleteByStaffId(staffInfo.getStaffId(), staffInfo.getOwnerId());
 
         if(result <= 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "임직원을 찾을 수 없습니다.");
+    }
+
+    @Override
+    public List<StaffInfo> getStaffs(Long ownerId) {
+        List<Staff> staffList = staffRepository.searchByOwnerId(ownerId);
+
+        return staffList.stream().map(
+                staff -> StaffInfo.builder()
+                        .email(staff.getEmail())
+                        .name(staff.getName())
+                        .staffId(staff.getStaffId())
+                        .build()).collect(Collectors.toList());
     }
 }
