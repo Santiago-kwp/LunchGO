@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -30,4 +31,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Modifying(clearAutomatically = true)
     @Query("UPDATE User u SET u.password = :password WHERE u.email = :email")
     int updatePassword(@Param("email") String email, @Param("password") String password);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE User u SET u.status = 'DORMANT' WHERE u.lastLoginAt < :current AND u.status = 'ACTIVE'")
+    int updateDormantUsers(@Param("current") LocalDateTime current);
 }
