@@ -8,8 +8,6 @@ import com.example.LunchGo.member.dto.MemberUpdateInfo;
 import com.example.LunchGo.member.entity.Owner;
 import com.example.LunchGo.member.entity.User;
 
-import java.util.List;
-
 public interface MemberService {
     void save(UserJoinRequest userReq);
 
@@ -30,6 +28,10 @@ public interface MemberService {
     MemberInfo getMemberInfo(Long userId);
 
     void updateMemberInfo(Long userId, MemberUpdateInfo memberUpdateInfo);
+
+    OwnerInfo getOwnerInfo(Long ownerId);
+
+    void updateOwnerInfo(Long ownerId, OwnerUpdateInfo ownerUpdateInfo);
 
     List<String> getEmails(Long ownerId);
 }

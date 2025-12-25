@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -150,6 +149,28 @@ public class BaseMemberService implements MemberService {
         if(info.getSpecialities() != null && !info.getSpecialities().isEmpty()) {
             memberMapper.insertUserSpecialities(userId, info.getSpecialities()); //변경, 신규, 삭제로 인한 변경 추가
         }
+    }
+
+    @Override
+    public OwnerInfo getOwnerInfo(Long ownerId) {
+        Owner owner = ownerRepository.findByOwnerId(ownerId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사업자를 찾을 수 없습니다"));
+
+        return OwnerInfo.builder()
+                .loginId(owner.getLoginId())
+                .name(owner.getName())
+                .phone(owner.getPhone())
+                .businessNum(owner.getBusinessNum())
+                .startAt(owner.getStartAt())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void updateOwnerInfo(Long ownerId ,OwnerUpdateInfo ownerUpdateInfo) {
+        int result = ownerRepository.updateOwner(ownerId, ownerUpdateInfo.getPhone(), ownerUpdateInfo.getImage());
+
+        if(result <= 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사업자를 찾을 수 없습니다.");
     }
 
     @Override
