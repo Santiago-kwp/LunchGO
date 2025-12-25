@@ -27,6 +27,7 @@ const currentStep = ref(1);
 
 // 영수증 업로드 모달
 const isReceiptModalOpen = ref(false);
+const isOcrProcessing = ref(false);
 
 // 사진 업로드 모달
 const isPhotoModalOpen = ref(false);
@@ -58,6 +59,9 @@ const receipt = ref({
     { name: "메뉴명3", quantity: 3, price: 11000 },
   ],
 });
+const receiptDraftItems = ref(
+  receipt.value.items.map((item) => ({ ...item }))
+);
 
 // 선택된 태그
 const selectedTags = ref([]);
@@ -233,12 +237,15 @@ const loadExistingReview = async () => {
         receipt.value.date = formatOcrDate(data.visitInfo.date);
         receipt.value.partySize = data.visitInfo.partySize || 0;
         receipt.value.totalAmount = data.visitInfo.totalAmount || 0;
-        receipt.value.items = (data.visitInfo.menuItems || []).map((item) => ({
+        const mappedItems = (data.visitInfo.menuItems || []).map((item) => ({
           name: item.name,
-          quantity: item.qty,
-          price: item.unitPrice,
+          quantity: Number(item.qty) || 0,
+          price: Number(item.unitPrice) || 0,
         }));
+        receipt.value.items = mappedItems.map((item) => ({ ...item }));
+        receiptDraftItems.value = mappedItems.map((item) => ({ ...item }));
         receipt.value.uploaded = !!data.receiptId;
+        recalculateReceiptTotal(receipt.value.items);
       }
     } catch (error) {
       console.error("리뷰 수정 데이터 로드 실패:", error);
@@ -250,6 +257,9 @@ const loadExistingReview = async () => {
 
         // 영수증 정보 로드
         receipt.value = { ...existingReview.receipt };
+        receiptDraftItems.value = (receipt.value.items || []).map((item) => ({
+          ...item,
+        }));
 
         // 선택된 태그 로드
         selectedTags.value = [...existingReview.selectedTags];
@@ -352,10 +362,35 @@ const goToPreviousStep = () => {
   }
 };
 
-const extractImageUrls = () => {
-  return reviewPhotos.value
-    .map((photo) => photo.url)
-    .filter((url) => typeof url === "string" && url.startsWith("http"));
+const uploadReviewPhotos = async () => {
+  const existingUrls = [];
+  const uploadedUrls = [];
+
+  for (const photo of reviewPhotos.value) {
+    if (photo.file) {
+      const formData = new FormData();
+      formData.append("file", photo.file);
+
+      const response = await axios.post(
+        "/api/v1/images/upload/reviews",
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
+      const data = response.data?.data ?? response.data;
+      const url = data?.fileUrl || data?.key;
+      if (url) {
+        uploadedUrls.push(url);
+        photo.url = url;
+        photo.file = null;
+      }
+    } else if (typeof photo.url === "string" && photo.url.startsWith("http")) {
+      existingUrls.push(photo.url);
+    }
+  }
+
+  return [...existingUrls, ...uploadedUrls];
 };
 
 const setRating = (value) => {
@@ -364,6 +399,15 @@ const setRating = (value) => {
 
 // 리뷰 등록 또는 수정
 const submitReview = async () => {
+  let imageUrls = [];
+  try {
+    imageUrls = await uploadReviewPhotos();
+  } catch (error) {
+    console.error("이미지 업로드 실패:", error);
+    alert("이미지 업로드에 실패했습니다.");
+    return;
+  }
+
   if (isEditMode.value) {
     try {
       const response = await axios.put(
@@ -373,7 +417,7 @@ const submitReview = async () => {
           rating: rating.value,
           content: reviewText.value,
           tagIds: selectedTagIds.value,
-          imageUrls: extractImageUrls(),
+          imageUrls: imageUrls,
         }
       );
       const updatedId = response.data.reviewId || reviewId;
@@ -393,7 +437,7 @@ const submitReview = async () => {
           rating: rating.value,
           content: reviewText.value,
           tagIds: selectedTagIds.value,
-          imageUrls: extractImageUrls(),
+          imageUrls: imageUrls,
         }
       );
       submittedReviewId.value = response.data.reviewId;
@@ -451,8 +495,7 @@ const handleReceiptUpload = async (event) => {
     return;
   }
 
-  // 로딩 표시를 해주면 좋습니다.
-  console.log("OCR 처리 시작...");
+  isOcrProcessing.value = true;
 
   const formData = new FormData();
   formData.append("file", file);
@@ -468,8 +511,14 @@ const handleReceiptUpload = async (event) => {
     // 2. 영수증 데이터 UI에 매핑
     receiptId.value = data.receiptId || null;
     receipt.value.date = formatOcrDate(data.date); // 날짜 포맷팅 함수 필요시 적용
-    receipt.value.totalAmount = data.totalAmount;
-    receipt.value.items = data.items; // 서버에서 받아온 메뉴 리스트
+    receipt.value.totalAmount = data.totalAmount ?? receipt.value.totalAmount;
+    const mappedItems = (data.items || []).map((item) => ({
+      name: item.name || "",
+      quantity: Number(item.quantity) || 0,
+      price: Number(item.price) || 0,
+    }));
+    receipt.value.items = mappedItems.map((item) => ({ ...item }));
+    receiptDraftItems.value = mappedItems.map((item) => ({ ...item }));
     receipt.value.uploaded = true;
 
     closeReceiptModal();
@@ -477,8 +526,44 @@ const handleReceiptUpload = async (event) => {
   } catch (error) {
     console.error("OCR 실패:", error);
     alert("영수증 인식에 실패했습니다. 직접 입력해주세요.");
+  } finally {
+    isOcrProcessing.value = false;
   }
 };
+
+const recalculateReceiptTotal = (items) => {
+  if (!items || items.length === 0) return;
+  receipt.value.totalAmount = items.reduce(
+    (sum, item) =>
+      sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
+    0
+  );
+};
+
+const addReceiptItem = () => {
+  receiptDraftItems.value.push({ name: "", quantity: 1, price: 0 });
+};
+
+const removeReceiptItem = (index) => {
+  receiptDraftItems.value.splice(index, 1);
+};
+
+const confirmReceiptEdits = () => {
+  const confirmed = receiptDraftItems.value.map((item) => ({
+    name: item.name?.trim() || "",
+    quantity: Number(item.quantity) || 0,
+    price: Number(item.price) || 0,
+  }));
+  receipt.value.items = confirmed;
+  recalculateReceiptTotal(confirmed);
+};
+
+const hasReceiptEdits = computed(() => {
+  return (
+    JSON.stringify(receiptDraftItems.value) !==
+    JSON.stringify(receipt.value.items)
+  );
+});
 // 날짜 형식 예쁘게 바꾸는 헬퍼 함수 (선택)
 const formatOcrDate = (dateStr) => {
   if (!dateStr) return "";
@@ -594,19 +679,72 @@ onMounted(() => {
             >
               <div class="col-span-6">메뉴이름</div>
               <div class="col-span-2 text-center">수량</div>
-              <div class="col-span-4 text-right">단가</div>
+              <div class="col-span-3 text-right">단가</div>
+              <div class="col-span-1 text-right">삭제</div>
             </div>
             <div
-              v-for="(item, index) in receipt.items"
+              v-for="(item, index) in receiptDraftItems"
               :key="index"
-              class="grid grid-cols-12 gap-2 text-xs text-[#495057]"
+              class="grid grid-cols-12 gap-2 text-xs text-[#495057] items-center"
             >
-              <div class="col-span-6">· {{ item.name }}</div>
-              <div class="col-span-2 text-center">{{ item.quantity }}</div>
-              <div class="col-span-4 text-right">
-                {{ (item.price * item.quantity).toLocaleString() }}원
+              <div class="col-span-6">
+                <input
+                  v-model="item.name"
+                  type="text"
+                  placeholder="메뉴명"
+                  class="w-full px-2 py-1 border border-[#dee2e6] rounded-md text-xs focus:outline-none focus:border-purple-300"
+                />
+              </div>
+              <div class="col-span-2 text-center">
+                <input
+                  v-model.number="item.quantity"
+                  type="number"
+                  min="0"
+                  class="w-full px-2 py-1 border border-[#dee2e6] rounded-md text-xs text-center focus:outline-none focus:border-purple-300"
+                />
+              </div>
+              <div class="col-span-3 text-right">
+                <input
+                  v-model.number="item.price"
+                  type="number"
+                  min="0"
+                  class="w-full px-2 py-1 border border-[#dee2e6] rounded-md text-xs text-right focus:outline-none focus:border-purple-300"
+                />
+              </div>
+              <div class="col-span-1 text-right">
+                <button
+                  @click="removeReceiptItem(index)"
+                  class="text-xs text-[#dc3545] hover:underline"
+                >
+                  삭제
+                </button>
               </div>
             </div>
+          </div>
+
+          <button
+            @click="addReceiptItem"
+            class="w-full mb-3 py-2 border border-dashed border-[#dee2e6] rounded-lg text-xs text-[#6c757d] hover:border-purple-300 hover:bg-purple-50 transition-colors"
+          >
+            메뉴 추가
+          </button>
+
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-xs text-[#6c757d]">
+              수정한 내용을 확인 후 확정해주세요.
+            </p>
+            <button
+              @click="confirmReceiptEdits"
+              :disabled="!hasReceiptEdits"
+              :class="[
+                'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                hasReceiptEdits
+                  ? 'bg-purple-600 text-white hover:bg-purple-700'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed',
+              ]"
+            >
+              수정 확정
+            </button>
           </div>
 
           <!-- 총 금액 -->
@@ -809,10 +947,17 @@ onMounted(() => {
 
         <div class="mb-4">
           <label
-            class="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-[#dee2e6] rounded-xl cursor-pointer hover:border-purple-300 hover:bg-purple-50 transition-colors"
+            :class="[
+              'flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl cursor-pointer transition-colors',
+              isOcrProcessing
+                ? 'border-[#dee2e6] bg-gray-50 cursor-not-allowed'
+                : 'border-[#dee2e6] hover:border-purple-300 hover:bg-purple-50',
+            ]"
           >
             <Upload class="w-12 h-12 text-[#6c757d] mb-2" />
-            <span class="text-sm text-[#495057]">클릭하여 파일 선택</span>
+            <span class="text-sm text-[#495057]">
+              {{ isOcrProcessing ? "OCR 처리 중..." : "클릭하여 파일 선택" }}
+            </span>
             <span class="text-xs text-[#6c757d] mt-1"
               >JPG, PNG, WEBP (최대 10MB)</span
             >
@@ -821,6 +966,7 @@ onMounted(() => {
               class="hidden"
               accept="image/jpeg,image/png,image/webp"
               @change="handleReceiptUpload"
+              :disabled="isOcrProcessing"
             />
           </label>
         </div>
@@ -828,12 +974,13 @@ onMounted(() => {
         <div class="flex gap-2">
           <button
             @click="closeReceiptModal"
+            :disabled="isOcrProcessing"
             class="flex-1 py-3 border border-[#dee2e6] rounded-lg text-sm font-medium text-[#495057] hover:bg-gray-50"
           >
             취소
           </button>
           <button
-            @click="handleReceiptUpload"
+            disabled
             class="flex-1 py-3 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700"
           >
             업로드

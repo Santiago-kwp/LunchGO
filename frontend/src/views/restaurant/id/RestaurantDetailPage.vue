@@ -19,6 +19,7 @@ import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import { loadKakaoMaps } from '@/utils/kakao';
 import { restaurants as restaurantData, getRestaurantById } from '@/data/restaurants';
+import axios from 'axios';
 
 const route = useRoute();
 const restaurantId = route.params.id || '1'; // Default to '1' if id is not available
@@ -100,7 +101,7 @@ const ratingDisplay = computed(() => {
   return '0.0';
 });
 
-const reviewCountDisplay = computed(() => restaurantInfo.value?.reviews ?? 0);
+const reviewCountDisplay = computed(() => restaurantReviewSummary.value?.reviewCount ?? restaurantInfo.value?.reviews ?? 0);
 const addressDisplay = computed(() => restaurantInfo.value?.address || '주소 정보가 곧 업데이트됩니다.');
 const phoneDisplay = computed(() => restaurantInfo.value?.phone || '문의처 준비중');
 const hoursDisplay = computed(
@@ -142,60 +143,35 @@ const detailDistanceSliderFill = computed(() => {
   );
 });
 
-const representativeReviews = ref([
-  {
-    id: 1,
-    author: '김**',
-    company: '네이버',
-    visitCount: 3,
-    rating: 5,
-    date: '2024.01.15',
-    content:
-      '회식하기 정말 좋았어요. 음식도 맛있고 분위기도 최고였습니다! 특히 룸이 프라이빗해서 회사 동료들과 편하게 대화할 수 있었고, 음식 양도 정말 푸짐해서 배불리 먹었습니다. 다음에 또 방문하고 싶어요.',
-    tags: ['룸이 있어 프라이빗해요', '대화하기 좋아요', '양이 푸짐해요'],
-    images: [
-      '/korean-appetizer-main-dessert.jpg',
-      '/premium-course-meal-with-wine.jpg',
-      '/korean-fine-dining.jpg',
-    ],
-    currentImageIndex: 0,
-    isExpanded: false,
-  },
-  {
-    id: 2,
-    author: '이**',
-    company: null,
-    visitCount: 2,
-    rating: 5,
-    date: '2024.01.10',
-    content:
-      '직원분들이 친절하시고 코스 구성이 알차서 만족스러웠습니다. 예약 시간에 맞춰 테이블이 완벽하게 세팅되어 있었고, 서비스도 훌륭했습니다.',
-    tags: ['사장님이 친절해요', '예약 시간 맞춰 세팅돼요'],
-    images: [
-      '/elegant-dining-room-setup.jpg',
-      '/restaurant-private-room-atmosphere.jpg',
-    ],
-    currentImageIndex: 0,
-    isExpanded: false,
-  },
-  {
-    id: 3,
-    author: '박**',
-    company: '카카오',
-    visitCount: 1,
-    rating: 4,
-    date: '2024.01.05',
-    content: '가격 대비 훌륭한 퀄리티입니다. 다음에 또 방문할게요.',
-    tags: ['법카 쓰기 좋은 가격대에요', '주차가 편해요'],
-    images: [
-      '/italian-pasta-dish.png',
-      '/pasta-carbonara.png',
-      '/italian-restaurant-dining.jpg',
-    ],
-    currentImageIndex: 0,
-    isExpanded: false,
-  },
-]);
+const representativeReviews = ref([]);
+const restaurantReviewSummary = ref(null);
+
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}.${month}.${day}`;
+};
+
+const mapReviewItem = (item) => ({
+  id: item.reviewId,
+  author: item.author || '익명',
+  company: item.company || null,
+  visitCount: item.visitCount ?? null,
+  rating: item.rating ?? 0,
+  date: formatDate(item.createdAt),
+  content: item.isBlinded
+    ? '관리자에 의해 블라인드 처리된 리뷰입니다.'
+    : item.content || '',
+  tags: (item.tags || []).map((tag) => tag.name || tag),
+  images: item.images || [],
+  currentImageIndex: 0,
+  isExpanded: false,
+  isBlinded: Boolean(item.isBlinded),
+  blindReason: item.blindReason || '관리자에 의해 블라인드 처리된 리뷰입니다.',
+});
 
 // 이미지 확대 모달 상태
 const isImageModalOpen = ref(false);
@@ -213,6 +189,24 @@ const openImageModal = (images, index) => {
 
 const toggleRestaurantFavorite = () => {
   isRestaurantFavorite.value = !isRestaurantFavorite.value;
+};
+
+const loadRepresentativeReviews = async () => {
+  try {
+    const response = await axios.get(`/api/restaurants/${restaurantId}/reviews`, {
+      params: {
+        page: 1,
+        size: 3,
+        sort: 'RECOMMEND',
+      },
+    });
+    const data = response.data?.data ?? response.data;
+    restaurantReviewSummary.value = data?.summary ?? null;
+    representativeReviews.value = (data?.items || []).map(mapReviewItem);
+  } catch (error) {
+    console.error('리뷰 데이터를 불러오지 못했습니다:', error);
+    representativeReviews.value = [];
+  }
 };
 
 // 모달 닫기
@@ -343,6 +337,7 @@ onMounted(() => {
     setupDragScroll(container);
   });
   initializeDetailMap();
+  loadRepresentativeReviews();
 });
 
 onBeforeUnmount(() => {
@@ -558,7 +553,9 @@ watch(detailMapDistanceStepIndex, () => {
         <div class="space-y-3">
           <div v-for="review in representativeReviews" :key="review.id">
             <Card
-              class="p-4 border-[#e9ecef] rounded-xl bg-white shadow-card hover:shadow-md transition-shadow"
+              :class="`p-4 border-[#e9ecef] rounded-xl bg-white shadow-card hover:shadow-md transition-shadow ${
+                review.isBlinded ? 'opacity-60' : ''
+              }`"
             >
               <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-2">
@@ -572,7 +569,7 @@ watch(detailMapDistanceStepIndex, () => {
                         class="font-semibold text-[#1e3a5f] text-sm"
                         >({{ review.company }})</span
                       >
-                      <div class="flex items-center gap-1">
+                      <div v-if="!review.isBlinded" class="flex items-center gap-1">
                         <Star
                           v-for="(_, i) in Array.from({
                             length: review.rating,
@@ -583,7 +580,7 @@ watch(detailMapDistanceStepIndex, () => {
                       </div>
                     </div>
                     <span
-                      v-if="review.visitCount"
+                      v-if="!review.isBlinded && review.visitCount"
                       class="text-xs text-[#6c757d] mt-0.5"
                     >
                       {{ review.visitCount }}번째 방문
@@ -595,7 +592,7 @@ watch(detailMapDistanceStepIndex, () => {
 
               <!-- 리뷰 이미지 갤러리 (스크롤 방식) -->
               <div
-                v-if="review.images && review.images.length > 0"
+                v-if="!review.isBlinded && review.images && review.images.length > 0"
                 class="mb-3 -mx-4"
               >
                 <div
@@ -630,7 +627,7 @@ watch(detailMapDistanceStepIndex, () => {
               </div>
 
               <!-- 리뷰 내용 -->
-              <div>
+              <div v-if="!review.isBlinded">
                 <p class="text-sm text-[#495057] leading-relaxed mb-2">
                   {{ truncateText(review.content, review.isExpanded) }}
                 </p>
@@ -662,6 +659,16 @@ watch(detailMapDistanceStepIndex, () => {
                     </span>
                   </div>
                 </RouterLink>
+              </div>
+              <div v-else>
+                <p class="text-sm text-[#495057] leading-relaxed mb-2">
+                  {{ review.content }}
+                </p>
+                <span
+                  class="inline-block px-2.5 py-1 text-xs rounded-full bg-[#6c757d] text-white"
+                >
+                  사유: {{ review.blindReason }}
+                </span>
               </div>
             </Card>
           </div>

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import {
   ArrowLeft,
@@ -10,168 +10,40 @@ import {
   MessageSquare,
 } from "lucide-vue-next";
 import Card from "@/components/ui/Card.vue";
+import axios from "axios";
 
 const route = useRoute();
 const router = useRouter();
 const restaurantId = route.params.id || "1";
 const reviewId = route.params.reviewId;
 
-// Mock data - 실제 구현 시 API에서 reviewId로 조회
-const reviews = [
-  {
-    id: "1",
-    author: "김**",
-    company: "네이버",
-    visitCount: 3,
-    rating: 5,
-    date: "2024.01.15",
-    content: "회식하기 정말 좋았어요. 음식도 맛있고 분위기도 최고였습니다!",
-    tags: ["룸이 있어 프라이빗해요", "대화하기 좋아요", "양이 푸짐해요"],
-    images: [
-      "/korean-appetizer-main-dessert.jpg",
-      "/premium-course-meal-with-wine.jpg",
-      "/korean-fine-dining.jpg",
-    ],
-    detailedContent: `회사 팀 회식으로 방문했는데 정말 만족스러웠습니다.
+const review = ref({
+  id: reviewId,
+  author: "익명",
+  company: null,
+  visitCount: null,
+  rating: 0,
+  date: "",
+  content: "",
+  tags: [],
+  images: [],
+  detailedContent: "",
+  visitInfo: null,
+  comments: [],
+  isBlinded: false,
+  blindReason: "",
+});
 
-먼저 룸으로 안내받아서 다른 손님들 눈치 보지 않고 편하게 대화하며 식사할 수 있었어요. 음식은 하나하나 정성스럽게 나왔고, 특히 메인 요리가 정말 맛있었습니다.
-
-직원분들도 친절하시고 서비스가 세심했어요. 가격대는 있지만 그만큼 충분히 가치가 있는 곳입니다. 
-
-다음 회식 때도 꼭 다시 방문하고 싶습니다!`,
-    // 예약/방문 정보
-    visitInfo: {
-      date: "2025년 11월 15일 (금)",
-      partySize: 8,
-      totalAmount: 111000,
-      menuItems: [
-        { name: "메뉴명1", quantity: 1, price: 18000 },
-        { name: "메뉴명2", quantity: 2, price: 9000 },
-        { name: "메뉴명3", quantity: 3, price: 11000 },
-      ],
-    },
-    // 댓글 (사장님/관리자가 작성)
-    comments: [
-      {
-        id: "comment-1",
-        authorType: "owner", // 'owner' (사장님) 또는 'admin' (관리자)
-        authorName: "식당명",
-        content:
-          "소중한 리뷰 감사합니다! 저희 식당을 방문해주셔서 감사드리며, 더욱 노력하는 모습 보여드리겠습니다. 다음에도 좋은 추억 만들어드릴 수 있도록 최선을 다하겠습니다.",
-        createdAt: "2024.01.16 14:30",
-      },
-      {
-        id: "comment-2",
-        authorType: "owner",
-        authorName: "식당명",
-        content:
-          "추가로, 다음 방문 시 웰컴 드링크를 서비스로 제공해드리겠습니다. 예약 시 리뷰 고객님이라고 말씀해주세요!",
-        createdAt: "2024.01.16 15:45",
-      },
-    ],
-  },
-  {
-    id: "2",
-    author: "이**",
-    company: null,
-    visitCount: 2,
-    rating: 5,
-    date: "2024.01.10",
-    content: "직원분들이 친절하시고 코스 구성이 알차서 만족스러웠습니다!",
-    tags: ["사장님이 친절해요", "예약 시간 맞춰 세팅돼요"],
-    images: [],
-    detailedContent: `B코스를 주문했는데 구성이 정말 알차더라고요. 전채부터 메인, 디저트까지 하나하나 맛있었습니다.
-
-특히 직원분들이 정말 친절하셔서 기분 좋게 식사할 수 있었어요. 음식 설명도 자세히 해주시고, 필요한 게 있으면 바로바로 챙겨주셨습니다.
-
-회식 장소로 강력 추천합니다!`,
-    visitInfo: {
-      date: "2025년 10월 20일 (목)",
-      partySize: 4,
-      totalAmount: 65000,
-      menuItems: [{ name: "B코스", quantity: 4, price: 16250 }],
-    },
-    comments: [
-      {
-        id: "comment-3",
-        authorType: "owner",
-        authorName: "식당명",
-        content: "리뷰 감사합니다! 친절한 서비스로 보답하겠습니다.",
-        createdAt: "2024.01.11 10:20",
-      },
-    ],
-  },
-  {
-    id: "3",
-    author: "박**",
-    company: "카카오",
-    visitCount: 1,
-    rating: 4,
-    date: "2024.01.05",
-    content: "가격 대비 훌륭한 퀄리티입니다. 다음에 또 방문할게요.",
-    tags: ["법카 쓰기 좋은 가격대에요", "주차가 편해요"],
-    images: ["/italian-pasta-dish.png"],
-    detailedContent: `주차장이 있어서 편하게 방문할 수 있었고, 음식 퀄리티도 가격 대비 정말 훌륭했습니다.
-
-파스타를 주문했는데 면의 식감도 좋고 소스도 진하고 맛있었어요. 양도 적당해서 다른 메뉴도 함께 주문해서 나눠 먹기 좋았습니다.
-
-다음에는 코스 메뉴도 도전해보고 싶네요!`,
-    visitInfo: {
-      date: "2025년 09월 10일 (화)",
-      partySize: 2,
-      totalAmount: 42000,
-      menuItems: [
-        { name: "까르보나라", quantity: 1, price: 18000 },
-        { name: "알리오올리오", quantity: 1, price: 16000 },
-        { name: "타파스", quantity: 2, price: 4000 },
-      ],
-    },
-    comments: [
-      {
-        id: "comment-4",
-        authorType: "admin",
-        authorName: "런치고 관리자",
-        content:
-          "안녕하세요, 런치고 관리자입니다. 좋은 리뷰 감사드립니다. 더욱 나은 서비스를 제공할 수 있도록 노력하겠습니다.",
-        createdAt: "2024.01.06 09:15",
-      },
-      {
-        id: "comment-5",
-        authorType: "owner",
-        authorName: "식당명",
-        content:
-          "파스타 맛있게 드셨다니 기쁩니다. 다음에는 코스 메뉴도 꼭 맛보시길 추천드립니다!",
-        createdAt: "2024.01.07 16:00",
-      },
-    ],
-  },
-  {
-    id: "9",
-    author: "[블라인드]",
-    company: null,
-    visitCount: null,
-    rating: 0,
-    date: "2023.12.08",
-    content: "관리자에 의해 블라인드 처리된 리뷰입니다.",
-    tags: [],
-    images: [],
-    isBlinded: true,
-    blindReason: "욕설/비속어 포함",
-    detailedContent:
-      "이 리뷰는 약관 위반으로 블라인드 처리되었습니다. 런치고는 건전한 리뷰 문화를 위해 노력하고 있습니다.",
-    visitInfo: null,
-    comments: [], // 블라인드 리뷰는 댓글 없음
-  },
-];
-
+const formatDate = (dateString) => {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}.${month}.${day}`;
+};
 // 댓글 개수 계산
-const commentCount = computed(() => {
-  return review.value?.comments?.length || 0;
-});
-
-const review = computed(() => {
-  return reviews.find((r) => r.id === reviewId) || reviews[0];
-});
+const commentCount = computed(() => review.value?.comments?.length || 0);
 
 // 이미지 확대 모달 상태
 const isImageModalOpen = ref(false);
@@ -250,10 +122,60 @@ const goToPreviousStep = () => {
 
 // 컴포넌트 마운트 후 드래그 스크롤 설정
 onMounted(() => {
-  const scrollContainer = document.querySelector(".review-image-scroll");
-  if (scrollContainer) {
-    setupDragScroll(scrollContainer);
-  }
+  const loadReviewDetail = async () => {
+    try {
+      const response = await axios.get(
+        `/api/restaurants/${restaurantId}/reviews/${reviewId}`
+      );
+      const data = response.data?.data ?? response.data;
+      review.value = {
+        id: data.reviewId,
+        author: data.author || "익명",
+        company: data.company || null,
+        visitCount: data.visitCount ?? null,
+        rating: data.rating ?? 0,
+        date: formatDate(data.createdAt),
+        content: data.isBlinded
+          ? "관리자에 의해 블라인드 처리된 리뷰입니다."
+          : data.content || "",
+        tags: (data.tags || []).map((tag) => tag.name || tag),
+        images: data.images || [],
+        detailedContent: data.content || "",
+        visitInfo: data.visitInfo
+          ? {
+              date: data.visitInfo.date,
+              partySize: data.visitInfo.partySize || 0,
+              totalAmount: data.visitInfo.totalAmount || 0,
+              menuItems: (data.visitInfo.menuItems || []).map((item) => ({
+                name: item.name,
+                quantity: item.qty ?? item.quantity ?? 0,
+                price: item.unitPrice ?? item.price ?? 0,
+              })),
+            }
+          : null,
+        comments: (data.comments || []).map((comment) => ({
+          id: comment.commentId,
+          authorType: comment.writerType === "OWNER" ? "owner" : "admin",
+          authorName: comment.writerName,
+          content: comment.content,
+          createdAt: comment.createdAt,
+        })),
+        isBlinded: Boolean(data.isBlinded),
+        blindReason:
+          data.blindReason || "관리자에 의해 블라인드 처리된 리뷰입니다.",
+      };
+    } catch (error) {
+      console.error("리뷰 상세 조회 실패:", error);
+    }
+
+    await nextTick();
+    const scrollContainer = document.querySelector(".review-image-scroll");
+    if (scrollContainer) {
+      setupDragScroll(scrollContainer);
+    }
+  };
+
+  loadReviewDetail();
 });
 </script>
 

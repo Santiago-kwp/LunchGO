@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-vue-next";
 import Card from "@/components/ui/Card.vue";
+import axios from "axios";
 
 const route = useRoute();
 const restaurantId = route.params.id || "1"; // Default ID
@@ -17,178 +18,50 @@ const restaurantId = route.params.id || "1"; // Default ID
 const sortOrder = ref("추천순");
 const isDropdownOpen = ref(false);
 
-const reviews = ref([
-  {
-    id: 1,
-    author: "김**",
-    company: "한화시스템",
-    visitCount: 3,
-    rating: 5,
-    date: "2024.01.20",
-    content:
-      "회식하기 정말 좋았어요. 음식도 맛있고 분위기도 최고였습니다! 특히 룸이 프라이빗해서 회사 동료들과 편하게 대화할 수 있었고, 음식 양도 정말 푸짐해서 배불리 먹었습니다. 다음에 또 방문하고 싶어요.",
-    tags: ["룸이 있어 프라이빗해요", "대화하기 좋아요", "양이 푸짐해요"],
-    images: [
-      "/korean-appetizer-main-dessert.jpg",
-      "/premium-course-meal-with-wine.jpg",
-      "/korean-fine-dining.jpg",
-    ],
-    isExpanded: false,
-  },
-  {
-    id: 2,
-    author: "이**",
-    company: "네이버",
-    visitCount: 2,
-    rating: 5,
-    date: "2024.01.20",
-    content:
-      "직원분들이 친절하시고 코스 구성이 알차서 만족스러웠습니다. 예약 시간에 맞춰 테이블이 완벽하게 세팅되어 있었고, 서비스도 훌륭했습니다.",
-    tags: ["사장님이 친절해요", "예약 시간 맞춰 세팅돼요"],
-    images: [
-      "/elegant-dining-room-setup.jpg",
-      "/restaurant-private-room-atmosphere.jpg",
-    ],
-    isExpanded: false,
-  },
-  {
-    id: 3,
-    author: "박**",
-    company: "카카오",
-    visitCount: 1,
-    rating: 4,
-    date: "2024.01.19",
-    content: "가격 대비 훌륭한 퀄리티입니다. 다음에 또 방문할게요.",
-    tags: ["법카 쓰기 좋은 가격대에요", "주차가 편해요"],
-    images: [
-      "/italian-pasta-dish.png",
-      "/pasta-carbonara.png",
-      "/italian-restaurant-dining.jpg",
-    ],
-    isExpanded: false,
-  },
-  {
-    id: 4,
-    author: "최**",
-    company: "토스",
-    visitCount: 5,
-    rating: 5,
-    date: "2024.01.18",
-    content: "팀 회식으로 다녀왔는데 모두 만족했어요. 특히 C코스 추천합니다!",
-    tags: ["단체석이 넓어요", "음식이 빨리 나와요", "호불호 없는 맛이에요"],
-    images: [
-      "/elegant-dining-room-setup.jpg",
-      "/korean-course-meal-plating.jpg",
-    ],
-    isExpanded: false,
-  },
-  {
-    id: 5,
-    author: "정**",
-    company: null,
-    visitCount: 1,
-    rating: 4,
-    date: "2024.01.17",
-    content: "음식이 정갈하고 맛있습니다. 예약 필수인 이유를 알겠어요.",
-    tags: ["예약 시간 맞춰 세팅돼요", "특별한 메뉴가 있어요"],
-    images: [],
-    isExpanded: false,
-  },
-  {
-    id: 6,
-    author: "강**",
-    company: "쿠팡",
-    visitCount: 4,
-    rating: 5,
-    date: "2024.01.16",
-    content: "회사 송년회로 다녀왔는데 분위기도 좋고 서비스도 훌륭했습니다.",
-    tags: ["대화하기 좋아요", "룸이 있어 프라이빗해요", "옷 보관하기 편해요"],
-    images: [
-      "/modern-korean-restaurant-interior.jpg",
-      "/restaurant-private-room-atmosphere.jpg",
-    ],
-    isExpanded: false,
-  },
-  {
-    id: 7,
-    author: "조**",
-    company: "배달의민족",
-    visitCount: 2,
-    rating: 5,
-    date: "2024.01.15",
-    content: "음식 하나하나 정성이 느껴져요. 재방문 의사 100%입니다!",
-    tags: ["양이 푸짐해요", "특별한 메뉴가 있어요"],
-    images: ["/korean-course-meal-plating.jpg"],
-    isExpanded: false,
-  },
-  {
-    id: 8,
-    author: "윤**",
-    company: null,
-    visitCount: 1,
-    rating: 4,
-    date: "2024.01.14",
-    content: "가격대가 있지만 그만큼 가치가 있는 곳입니다. 특별한 날 추천해요.",
-    tags: ["대화하기 좋아요", "특별한 메뉴가 있어요"],
-    images: [],
-    isExpanded: false,
-  },
-  {
-    id: 9,
-    author: "[블라인드]",
-    company: null,
-    rating: 0,
-    date: "2024.01.13",
-    content: "관리자에 의해 블라인드 처리된 리뷰입니다.",
-    tags: [],
-    images: [],
-    isBlinded: true,
-    blindReason: "욕설/비속어 포함",
-  },
-  {
-    id: 10,
-    author: "장**",
-    company: "라인",
-    visitCount: 3,
-    rating: 5,
-    date: "2024.01.12",
-    content: "파스타가 정말 맛있었고, 와인 추천도 완벽했습니다!",
-    tags: ["호불호 없는 맛이에요", "특별한 메뉴가 있어요"],
-    images: ["/italian-pasta-dish.png"],
-    isExpanded: false,
-  },
-  {
-    id: 11,
-    author: "임**",
-    company: null,
-    visitCount: 1,
-    rating: 5,
-    date: "2024.01.11",
-    content: "직원분들 응대가 정말 좋고, 음식도 너무 맛있어요. 강력 추천!",
-    tags: ["사장님이 친절해요", "회전율이 빨라요"],
-    images: [],
-    isExpanded: false,
-  },
-]);
+const reviews = ref([]);
+const reviewSummary = ref(null);
 
-const averageRating = computed(() => {
-  const totalRating = reviews.value.reduce((sum, r) => sum + r.rating, 0);
-  return (totalRating / reviews.value.length).toFixed(1);
+const formatDate = (dateString) => {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}.${month}.${day}`;
+};
+
+const mapReviewItem = (item) => ({
+  id: item.reviewId,
+  author: item.author || "익명",
+  company: item.company || null,
+  visitCount: item.visitCount ?? null,
+  rating: item.rating ?? 0,
+  date: formatDate(item.createdAt),
+  content: item.isBlinded
+    ? "관리자에 의해 블라인드 처리된 리뷰입니다."
+    : item.content || "",
+  tags: (item.tags || []).map((tag) => tag.name || tag),
+  images: item.images || [],
+  isExpanded: false,
+  isBlinded: Boolean(item.isBlinded),
+  blindReason: item.blindReason || "관리자에 의해 블라인드 처리된 리뷰입니다.",
 });
 
-const tagCounts = computed(() => {
-  return reviews.value.reduce((acc, review) => {
-    review.tags.forEach((tag) => {
-      acc[tag] = (acc[tag] || 0) + 1;
-    });
-    return acc;
-  }, {});
+const averageRating = computed(() => {
+  if (reviewSummary.value?.avgRating != null) {
+    return Number(reviewSummary.value.avgRating).toFixed(1);
+  }
+  const totalRating = reviews.value.reduce((sum, r) => sum + r.rating, 0);
+  return reviews.value.length > 0
+    ? (totalRating / reviews.value.length).toFixed(1)
+    : "0.0";
 });
 
 const topTags = computed(() => {
-  return Object.entries(tagCounts.value)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3);
+  if (reviewSummary.value?.topTags?.length > 0) {
+    return reviewSummary.value.topTags.map((tag) => [tag.name, tag.count]);
+  }
+  return [];
 });
 
 const sortOptions = ref(["추천순", "최신순", "별점 높은순", "별점 낮은순"]);
@@ -372,10 +245,29 @@ const setupDragScroll = (element) => {
 
 // 컴포넌트 마운트 후 드래그 스크롤 설정
 onMounted(() => {
-  const scrollContainers = document.querySelectorAll(".review-image-scroll");
-  scrollContainers.forEach((container) => {
-    setupDragScroll(container);
-  });
+  const loadReviews = async () => {
+    try {
+      const response = await axios.get(
+        `/api/restaurants/${restaurantId}/reviews`,
+        {
+          params: { page: 1, size: 200, sort: "LATEST" },
+        }
+      );
+      const data = response.data?.data ?? response.data;
+      reviewSummary.value = data?.summary ?? null;
+      reviews.value = (data?.items || []).map(mapReviewItem);
+    } catch (error) {
+      console.error("리뷰 데이터를 불러오지 못했습니다:", error);
+      reviews.value = [];
+    }
+
+    const scrollContainers = document.querySelectorAll(".review-image-scroll");
+    scrollContainers.forEach((container) => {
+      setupDragScroll(container);
+    });
+  };
+
+  loadReviews();
 });
 </script>
 
@@ -412,7 +304,7 @@ onMounted(() => {
                 />
               </div>
               <div class="text-xs text-[#6c757d]">
-                {{ reviews.length }}개 리뷰
+                {{ reviewSummary?.reviewCount ?? reviews.length }}개 리뷰
               </div>
             </div>
 
