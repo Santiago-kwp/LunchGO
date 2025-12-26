@@ -1,10 +1,18 @@
 <script setup>
+import { ref, onMounted } from 'vue';
 import { CheckCircle2, MapPin, Calendar, Clock, Users, Download, Share2 } from 'lucide-vue-next'; // Import Lucide icons for Vue
-import { RouterLink } from 'vue-router'; // Import Vue RouterLink
+import { RouterLink, useRoute } from 'vue-router'; // Import Vue RouterLink
+import axios from 'axios';
 import Button from '@/components/ui/Button.vue'; // Import custom Button
 import Card from '@/components/ui/Card.vue';
 
-const reservation = {
+const route = useRoute();
+const reservationId = route.query.reservationId || null;
+const isLoading = ref(false);
+const errorMessage = ref('');
+const completionAttempted = ref(false);
+
+const reservation = ref({
   confirmationNumber: 'LG2024121500123',
   restaurant: {
     name: '식당명',
@@ -22,7 +30,80 @@ const reservation = {
     method: '신용카드',
     paidAt: '2024. 12. 10. 14:35',
   },
+});
+
+const fetchReservationDetail = async () => {
+  if (!reservationId) return;
+  isLoading.value = true;
+  errorMessage.value = '';
+  try {
+    // TODO: 백엔드 스펙 확정 후 엔드포인트/필드 매핑 조정
+    const response = await axios.get(`/api/reservations/${reservationId}/confirmation`);
+    const data = response?.data || {};
+
+    reservation.value = {
+      confirmationNumber: data.reservationCode || reservation.value.confirmationNumber,
+      restaurant: {
+        name: data.restaurant?.name || reservation.value.restaurant.name,
+        address: data.restaurant?.address || reservation.value.restaurant.address,
+        phone: data.restaurant?.phone || reservation.value.restaurant.phone,
+      },
+      booking: {
+        date: data.booking?.date || reservation.value.booking.date,
+        time: data.booking?.time || reservation.value.booking.time,
+        partySize: data.booking?.partySize ?? reservation.value.booking.partySize,
+        requestNote: data.booking?.requestNote || '',
+      },
+      payment: {
+        amount: data.payment?.amount ?? reservation.value.payment.amount,
+        method: data.payment?.method || reservation.value.payment.method,
+        paidAt: data.payment?.paidAt || reservation.value.payment.paidAt,
+      },
+    };
+  } catch (error) {
+    errorMessage.value = error?.message || '예약 정보를 불러오지 못했습니다.';
+  } finally {
+    isLoading.value = false;
+  }
 };
+
+const completePaymentFromRedirect = async () => {
+  if (completionAttempted.value) return;
+  completionAttempted.value = true;
+
+  const merchantUid =
+    route.query.paymentId ||
+    route.query.merchantUid ||
+    route.query.merchant_uid ||
+    null;
+  const paidAmount = Number(route.query.totalAmount || route.query.amount || 0);
+  const impUid =
+    route.query.imp_uid ||
+    route.query.impUid ||
+    route.query.txId ||
+    route.query.transactionId ||
+    null;
+
+  if (!merchantUid || !Number.isFinite(paidAmount) || paidAmount <= 0) {
+    return;
+  }
+
+  try {
+    await axios.post('/api/payments/portone/complete', {
+      merchantUid: String(merchantUid),
+      impUid: impUid ? String(impUid) : null,
+      paidAmount,
+    });
+  } catch (error) {
+    errorMessage.value =
+      error?.message || '결제 완료 처리에 실패했습니다. 다시 확인해 주세요.';
+  }
+};
+
+onMounted(async () => {
+  await completePaymentFromRedirect();
+  await fetchReservationDetail();
+});
 </script>
 
 <template>
@@ -39,6 +120,8 @@ const reservation = {
           <br />
           방문 시 QR 코드를 제시해 주세요
         </p>
+        <p v-if="isLoading" class="mt-3 text-xs text-[#6c757d]">예약 정보를 불러오는 중...</p>
+        <p v-if="errorMessage" class="mt-3 text-xs text-red-500">{{ errorMessage }}</p>
       </div>
 
       <!-- QR Code Section -->

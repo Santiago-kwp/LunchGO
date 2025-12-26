@@ -1,24 +1,34 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { RouterLink, useRouter, useRoute } from 'vue-router';
-import { ArrowLeft, CreditCard, Smartphone, Building2, Check } from 'lucide-vue-next';
-import Button from '@/components/ui/Button.vue';
-import Card from '@/components/ui/Card.vue';
+import { ref, computed, onMounted } from "vue";
+import { RouterLink, useRouter, useRoute } from "vue-router";
+import {
+  ArrowLeft,
+  CreditCard,
+  Smartphone,
+  Building2,
+  Check,
+} from "lucide-vue-next";
+import axios from "axios";
+import Button from "@/components/ui/Button.vue";
+import Card from "@/components/ui/Card.vue";
 
 const router = useRouter();
 const route = useRoute();
-const restaurantId = route.params.id || '1'; // Default to '1' if id is not available
+const restaurantId = route.params.id || "7"; // Default to '1' if id is not available
 
 //예약금 / 선주문선결제 분기
-const paymentType = computed(() => String(route.query.type || 'deposit'));
-const isDepositOnly = computed(() => paymentType.value === 'deposit');
+const paymentType = computed(() => String(route.query.type || "deposit"));
+const isDepositOnly = computed(() => paymentType.value === "deposit");
 
 const selectedPayment = ref(null);
 const agreedToTerms = ref(false);
 const agreedToRefund = ref(false);
+const isProcessing = ref(false);
+const isPortOneReady = ref(false);
+const errorMessage = ref("");
 const isTermsModalOpen = ref(false);
-const modalTitle = ref('');
-const modalContent = ref('');
+const modalTitle = ref("");
+const modalContent = ref("");
 
 //인원수 : query에서 partySize로 받는다고 가정 (없으면 1명)
 const headcount = computed(() => {
@@ -45,8 +55,11 @@ const totalAmount = computed(() => {
 });
 
 const bookingId = computed(() => route.query.bookingId || null);
+const reservationId = computed(
+  () => route.query.reservationId || bookingId.value || null
+);
 const bookingSummary = ref({
-  requestNote: '', // 요청사항(read-only 표시용)
+  requestNote: "", // 요청사항(read-only 표시용)
 });
 const isBookingLoading = ref(false);
 const fetchBookingSummary = async () => {
@@ -57,7 +70,7 @@ const fetchBookingSummary = async () => {
     // bookingSummary.value.requestNote = res.data.requestNote;
 
     // 임시 더미(모양 확인용)
-    bookingSummary.value.requestNote = '유아용 의자 부탁드려요';
+    bookingSummary.value.requestNote = "유아용 의자 부탁드려요";
   } finally {
     isBookingLoading.value = false;
   }
@@ -65,6 +78,7 @@ const fetchBookingSummary = async () => {
 
 onMounted(() => {
   fetchBookingSummary();
+  loadPortOneSdk();
 });
 
 // 모달에 보여줄 텍스트 (원하는 약관 원문 그대로 붙여넣기)
@@ -212,14 +226,14 @@ const REFUND_POLICY_TEXT = `## **제 1 조 (목적)**
 const openModal = (type) => {
   isTermsModalOpen.value = true;
 
-  if (type === 'terms') {
-    modalTitle.value = '서비스 이용약관';
+  if (type === "terms") {
+    modalTitle.value = "서비스 이용약관";
     modalContent.value = SERVICE_TERMS_TEXT;
     return;
   }
 
   // type === 'refund'
-  modalTitle.value = '취소 및 환불 정책';
+  modalTitle.value = "취소 및 환불 정책";
   modalContent.value = REFUND_POLICY_TEXT;
 };
 
@@ -237,28 +251,210 @@ const iconComponents = {
 
 const paymentMethods = [
   {
-    id: 'card',
-    name: '신용/체크카드',
-    iconName: 'CreditCard', // Use string name to reference iconComponents
-    description: '국내 모든 카드 사용 가능',
-  }
+    id: "card",
+    name: "신용/체크카드",
+    iconName: "CreditCard", // Use string name to reference iconComponents
+    description: "국내 모든 카드 사용 가능",
+  },
 ];
 
-const canProceed = computed(() => selectedPayment.value && agreedToTerms.value && agreedToRefund.value);
+const canProceed = computed(
+  () =>
+    selectedPayment.value &&
+    agreedToTerms.value &&
+    agreedToRefund.value &&
+    !isProcessing.value
+);
+
+const PAYMENT_TIMEOUT_MS = 7 * 60 * 1000;
+const PORTONE_STORE_ID = import.meta.env.VITE_PORTONE_STORE_ID || "";
+const PORTONE_CHANNEL_KEY = import.meta.env.VITE_PORTONE_CHANNEL_KEY || "";
+const PORTONE_OPEN_TYPE = import.meta.env.VITE_PORTONE_OPEN_TYPE || "popup";
+
+const createIdempotencyKey = () => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `idempo_${Date.now()}_${Math.random().toString(16).slice(2, 10)}`;
+};
+
+const loadPortOneSdk = () => {
+  if (window.PortOne) {
+    isPortOneReady.value = true;
+    return Promise.resolve();
+  }
+
+  const existing = document.querySelector("script[data-portone-sdk]");
+  if (existing) {
+    return new Promise((resolve, reject) => {
+      existing.addEventListener("load", () => {
+        isPortOneReady.value = true;
+        resolve();
+      });
+      existing.addEventListener("error", () => {
+        reject(new Error("PortOne SDK 로드에 실패했습니다."));
+      });
+    });
+  }
+
+  const script = document.createElement("script");
+  script.src =
+    import.meta.env.VITE_PORTONE_SDK_URL ||
+    "https://cdn.portone.io/v2/browser-sdk.js";
+  script.async = true;
+  script.defer = true;
+  script.setAttribute("data-portone-sdk", "true");
+  document.head.appendChild(script);
+
+  return new Promise((resolve, reject) => {
+    script.onload = () => {
+      isPortOneReady.value = true;
+      resolve();
+    };
+    script.onerror = () => {
+      reject(new Error("PortOne SDK 로드에 실패했습니다."));
+    };
+  });
+};
+
+const requestPayment = async ({ merchantUid, amount, reservationId }) => {
+  // TODO: PortOne SDK 연동 지점
+  // window.PortOne.requestPayment(...) 결과를 반환하도록 구현
+  await loadPortOneSdk();
+  return new Promise((resolve, reject) => {
+    if (!window.PortOne) {
+      reject(new Error("PortOne SDK가 로드되지 않았습니다."));
+      return;
+    }
+    if (!PORTONE_STORE_ID || !PORTONE_CHANNEL_KEY) {
+      reject(
+        new Error("PortOne 설정값이 누락되었습니다. 관리자에게 문의해 주세요.")
+      );
+      return;
+    }
+    const openTypeValue =
+      PORTONE_OPEN_TYPE === "popup" || PORTONE_OPEN_TYPE === "iframe"
+        ? PORTONE_OPEN_TYPE
+        : "popup";
+    const redirectParams = new URLSearchParams({
+      reservationId: String(reservationId || ""),
+      totalAmount: String(amount),
+      type: paymentType.value,
+      paymentId: merchantUid,
+    });
+    const redirectUrl = `${
+      window.location.origin
+    }/restaurant/${restaurantId}/confirmation?${redirectParams.toString()}`;
+    window.PortOne.requestPayment(
+      {
+        storeId: PORTONE_STORE_ID,
+        channelKey: PORTONE_CHANNEL_KEY,
+        paymentId: merchantUid,
+        orderName: isDepositOnly.value ? "예약금 결제" : "선결제",
+        totalAmount: amount,
+        currency: "KRW",
+        payMethod: "CARD",
+        openType: openTypeValue,
+        redirectUrl,
+      },
+      (response) => {
+        if (response?.error) {
+          reject(new Error(response.error.message || "결제에 실패했습니다."));
+          return;
+        }
+        resolve(response);
+      }
+    );
+  });
+};
 
 //선주문 메뉴 합계 전달
-const handlePayment = () => {
-  router.push({
-    path: `/restaurant/${restaurantId}/confirmation`,
-    query: {
-      type: paymentType.value,              // 'deposit' or 'full'
-      totalAmount: String(totalAmount.value), // 숫자를 값으로 넘겨
-      partySize: String(route.query.partySize ?? ''),
-      requestNote: String(route.query.requestNote ?? ''),
-      dateIndex: String(route.query.dateIndex ?? ''),
-      time: String(route.query.time ?? ''),
-    },
-  });
+const handlePayment = async () => {
+  if (!canProceed.value) return;
+  errorMessage.value = "";
+  isProcessing.value = true;
+
+  try {
+    const currentReservationId =
+      reservationId.value || (import.meta.env.DEV ? "7" : null); // 테스트용으로 7을 넣고 하자
+    if (!currentReservationId) {
+      throw new Error("예약 정보가 없습니다. 다시 예약 과정을 진행해 주세요.");
+    }
+
+    // TODO: 임시 예약 생성이 완료되었다고 가정하고 이 블록은 비워둡니다.
+    // (임시 예약 생성/슬롯 락은 다른 담당에서 구현)
+
+    const paymentTypeValue = isDepositOnly.value ? "DEPOSIT" : "PREPAID_FOOD";
+    const paymentRes = await axios.post(
+      `/api/reservations/${currentReservationId}/payments`,
+      {
+        paymentType: paymentTypeValue,
+        amount: totalAmount.value,
+        method: selectedPayment.value === "card" ? "CARD" : "UNKNOWN",
+        idempotencyKey: createIdempotencyKey(),
+      }
+    );
+
+    const { merchantUid, amount } = paymentRes.data;
+
+    const paymentPromise = requestPayment({
+      merchantUid,
+      amount,
+      reservationId: currentReservationId,
+    });
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(
+        () =>
+          reject(new Error("결제 시간이 초과되었습니다. 다시 시도해 주세요.")),
+        PAYMENT_TIMEOUT_MS
+      );
+    });
+
+    const portoneResult = await Promise.race([paymentPromise, timeoutPromise]);
+
+    await axios.post("/api/payments/portone/complete", {
+      merchantUid,
+      impUid:
+        portoneResult.imp_uid ||
+        portoneResult.impUid ||
+        portoneResult.txId ||
+        portoneResult.transactionId,
+      paidAmount: amount,
+    });
+
+    router.push({
+      path: `/restaurant/${restaurantId}/confirmation`,
+      query: {
+        type: paymentType.value,
+        totalAmount: String(totalAmount.value),
+        partySize: String(route.query.partySize ?? ""),
+        requestNote: String(route.query.requestNote ?? ""),
+        dateIndex: String(route.query.dateIndex ?? ""),
+        time: String(route.query.time ?? ""),
+        reservationId: String(currentReservationId),
+      },
+    });
+  } catch (error) {
+    const message = error?.message || "결제 처리 중 오류가 발생했습니다.";
+    errorMessage.value = message;
+
+    try {
+      if (message.includes("초과")) {
+        await axios.post(
+          `/api/reservations/${reservationId.value}/payments/expire`
+        );
+      } else {
+        await axios.post("/api/payments/portone/fail", {
+          reservationId: reservationId.value,
+          reason: message,
+        });
+      }
+    } catch (callbackError) {
+      console.error("결제 실패/만료 콜백 처리 실패", callbackError);
+    }
+  } finally {
+    isProcessing.value = false;
+  }
 };
 
 const backTarget = computed(() => {
@@ -267,7 +463,7 @@ const backTarget = computed(() => {
     return {
       path: `/restaurant/${restaurantId}/booking`,
       query: {
-        type: 'reservation',
+        type: "reservation",
         partySize: route.query.partySize,
         requestNote: route.query.requestNote,
         dateIndex: route.query.dateIndex,
@@ -280,7 +476,7 @@ const backTarget = computed(() => {
   return {
     path: `/restaurant/${restaurantId}/menu`,
     query: {
-      type: 'preorder',
+      type: "preorder",
       partySize: route.query.partySize,
       requestNote: route.query.requestNote,
       dateIndex: route.query.dateIndex,
@@ -300,7 +496,7 @@ const backTarget = computed(() => {
         </button>
 
         <h1 class="font-semibold text-[#1e3a5f] text-base">
-          {{ isDepositOnly ? '예약금 결제' : '결제하기' }}
+          {{ isDepositOnly ? "예약금 결제" : "결제하기" }}
         </h1>
       </div>
     </header>
@@ -309,8 +505,12 @@ const backTarget = computed(() => {
       <!-- Payment Amount -->
       <div class="bg-white px-4 py-6 border-b border-[#e9ecef]">
         <div class="text-center">
-          <p class="text-sm text-[#6c757d] mb-2">{{ isDepositOnly ? '예약금' : '최종 결제 금액' }}</p>
-          <p class="text-3xl font-bold text-[#1e3a5f]">{{ totalAmount.toLocaleString() }}원</p>
+          <p class="text-sm text-[#6c757d] mb-2">
+            {{ isDepositOnly ? "예약금" : "최종 결제 금액" }}
+          </p>
+          <p class="text-3xl font-bold text-[#1e3a5f]">
+            {{ totalAmount.toLocaleString() }}원
+          </p>
           <p v-if="isDepositOnly" class="text-xs text-[#6c757d] mt-2">
             * 예약금은 이용 완료 시 돌려드리며, 노쇼 시 환불되지 않습니다
           </p>
@@ -321,12 +521,18 @@ const backTarget = computed(() => {
       <div class="bg-white px-4 py-5 border-b border-[#e9ecef]">
         <div class="flex items-center justify-between mb-2">
           <h2 class="text-base font-semibold text-[#1e3a5f]">요청사항</h2>
-          <span v-if="isBookingLoading" class="text-xs text-[#6c757d]">불러오는 중...</span>
+          <span v-if="isBookingLoading" class="text-xs text-[#6c757d]"
+            >불러오는 중...</span
+          >
         </div>
 
         <div class="rounded-xl border border-[#e9ecef] bg-[#f8f9fa] px-3 py-3">
           <p class="text-sm text-[#495057] whitespace-pre-line">
-            {{ bookingSummary.requestNote?.trim() ? bookingSummary.requestNote : '-' }}
+            {{
+              bookingSummary.requestNote?.trim()
+                ? bookingSummary.requestNote
+                : "-"
+            }}
           </p>
         </div>
 
@@ -337,30 +543,54 @@ const backTarget = computed(() => {
 
       <!-- Payment Method Selection -->
       <div class="px-4 py-5">
-        <h2 class="text-base font-semibold text-[#1e3a5f] mb-4">결제 수단 선택</h2>
+        <h2 class="text-base font-semibold text-[#1e3a5f] mb-4">
+          결제 수단 선택
+        </h2>
         <div class="space-y-3">
           <button
             v-for="method in paymentMethods"
             :key="method.id"
             @click="selectedPayment = method.id"
-            :class="`w-full text-left transition-all ${selectedPayment === method.id ? 'ring-2 ring-[#ff6b4a]' : ''}`"
+            :class="`w-full text-left transition-all ${
+              selectedPayment === method.id ? 'ring-2 ring-[#ff6b4a]' : ''
+            }`"
           >
-            <Card class="p-4 border-[#e9ecef] rounded-xl bg-white shadow-card hover:shadow-md">
+            <Card
+              class="p-4 border-[#e9ecef] rounded-xl bg-white shadow-card hover:shadow-md"
+            >
               <div class="flex items-center gap-3">
                 <div
                   :class="`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    selectedPayment === method.id ? 'gradient-primary' : 'bg-[#f8f9fa]'
+                    selectedPayment === method.id
+                      ? 'gradient-primary'
+                      : 'bg-[#f8f9fa]'
                   }`"
                 >
-                  <component :is="iconComponents[method.iconName]" :class="`w-6 h-6 ${selectedPayment === method.id ? 'text-white' : 'text-[#6c757d]'}`" />
+                  <component
+                    :is="iconComponents[method.iconName]"
+                    :class="`w-6 h-6 ${
+                      selectedPayment === method.id
+                        ? 'text-white'
+                        : 'text-[#6c757d]'
+                    }`"
+                  />
                 </div>
                 <div class="flex-1">
-                  <p :class="`font-semibold mb-0.5 ${selectedPayment === method.id ? 'text-[#ff6b4a]' : 'text-[#1e3a5f]'}`">
+                  <p
+                    :class="`font-semibold mb-0.5 ${
+                      selectedPayment === method.id
+                        ? 'text-[#ff6b4a]'
+                        : 'text-[#1e3a5f]'
+                    }`"
+                  >
                     {{ method.name }}
                   </p>
                   <p class="text-xs text-[#6c757d]">{{ method.description }}</p>
                 </div>
-                <div v-if="selectedPayment === method.id" class="w-6 h-6 rounded-full gradient-primary flex items-center justify-center flex-shrink-0">
+                <div
+                  v-if="selectedPayment === method.id"
+                  class="w-6 h-6 rounded-full gradient-primary flex items-center justify-center flex-shrink-0"
+                >
                   <Check class="w-4 h-4 text-white" />
                 </div>
               </div>
@@ -373,30 +603,67 @@ const backTarget = computed(() => {
       <div class="px-4 py-5 bg-white border-t border-b border-[#e9ecef]">
         <h2 class="text-base font-semibold text-[#1e3a5f] mb-4">약관 동의</h2>
         <div class="space-y-3">
-          <label :class="`flex items-start gap-3 cursor-pointer group rounded-xl p-2 -m-2 transition-colors ${agreedToTerms ? 'bg-[#fff5f3]' : ''}`">
+          <label
+            :class="`flex items-start gap-3 cursor-pointer group rounded-xl p-2 -m-2 transition-colors ${
+              agreedToTerms ? 'bg-[#fff5f3]' : ''
+            }`"
+          >
             <div class="relative flex-shrink-0 mt-0.5">
               <input type="checkbox" v-model="agreedToTerms" class="sr-only" />
-              <div :class="`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${agreedToTerms ? 'bg-[#ff6b4a] border-[#ff6b4a]' : 'bg-white border-[#dee2e6]'} group-hover:border-[#ff6b4a]`">
+              <div
+                :class="`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                  agreedToTerms
+                    ? 'bg-[#ff6b4a] border-[#ff6b4a]'
+                    : 'bg-white border-[#dee2e6]'
+                } group-hover:border-[#ff6b4a]`"
+              >
                 <Check v-if="agreedToTerms" class="w-3.5 h-3.5 text-white" />
               </div>
             </div>
             <div class="flex-1">
-              <p class="text-sm text-[#1e3a5f] font-medium mb-0.5">(필수) 서비스 이용약관 동의</p>
-              <button type="button" @click.stop="openModal('terms')" class="text-xs text-[#6c757d] underline hover:text-[#ff6b4a]">자세히 보기</button> <!--이용약관 모달 버튼-->
+              <p class="text-sm text-[#1e3a5f] font-medium mb-0.5">
+                (필수) 서비스 이용약관 동의
+              </p>
+              <button
+                type="button"
+                @click.stop="openModal('terms')"
+                class="text-xs text-[#6c757d] underline hover:text-[#ff6b4a]"
+              >
+                자세히 보기
+              </button>
+              <!--이용약관 모달 버튼-->
             </div>
           </label>
 
-          <label :class="`flex items-start gap-3 cursor-pointer group rounded-xl p-2 -m-2 transition-colors ${agreedToRefund ? 'bg-[#fff5f3]' : ''}`">
+          <label
+            :class="`flex items-start gap-3 cursor-pointer group rounded-xl p-2 -m-2 transition-colors ${
+              agreedToRefund ? 'bg-[#fff5f3]' : ''
+            }`"
+          >
             <div class="relative flex-shrink-0 mt-0.5">
               <input type="checkbox" v-model="agreedToRefund" class="sr-only" />
-              <div :class="`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${agreedToRefund ? 'bg-[#ff6b4a] border-[#ff6b4a]' : 'bg-white border-[#dee2e6]'} group-hover:border-[#ff6b4a]`">
+              <div
+                :class="`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                  agreedToRefund
+                    ? 'bg-[#ff6b4a] border-[#ff6b4a]'
+                    : 'bg-white border-[#dee2e6]'
+                } group-hover:border-[#ff6b4a]`"
+              >
                 <Check v-if="agreedToRefund" class="w-3.5 h-3.5 text-white" />
               </div>
             </div>
             <div class="flex-1">
-              <p class="text-sm text-[#1e3a5f] font-medium mb-0.5">(필수) 취소 및 환불 정책 동의</p>
+              <p class="text-sm text-[#1e3a5f] font-medium mb-0.5">
+                (필수) 취소 및 환불 정책 동의
+              </p>
               <!--이용약관 모달 버튼-->
-              <button type="button" @click.stop="openModal('refund')" class="text-xs text-[#6c757d] underline hover:text-[#ff6b4a]">자세히 보기</button>
+              <button
+                type="button"
+                @click.stop="openModal('refund')"
+                class="text-xs text-[#6c757d] underline hover:text-[#ff6b4a]"
+              >
+                자세히 보기
+              </button>
             </div>
           </label>
         </div>
@@ -410,7 +677,10 @@ const backTarget = computed(() => {
             <template v-if="isDepositOnly">
               <li>• 예약금 결제 후 즉시 예약이 확정됩니다.</li>
               <li>• 예약금은 이용 완료 확인 시 돌려드립니다.</li>
-              <li>• 취소는 방문 1일 전까지 가능하며, 당일 취소 및 노쇼 시 환불 정책에 따라 환불 됩니다.</li>
+              <li>
+                • 취소는 방문 1일 전까지 가능하며, 당일 취소 및 노쇼 시 환불
+                정책에 따라 환불 됩니다.
+              </li>
               <li>• 예약 변경 시 취소 후 재예약 해주시길 바랍니다.</li>
               <li>• 취소 후 재예약시 환불 정책에 따라 환불 됩니다.</li>
             </template>
@@ -425,38 +695,64 @@ const backTarget = computed(() => {
     </main>
 
     <!-- Terms Modal -->
-  <div v-if="isTermsModalOpen" class="fixed inset-0 z-[999]">
-  <!-- Backdrop -->
-  <div class="absolute inset-0 bg-black/40" @click="closeModal"></div>
+    <div v-if="isTermsModalOpen" class="fixed inset-0 z-[999]">
+      <!-- Backdrop -->
+      <div class="absolute inset-0 bg-black/40" @click="closeModal"></div>
 
-  <!-- Modal -->
-    <div class="absolute left-1/2 top-1/2 w-[calc(100%-32px)] max-w-[500px] -translate-x-1/2 -translate-y-1/2">
-      <Card class="p-5 rounded-2xl bg-white border-[#e9ecef] shadow-lg">
-        <div class="flex items-start justify-between gap-3">
-          <h3 class="text-base font-semibold text-[#1e3a5f]">{{ modalTitle }}</h3>
-          <button type="button" class="text-sm text-[#6c757d] hover:text-[#ff6b4a]" @click="closeModal">닫기</button>
-        </div>
+      <!-- Modal -->
+      <div
+        class="absolute left-1/2 top-1/2 w-[calc(100%-32px)] max-w-[500px] -translate-x-1/2 -translate-y-1/2"
+      >
+        <Card class="p-5 rounded-2xl bg-white border-[#e9ecef] shadow-lg">
+          <div class="flex items-start justify-between gap-3">
+            <h3 class="text-base font-semibold text-[#1e3a5f]">
+              {{ modalTitle }}
+            </h3>
+            <button
+              type="button"
+              class="text-sm text-[#6c757d] hover:text-[#ff6b4a]"
+              @click="closeModal"
+            >
+              닫기
+            </button>
+          </div>
 
-        <div class="mt-3 max-h-[60vh] overflow-auto text-sm text-[#495057] leading-relaxed whitespace-pre-line">
-          {{ modalContent }}
-        </div>
+          <div
+            class="mt-3 max-h-[60vh] overflow-auto text-sm text-[#495057] leading-relaxed whitespace-pre-line"
+          >
+            {{ modalContent }}
+          </div>
 
-        <div class="mt-4">
-          <Button type="button" class="w-full h-11 gradient-primary text-white font-semibold rounded-xl" @click="closeModal">확인</Button>
-        </div>
-      </Card>
+          <div class="mt-4">
+            <Button
+              type="button"
+              class="w-full h-11 gradient-primary text-white font-semibold rounded-xl"
+              @click="closeModal"
+              >확인</Button
+            >
+          </div>
+        </Card>
+      </div>
     </div>
-  </div>
 
     <!-- Fixed Bottom Button -->
-    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e9ecef] z-50 shadow-lg">
+    <div
+      class="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e9ecef] z-50 shadow-lg"
+    >
       <div class="max-w-[500px] mx-auto px-4 py-3">
+        <p v-if="errorMessage" class="mb-2 text-xs text-red-500">
+          {{ errorMessage }}
+        </p>
         <Button
           @click="handlePayment"
           :disabled="!canProceed"
           class="w-full h-12 gradient-primary text-white font-semibold text-base rounded-xl shadow-button-hover hover:shadow-button-pressed disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {{ totalAmount.toLocaleString() }}원 결제하기
+          {{
+            isProcessing
+              ? "결제 진행 중..."
+              : `${totalAmount.toLocaleString()}원 결제하기`
+          }}
         </Button>
       </div>
     </div>
