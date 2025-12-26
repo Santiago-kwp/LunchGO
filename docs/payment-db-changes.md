@@ -121,6 +121,7 @@ public enum ReservationStatus {
 - 선결제 성공: `PREPAID_CONFIRMED`
 - 결제 만료: `EXPIRED`
 - 취소 완료: `CANCELLED`
+- 결제 요청 시작 기록: `READY` → `REQUESTED` (`/api/payments/portone/requested`)
 
 ## 4) 상태 전이표
 

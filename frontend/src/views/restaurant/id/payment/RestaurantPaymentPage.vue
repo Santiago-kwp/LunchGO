@@ -397,6 +397,14 @@ const handlePayment = async () => {
 
     const { merchantUid, amount } = paymentRes.data;
 
+    try {
+      await axios.post("/api/payments/portone/requested", {
+        merchantUid,
+      });
+    } catch (requestError) {
+      console.warn("결제 요청 시작 기록 실패", requestError);
+    }
+
     const paymentPromise = requestPayment({
       merchantUid,
       amount,

@@ -26,9 +26,24 @@ BODY=$(cat <<JSON
 {"type":"${EVENT_TYPE}","timestamp":"${TIMESTAMP_ISO}","data":{"storeId":"${STORE_ID}","paymentId":"${PAYMENT_ID}","transactionId":"${TRANSACTION_ID}"}}
 JSON
 )
+BODY="${BODY%$'\n'}"
 
 SIGNING_PAYLOAD="${WEBHOOK_ID}.${WEBHOOK_TS}.${BODY}"
-SIG=$(printf "%s" "$SIGNING_PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" -binary | openssl base64)
+
+KEY_STRIPPED="${WEBHOOK_SECRET}"
+if [[ "$KEY_STRIPPED" == whsec_* ]]; then
+  KEY_STRIPPED="${KEY_STRIPPED#whsec_}"
+fi
+
+if decoded=$(printf "%s" "$KEY_STRIPPED" | base64 --decode 2>/dev/null); then
+  KEY_HEX=$(printf "%s" "$KEY_STRIPPED" | base64 --decode | xxd -p -c 256)
+  SIG=$(printf "%s" "$SIGNING_PAYLOAD" | openssl dgst -sha256 -mac HMAC -macopt hexkey:"$KEY_HEX" -binary | openssl base64)
+elif decoded=$(printf "%s" "$KEY_STRIPPED" | base64 -D 2>/dev/null); then
+  KEY_HEX=$(printf "%s" "$KEY_STRIPPED" | base64 -D | xxd -p -c 256)
+  SIG=$(printf "%s" "$SIGNING_PAYLOAD" | openssl dgst -sha256 -mac HMAC -macopt hexkey:"$KEY_HEX" -binary | openssl base64)
+else
+  SIG=$(printf "%s" "$SIGNING_PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" -binary | openssl base64)
+fi
 
 curl -i -X POST "${BASE_URL}/api/payments/portone/webhook" \
   -H "Content-Type: application/json" \

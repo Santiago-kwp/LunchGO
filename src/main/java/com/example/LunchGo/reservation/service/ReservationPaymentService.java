@@ -19,11 +19,13 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ReservationPaymentService {
     private static final String PAYMENT_STATUS_READY = "READY";
     private static final String PAYMENT_STATUS_REQUESTED = "REQUESTED";
@@ -48,19 +50,26 @@ public class ReservationPaymentService {
             throw new IllegalArgumentException("결제 금액이 예약 정보와 일치하지 않습니다.");
         }
 
+        if (request.getIdempotencyKey() != null && !request.getIdempotencyKey().isBlank()) {
+            Optional<Payment> idempotentPayment = paymentRepository.findByIdempotencyKey(request.getIdempotencyKey());
+            if (idempotentPayment.isPresent()) {
+                Payment payment = idempotentPayment.get();
+                if (!payment.getReservationId().equals(reservationId)
+                    || !payment.getPaymentType().equals(request.getPaymentType())
+                    || !payment.getAmount().equals(request.getAmount())) {
+                    throw new IllegalArgumentException("이미 처리된 결제 요청입니다.");
+                }
+                return toCreateResponse(payment);
+            }
+        }
+
         Optional<Payment> existing = paymentRepository.findByReservationIdAndPaymentType(
             reservationId,
             request.getPaymentType()
         );
         if (existing.isPresent()) {
             Payment payment = existing.get();
-            return CreatePaymentResponse.builder()
-                .paymentId(payment.getPaymentId())
-                .merchantUid(payment.getMerchantUid())
-                .amount(payment.getAmount())
-                .pgProvider(payment.getPgProvider())
-                .currency(payment.getCurrency())
-                .build();
+            return toCreateResponse(payment);
         }
 
         String merchantUid = "RSV-" + reservationId + "-" + System.currentTimeMillis();
@@ -79,13 +88,29 @@ public class ReservationPaymentService {
             .build();
 
         Payment saved = paymentRepository.save(payment);
-        return CreatePaymentResponse.builder()
-            .paymentId(saved.getPaymentId())
-            .merchantUid(saved.getMerchantUid())
-            .amount(saved.getAmount())
-            .pgProvider(saved.getPgProvider())
-            .currency(saved.getCurrency())
-            .build();
+        return toCreateResponse(saved);
+    }
+
+    @Transactional
+    public void markPaymentRequested(String merchantUid) {
+        if (merchantUid == null || merchantUid.isBlank()) {
+            log.warn("결제 요청 시작 기록 실패: merchantUid 누락");
+            throw new IllegalArgumentException("결제 정보를 찾을 수 없습니다.");
+        }
+
+        Optional<Payment> paymentOptional = paymentRepository.findByMerchantUid(merchantUid);
+        if (paymentOptional.isEmpty()) {
+            log.warn("결제 요청 시작 기록 실패: 결제 정보 없음 (merchantUid={})", merchantUid);
+            throw new IllegalArgumentException("결제 정보를 찾을 수 없습니다.");
+        }
+        Payment payment = paymentOptional.get();
+
+        if (PAYMENT_STATUS_READY.equals(payment.getStatus())) {
+            payment.setStatus(PAYMENT_STATUS_REQUESTED);
+            payment.setRequestedAt(LocalDateTime.now());
+        } else {
+            log.warn("결제 요청 시작 기록 스킵: 상태={} (merchantUid={})", payment.getStatus(), merchantUid);
+        }
     }
 
     @Transactional
@@ -368,5 +393,15 @@ public class ReservationPaymentService {
         }
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy. MM. dd. HH:mm");
         return approvedAt.format(formatter);
+    }
+
+    private CreatePaymentResponse toCreateResponse(Payment payment) {
+        return CreatePaymentResponse.builder()
+            .paymentId(payment.getPaymentId())
+            .merchantUid(payment.getMerchantUid())
+            .amount(payment.getAmount())
+            .pgProvider(payment.getPgProvider())
+            .currency(payment.getCurrency())
+            .build();
     }
 }

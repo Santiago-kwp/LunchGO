@@ -13,22 +13,23 @@ flowchart TD
   C --> E[결제 요청 생성<br/>payments READY]
   D --> E
 
-  E --> F[PG 결제 요청<br/>payments REQUESTED]
-  F -->|승인 성공| G[결제 승인 처리<br/>imp_uid, pg_tid 저장]
-  F -->|승인 실패| H[결제 실패 처리<br/>payments FAILED]
+  E --> F[결제 요청 시작 기록<br/>payments REQUESTED]
+  F --> G[PG 결제 요청]
+  G -->|승인 성공| H[결제 승인 처리<br/>imp_uid, pg_tid 저장]
+  G -->|승인 실패| I[결제 실패 처리<br/>payments FAILED]
 
-  G --> I{결제 타입}
-  I -->|예약금| J[예약 CONFIRMED]
-  I -->|선결제| K[예약 PREPAID_CONFIRMED]
+  H --> J{결제 타입}
+  J -->|예약금| K[예약 CONFIRMED]
+  J -->|선결제| L[예약 PREPAID_CONFIRMED]
 
-  J --> L[예약 완료]
-  K --> L
+  K --> M[예약 완료]
+  L --> M
 
-  L --> M{취소/환불 발생?}
-  M -->|아니오| N[종료]
-  M -->|예| O[환불 요청<br/>refunds REQUESTED]
-  O --> P[환불 승인 처리<br/>refunds SUCCEEDED]
-  P --> Q[예약 CANCELLED]
+  M --> N{취소/환불 발생?}
+  N -->|아니오| O[종료]
+  N -->|예| P[환불 요청<br/>refunds REQUESTED]
+  P --> Q[환불 승인 처리<br/>refunds SUCCEEDED]
+  Q --> R[예약 CANCELLED]
 ```
 
 ## 주요 API 단계 요약
@@ -42,16 +43,20 @@ flowchart TD
    - `payments` 생성 (`READY`)
    - `merchant_uid`, `idempotency_key` 부여
 
-3) PG 결제 요청/응답 처리
-   - 요청 시: `REQUESTED`
-   - 승인 시: `PAID`, `imp_uid`, `pg_tid` 저장
+3) 결제 요청 시작 기록
+   - `/api/payments/portone/requested`
+   - `payments.status=REQUESTED`, `requested_at` 업데이트
+
+4) PG 결제 요청/응답 처리
+   - 승인 시: `/payments/portone/complete` 처리, 웹훅과 상태 동기화
+   - `PAID`, `imp_uid`, `pg_tid` 저장
    - 실패 시: `FAILED`
 
-4) 예약 상태 전이
+5) 예약 상태 전이
    - 예약금 승인: `CONFIRMED`
    - 선결제 승인: `PREPAID_CONFIRMED`
 
-5) 취소/환불
+6) 취소/환불
    - 환불 시: `refunds` 생성 및 상태 업데이트
    - 예약 상태: `CANCELLED`
 

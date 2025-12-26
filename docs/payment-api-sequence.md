@@ -19,11 +19,16 @@ sequenceDiagram
   A->>D: payments 생성(READY, merchant_uid, idempotency_key)
   A-->>U: 결제 요청 정보 반환
 
+  U->>A: 결제 요청 시작 기록(/payments/portone/requested)
+  A->>D: payments 업데이트(REQUESTED)
+
   U->>P: 결제 진행(merchant_uid)
-  P-->>A: 결제 승인 콜백(imp_uid, pg_tid, amount)
+  P-->>U: 결제 결과 응답
+  U->>A: 결제 완료 콜백(/payments/portone/complete)
   A->>D: payments 업데이트(PAID)
   A->>D: reservations 상태 변경(CONFIRMED)
-  A-->>U: 결제 완료 응답
+  P-->>A: 웹훅(Transaction.Paid)
+  A->>D: payments 상태 동기화(PAID)
 ```
 
 ## 선결제 시퀀스
@@ -43,11 +48,16 @@ sequenceDiagram
   A->>D: payments 생성(READY, merchant_uid, idempotency_key)
   A-->>U: 결제 요청 정보 반환
 
+  U->>A: 결제 요청 시작 기록(/payments/portone/requested)
+  A->>D: payments 업데이트(REQUESTED)
+
   U->>P: 결제 진행(merchant_uid)
-  P-->>A: 결제 승인 콜백(imp_uid, pg_tid, amount)
+  P-->>U: 결제 결과 응답
+  U->>A: 결제 완료 콜백(/payments/portone/complete)
   A->>D: payments 업데이트(PAID)
   A->>D: reservations 상태 변경(PREPAID_CONFIRMED)
-  A-->>U: 결제 완료 응답
+  P-->>A: 웹훅(Transaction.Paid)
+  A->>D: payments 상태 동기화(PAID)
 ```
 
 ## 참고
