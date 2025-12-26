@@ -2,6 +2,7 @@
 import { computed, ref, onMounted } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import { ArrowLeft, Check } from "lucide-vue-next";
+import axios from "axios";
 import Button from "@/components/ui/Button.vue";
 import Card from "@/components/ui/Card.vue";
 
@@ -46,13 +47,17 @@ const isSummaryLoading = ref(false);
 const fetchReservationSummary = async () => {
   isSummaryLoading.value = true;
   try {
-    reservationSummary.value.restaurantName = String(route.query.restaurantName ?? "식당명(더미)");
-    reservationSummary.value.address = String(route.query.address ?? "주소(더미)");
-    reservationSummary.value.date = String(route.query.date ?? "2025-12-24");
-    reservationSummary.value.time = String(route.query.time ?? "18:00");
-    reservationSummary.value.partySize = String(route.query.partySize ?? "2");
-    reservationSummary.value.paymentType = String(route.query.type ?? "deposit");
-    reservationSummary.value.paidAmount = String(route.query.amount ?? "10000");
+    const response = await axios.get(`/api/reservations/${reservationId.value}/summary`);
+    const data = response?.data || {};
+    reservationSummary.value = {
+      restaurantName: data.restaurant?.name || "",
+      address: data.restaurant?.address || "",
+      date: data.booking?.date || "",
+      time: data.booking?.time || "",
+      partySize: String(data.booking?.partySize ?? ""),
+      paymentType: data.payment?.type || "",
+      paidAmount: String(data.payment?.amount ?? ""),
+    };
   } finally {
     isSummaryLoading.value = false;
   }
@@ -182,9 +187,8 @@ const canSubmit = computed(() => {
 });
 
 async function cancelReservation(id, payload) {
-  // 백엔드 연동 시 여기만 바꾸면 됨
-  // await reservationApi.cancelReservation(id, payload);
-  return { ok: true };
+  const response = await axios.post(`/api/reservations/${id}/cancel`, payload);
+  return response?.data;
 }
 
 const submitCancel = async () => {

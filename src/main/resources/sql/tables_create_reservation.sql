@@ -97,7 +97,7 @@ CREATE TABLE `reservation_menu_items` (
 
 
 
-# drop table payments;
+drop table if exists payments;
 CREATE TABLE `payments` (
                             `payment_id`      BIGINT NOT NULL AUTO_INCREMENT COMMENT '결제ID(PK)',
                             `reservation_id`  BIGINT NOT NULL COMMENT '예약ID(FK)',
@@ -144,7 +144,7 @@ CREATE TABLE `payments` (
 
 
 
-# drop table refunds;
+drop table if exists refunds;
 CREATE TABLE `refunds` (
                            `refund_id`       BIGINT NOT NULL AUTO_INCREMENT COMMENT '환불ID(PK)',
                            `payment_id`      BIGINT NOT NULL COMMENT '결제ID(FK)',

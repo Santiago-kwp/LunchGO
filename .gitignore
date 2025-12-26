@@ -19,6 +19,10 @@ api_specification.csv
 docs/object-storage-manual.md
 .sample_images/
 
+## Frontend env
+frontend/.env
+frontend/.env.*
+
 
 ### STS ###
 .apt_generated
