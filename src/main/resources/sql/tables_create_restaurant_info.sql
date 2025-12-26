@@ -10,14 +10,26 @@ use lunchgo;
 DROP TABLE IF EXISTS search_tags;
 CREATE TABLE search_tags
 (
-    tag_id   BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '태그ID',
-    content  VARCHAR(50) NOT NULL COMMENT '태그 내용',
-    category VARCHAR(50) NOT NULL COMMENT '태그 카테고리',
+    tag_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '태그ID', -- (참고: 이전 파일명세와 맞추기 위해 tag_id -> search_tag_id로 변경 권장)
+    content       VARCHAR(50) NOT NULL COMMENT '태그 내용',
+    category      VARCHAR(50) NOT NULL COMMENT '태그 카테고리',
+
+    -- 1. 카테고리 유효성 검사 (기존 유지)
     CONSTRAINT chk_tag_category CHECK (category IN ('MENUTYPE', 'TABLETYPE', 'ATMOSPHERE', 'FACILITY', 'INGREDIENT'))
+
 ) COMMENT '검색태그';
 
--- 인덱스 추가
+-- 중복 태그 방지 (Unique Constraint) 추가
+ALTER TABLE search_tags
+    ADD CONSTRAINT uk_search_tags_content UNIQUE (content);
+
+-- 빈 문자열/공백 방지 (Check Constraint) 추가
+ALTER TABLE search_tags
+    ADD CONSTRAINT chk_tag_content_length CHECK (LENGTH(TRIM(content)) > 0);
+
+-- 인덱스 추가 (카테고리별 조회 성능 향상)
 CREATE INDEX idx_search_tags_category ON search_tags (category);
+
 
 -- 2. 식당
 DROP TABLE IF EXISTS restaurants;
