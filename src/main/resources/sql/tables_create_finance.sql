@@ -51,7 +51,7 @@ CREATE TABLE invoice_payments (
 # 식당 테이블 조인 없이 연체 식당 정보 바로 제공하기 위해,
 # 청구서 생성 시점에 식당 정보(이름, 연락처)를 별도 제공
 # 04. 청구현황 스냅샷 테이블
-DROP TABLE IF EXISTS Invoice_snapshot;
+DROP TABLE IF EXISTS invoice_snapshot;
 CREATE TABLE invoice_snapshot (
 invoice_id	bigint	NOT NULL PRIMARY KEY ,
 restaurant_id	bigint	NULL,
@@ -102,7 +102,6 @@ CREATE TABLE daily_global_finance (
     payment_success_cnt	int	NULL,
     payment_fail_cnt	int	NULL
 );
-
 
 
 

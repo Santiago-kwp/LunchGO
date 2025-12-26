@@ -5,11 +5,11 @@ ALTER TABLE reviews
 
 ALTER TABLE reviews
     ADD CONSTRAINT FK_Reviews_users
-        FOREIGN KEY (user_id) REFERENCES Users (user_id);
+        FOREIGN KEY (user_id) REFERENCES users (user_id);
 
 ALTER TABLE reviews
     ADD CONSTRAINT FK_Reviews_receipts
-        FOREIGN KEY (receipt_id) REFERENCES Receipts (receipt_id);
+        FOREIGN KEY (receipt_id) REFERENCES receipts (receipt_id);
 
 ALTER TABLE reviews
     ADD CONSTRAINT fk_reviews_blind_request_tag
@@ -22,7 +22,7 @@ ALTER TABLE review_tag_maps
 
 ALTER TABLE review_tag_maps
     ADD CONSTRAINT FK_review
-        FOREIGN KEY (review_id) REFERENCES Reviews(review_id)
+        FOREIGN KEY (review_id) REFERENCES reviews(review_id)
             ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE review_tag_maps
@@ -59,7 +59,6 @@ ALTER TABLE cafeteria_menus
     ADD CONSTRAINT fk_cafeteria_menus_users
         FOREIGN KEY (user_id) REFERENCES users(user_id)
             ON DELETE CASCADE ON UPDATE CASCADE;
-
 
 
 

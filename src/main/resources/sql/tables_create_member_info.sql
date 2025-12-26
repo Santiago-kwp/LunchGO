@@ -55,7 +55,7 @@ CREATE TABLE owners (
                             CHECK (status IN ('PENDING', 'ACTIVE', 'WITHDRAWAL'))
 );
 
-drop table if exists Managers;
+drop table if exists managers;
 
 CREATE TABLE managers (
                           manager_id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -81,15 +81,15 @@ CREATE TABLE staffs(
                        last_login_at DATETIME,
                        role CHAR(20) NOT NULL DEFAULT 'ROLE_STAFF',
                        owner_id BIGINT NOT NULL,
-                       FOREIGN KEY (owner_id) REFERENCES Owners(owner_id)
+                       FOREIGN KEY (owner_id) REFERENCES owners(owner_id)
 );
 
-CREATE TABLE Speciality_mappings (
+CREATE TABLE speciality_mappings (
                                      user_id BIGINT NOT NULL,
                                      speciality_id BIGINT NOT NULL,
                                      PRIMARY KEY (user_id, speciality_id),
-                                     FOREIGN KEY (user_id) REFERENCES users(user_id),
-                                     FOREIGN KEY (speciality_id) REFERENCES specialities(speciality_id)
+                           FOREIGN KEY (user_id) REFERENCES users(user_id),
+                           FOREIGN KEY (speciality_id) REFERENCES specialities(speciality_id)
 );
 
 
@@ -98,7 +98,7 @@ CREATE TABLE bookmarks (
                            user_id BIGINT NOT NULL,
                            restaurant_id BIGINT NOT NULL,
                            promotion_agree TINYINT NOT NULL DEFAULT 0,
-                           FOREIGN KEY (user_id) REFERENCES Users(user_id)
+                           FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
 -- 프로모션 받기 등록한 사용자 email 찾는 방법
@@ -113,5 +113,3 @@ WHERE r.owner_id = in_ownerId
   AND b.promotion_agree = 1;
 end ##
 delimiter ;
-
-

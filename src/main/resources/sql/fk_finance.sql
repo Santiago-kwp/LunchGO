@@ -38,7 +38,7 @@ ALTER TABLE restaurant_user_stats
 
 ALTER TABLE restaurant_user_stats
     ADD CONSTRAINT FK_Users_Restaurant_user_stats
-        FOREIGN KEY (user_id) REFERENCES Users (user_id);
+        FOREIGN KEY (user_id) REFERENCES users (user_id);
 
 ALTER TABLE restaurant_user_stats
     ADD CONSTRAINT FK_Restaurants_Restaurant_user_stats

@@ -17,7 +17,7 @@ CREATE TABLE `restaurant_reservation_slots` (
   KEY `idx_slot_lookup` (`restaurant_id`, `slot_date`, `slot_time`),
 
   CONSTRAINT `fk_slot_restaurant`
-    FOREIGN KEY (`restaurant_id`) REFERENCES `Restaurants`(`restaurant_id`)
+    FOREIGN KEY (`restaurant_id`) REFERENCES `restaurants`(`restaurant_id`)
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='예약 슬롯(락 대상 1행)';
 
@@ -35,9 +35,14 @@ CREATE TABLE `reservations` (
                                 `party_size`           INT NOT NULL COMMENT '예약 인원',
 
                                 `reservation_type`     VARCHAR(30) NOT NULL COMMENT '예약 유형(예: RESERVATION_DEPOSIT, PREORDER_PREPAY)',
-                                `status`               VARCHAR(20) NOT NULL DEFAULT 'TEMPORARY' COMMENT '예약 상태(예: TEMPORARY/CONFIRMED/...)',
+                                `status`               VARCHAR(20) NOT NULL DEFAULT 'TEMPORARY' COMMENT '예약 상태(TEMPORARY/CONFIRMED/PREPAID_CONFIRMED/EXPIRED/CANCELLED)',
 
                                 `request_message`      VARCHAR(50) NULL COMMENT '요청사항(최대 50자)',
+
+                                `deposit_amount`       INT NULL COMMENT '예약금 스냅샷(원)',
+                                `prepay_amount`        INT NULL COMMENT '선결제 합계 스냅샷(원)',
+                                `total_amount`         INT NULL COMMENT '총 결제 예정액 스냅샷(원)',
+                                `currency`             CHAR(3) NOT NULL DEFAULT 'KRW' COMMENT '통화(KRW)',
 
                                 `hold_expires_at`      DATETIME NULL COMMENT '홀드 만료(now+7분)',
                                 `payment_deadline_at`  DATETIME NULL COMMENT '결제 마감(PG요청+10분)',
@@ -58,7 +63,7 @@ CREATE TABLE `reservations` (
                                         ON DELETE RESTRICT,
 
                                 CONSTRAINT `fk_reservation_user`
-                                    FOREIGN KEY (`user_id`) REFERENCES `Users`(`user_id`)
+                                    FOREIGN KEY (`user_id`) REFERENCES `users`(`user_id`)
                                         ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='예약(슬롯 기반, 중복 컬럼 없음)';
 
@@ -86,7 +91,7 @@ CREATE TABLE `reservation_menu_items` (
                                                   ON DELETE CASCADE,
 
                                           CONSTRAINT `fk_rmi_menu`
-                                              FOREIGN KEY (`menu_id`) REFERENCES `Menus`(`menu_id`)
+                                              FOREIGN KEY (`menu_id`) REFERENCES `menus`(`menu_id`)
                                                   ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='선결제 주문 메뉴 항목(스냅샷)';
 
@@ -109,6 +114,11 @@ CREATE TABLE `payments` (
                             `pg_provider`     VARCHAR(50) NOT NULL COMMENT 'PG사',
                             `pg_payment_key`  VARCHAR(128) NULL COMMENT 'PG결제키',
                             `pg_order_id`     VARCHAR(64)  NULL COMMENT '주문번호(가맹점 주문번호)',
+                            `merchant_uid`    VARCHAR(64) NULL COMMENT '가맹점 주문번호(포트원)',
+                            `imp_uid`         VARCHAR(64) NULL COMMENT '포트원 결제 고유번호',
+                            `pg_tid`          VARCHAR(64) NULL COMMENT 'PG 거래 ID',
+                            `receipt_url`     VARCHAR(255) NULL COMMENT '영수증 URL',
+                            `idempotency_key` VARCHAR(64) NULL COMMENT '중복 방지 키',
 
                             `requested_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '결제요청시각',
                             `approved_at`     DATETIME NULL COMMENT '결제승인시각',
@@ -122,6 +132,10 @@ CREATE TABLE `payments` (
                             KEY `idx_payment_reservation` (`reservation_id`),
                             KEY `idx_payment_status` (`status`, `created_at`),
                             UNIQUE KEY `uk_pg_key` (`pg_provider`, `pg_payment_key`),
+                            UNIQUE KEY `uk_payments_merchant_uid` (`merchant_uid`),
+                            UNIQUE KEY `uk_payments_imp_uid` (`imp_uid`),
+                            UNIQUE KEY `uk_payments_idempotency` (`idempotency_key`),
+                            UNIQUE KEY `uk_reservation_payment_type` (`reservation_id`, `payment_type`),
 
                             CONSTRAINT `fk_payment_reservation`
                                 FOREIGN KEY (`reservation_id`) REFERENCES `reservations`(`reservation_id`)
@@ -136,7 +150,9 @@ CREATE TABLE `refunds` (
                            `payment_id`      BIGINT NOT NULL COMMENT '결제ID(FK)',
 
                            `requested_by`    VARCHAR(20) NOT NULL COMMENT '환불요청주체(USER/OWNER/ADMIN/SYSTEM)',
-                           `policy_case`     VARCHAR(30) NOT NULL COMMENT '정책케이스(DAY_BEFORE/SAME_DAY_BEFORE_2H/WITHIN_2H/NOSHOW/OWNER_FORCED/TIMEOUT)',
+                           `policy_case`     VARCHAR(30) NOT NULL COMMENT '정책케이스(DAY_BEFORE/SAME_DAY_BEFORE_2H/WITHIN_2H/NOSHOW/OWNER_FORCED/TIMEOUT/CORPORATE_CARD)',
+                           `payment_type`   VARCHAR(20) NOT NULL COMMENT '결제유형 스냅샷(DEPOSIT/PREPAID_FOOD)',
+                           `card_type`      VARCHAR(20) NOT NULL COMMENT '카드구분 스냅샷(PERSONAL/CORPORATE/UNKNOWN)',
 
                            `refund_rate`     DECIMAL(5,4) NOT NULL COMMENT '환불율(1.0000/0.5000/0.2000 등)',
 
