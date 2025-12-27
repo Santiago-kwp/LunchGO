@@ -20,4 +20,8 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, Long> {
     @Modifying
     @Query(value = "INSERT INTO restaurant_tag_maps (restaurant_id, tag_id) VALUES (:restaurantId, :tagId)", nativeQuery = true)
     void saveRestaurantTagMapping(@Param("restaurantId") Long restaurantId, @Param("tagId") Long tagId);
+
+    @Modifying
+    @Query(value = "DELETE FROM restaurant_tag_maps WHERE restaurant_id = :restaurantId", nativeQuery = true)
+    void deleteRestaurantTagMappingsByRestaurantId(@Param("restaurantId") Long restaurantId);
 }

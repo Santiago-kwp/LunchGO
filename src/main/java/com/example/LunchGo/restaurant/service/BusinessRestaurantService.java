@@ -10,6 +10,7 @@ import com.example.LunchGo.restaurant.entity.RegularHoliday;
 import com.example.LunchGo.restaurant.entity.Restaurant;
 import com.example.LunchGo.restaurant.repository.RegularHolidayRepository;
 import com.example.LunchGo.restaurant.repository.RestaurantRepository;
+import com.example.LunchGo.restaurant.dto.RestaurantUpdateRequest;
 import com.example.LunchGo.tag.entity.SearchTag;
 import com.example.LunchGo.tag.repository.SearchTagRepository;
 import lombok.RequiredArgsConstructor;
@@ -157,5 +158,57 @@ public class BusinessRestaurantService {
         }
 
         return newRestaurantId;
+    }
+
+    @Transactional
+    public RestaurantDetailResponse updateRestaurant(Long id, RestaurantUpdateRequest request) {
+        // 1. 식당 정보 조회
+        Restaurant restaurant = restaurantRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Restaurant not found with id: " + id));
+
+        // 2. 기본 정보 업데이트
+        restaurant.setName(request.getName());
+        restaurant.setPhone(request.getPhone());
+        restaurant.setRoadAddress(request.getRoadAddress());
+        restaurant.setDetailAddress(request.getDetailAddress());
+        restaurant.setDescription(request.getDescription());
+        restaurant.setReservationLimit(request.getReservationLimit());
+        restaurant.setHolidayAvailable(request.isHolidayAvailable());
+        restaurant.setPreorderAvailable(request.isPreorderAvailable());
+        restaurant.setOpenTime(LocalTime.parse(request.getOpenTime()));
+        restaurant.setCloseTime(LocalTime.parse(request.getCloseTime()));
+        restaurant.setOpenDate(request.getOpenDate());
+
+        // 3. TODO: 식당 이미지 정보 업데이트 (추후 구현)
+        // 이미지 파일 처리 로직 (e.g., S3 업로드 및 URL 업데이트) 필요
+
+        // 4. TODO: 식당 메뉴 정보 업데이트 (추후 구현)
+        // 메뉴 추가/수정/삭제 로직 필요
+
+        // 5. 정기 휴무일 업데이트 (기존 정보 삭제 후 새로 추가)
+        regularHolidayRepository.deleteAllByRestaurantId(id);
+        if (request.getRegularHolidayNumbers() != null && !request.getRegularHolidayNumbers().isEmpty()) {
+            request.getRegularHolidayNumbers().forEach(dayOfWeek -> {
+                RegularHoliday holiday = RegularHoliday.builder()
+                        .restaurantId(id)
+                        .dayOfWeek(dayOfWeek)
+                        .build();
+                regularHolidayRepository.save(holiday);
+            });
+        }
+
+        // 6. 태그 정보 업데이트 (기존 정보 삭제 후 새로 추가)
+        restaurantRepository.deleteRestaurantTagMappingsByRestaurantId(id);
+        if (request.getSelectedTagIds() != null && !request.getSelectedTagIds().isEmpty()) {
+            request.getSelectedTagIds().forEach(tagId -> {
+                restaurantRepository.saveRestaurantTagMapping(id, tagId);
+            });
+        }
+
+        // 변경된 내용을 DB에 즉시 반영하기 위해 save 호출
+        restaurantRepository.save(restaurant);
+
+        // 7. 업데이트된 전체 정보 다시 조회하여 반환
+        return getRestaurantDetail(id);
     }
 }
