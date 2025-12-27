@@ -25,7 +25,7 @@ public class BookmarkController {
 
     @DeleteMapping("/bookmark")
     public ResponseEntity<?> deleteBookmark(@RequestBody BookmarkInfo bookmarkInfo) {
-        if(bookmarkInfo.getUserId() == null || bookmarkInfo.getBookmarkId() == null) {
+        if(bookmarkInfo.getUserId() == null || bookmarkInfo.getRestaurantId() == null) {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
 

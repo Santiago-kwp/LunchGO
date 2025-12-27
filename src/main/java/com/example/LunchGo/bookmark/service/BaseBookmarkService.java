@@ -33,10 +33,10 @@ public class BaseBookmarkService implements BookmarkService {
     @Override
     @Transactional
     public void delete(BookmarkInfo bookmarkInfo) {
-        if(!bookmarkRepository.existsByBookmarkId(bookmarkInfo.getBookmarkId())) {
+        if(!bookmarkRepository.existsByUserIdAndRestaurantId(bookmarkInfo.getUserId(), bookmarkInfo.getRestaurantId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "즐겨찾기에 등록되어있지 않습니다.");
         }
 
-        bookmarkRepository.deleteByBookmarkId(bookmarkInfo.getBookmarkId(), bookmarkInfo.getUserId());
+        bookmarkRepository.deleteByRestaurantIdAndUserId(bookmarkInfo.getRestaurantId(), bookmarkInfo.getUserId());
     }
 }

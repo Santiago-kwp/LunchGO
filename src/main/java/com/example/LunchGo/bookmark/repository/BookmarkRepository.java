@@ -10,13 +10,11 @@ public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
      * 사용자 즐겨찾기 삭제
      * */
     @Modifying
-    @Query("DELETE FROM Bookmark b WHERE b.bookmarkId = :bookmarkId AND b.userId = :userId")
-    int deleteByBookmarkId(Long bookmarkId, Long userId);
+    @Query("DELETE FROM Bookmark b WHERE b.restaurantId = :restaurantId AND b.userId = :userId")
+    int deleteByRestaurantIdAndUserId(Long restaurantId, Long userId);
 
     /**
      * 즐겨찾기 여부 확인
      * */
-    boolean existsByBookmarkId(Long bookmarkId);
-
     boolean existsByUserIdAndRestaurantId(Long userId, Long restaurantId);
 }

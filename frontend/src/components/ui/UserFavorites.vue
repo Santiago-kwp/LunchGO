@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
-import { Heart, Star, Bell } from 'lucide-vue-next';
+import { Star, Bell } from 'lucide-vue-next';
+import FavoriteHeart from '@/components/ui/FavoriteHeart.vue';
 // import axios from 'axios'; // 실제 API 연동 시 주석 해제
 
 // 타입 정의
@@ -15,6 +16,7 @@ interface Restaurant {
   price: string;
   badgeColor: string;
   hasPromotion: boolean; // 프로모션 알림 수신 여부
+  isFavorite: boolean;
 }
 
 //api 호출 시 필요한 정보(변수명과 매핑)
@@ -57,6 +59,7 @@ const fetchFavorites = async () => {
         price: '18,000원 · 4인 ~ 12인',
         badgeColor: 'bg-emerald-500',
         hasPromotion: true, // 이미 알림 받는 중
+        isFavorite:true,
       },
       {
         id: 2,
@@ -68,6 +71,7 @@ const fetchFavorites = async () => {
         price: '15,000원 · 4인 ~ 10인',
         badgeColor: 'bg-emerald-600',
         hasPromotion: false, // 알림 안 받는 중
+        isFavorite: true,
       },
       {
         id: 3,
@@ -79,6 +83,7 @@ const fetchFavorites = async () => {
         price: '22,000원 · 4인 ~ 8인',
         badgeColor: 'bg-emerald-500',
         hasPromotion: false,
+        isFavorite: true,
       },
     ];
   } catch (error) {
@@ -93,12 +98,10 @@ onMounted(() => {
   fetchFavorites();
 });
 
-// 찜 해제 핸들러
-const toggleFavorite = async (id: number) => {
-  if (confirm('즐겨찾기에서 삭제하시겠습니까?')) {
-    favorites.value = favorites.value.filter((item) => item.id !== id);
-    // API 삭제 로직 추가 가능
-  }
+
+//찜 해제
+const handleRemoveFromList = (id:number) => {
+  favorites.value = favorites.value.filter(item => item.id !== id);
 };
 
 // [프로모션 토글 핸들러]
@@ -161,12 +164,13 @@ const handlePromotionToggle = async (restaurant: Restaurant) => {
               <div class="flex-1 min-w-0 flex flex-col justify-center">
                 <div class="flex items-start justify-between mb-1">
                   <h4 class="font-bold text-[#1e3a5f] text-sm truncate pr-2">{{ restaurant.name }}</h4>
-                  <button 
-                    @click.prevent="toggleFavorite(restaurant.id)"
-                    class="w-6 h-6 flex items-center justify-center hover:bg-gray-50 rounded-full -mt-1 -mr-1 transition-colors"
-                  >
-                    <Heart class="w-4 h-4 fill-[#ff6b4a] text-[#ff6b4a]" />
-                  </button>
+                  <div class="-mt-1 -mr-1">
+                    <FavoriteHeart
+                      :restaurant-id="restaurant.id"
+                      :initial-favorite="restaurant.isFavorite"
+                      @remove="handleRemoveFromList(restaurant.id)" 
+                    />
+                  </div>
                 </div>
                 
                 <div class="flex items-center gap-1 mb-1.5">
