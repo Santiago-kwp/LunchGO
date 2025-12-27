@@ -165,3 +165,54 @@ INSERT INTO review_tag_maps (review_id, tag_id) VALUES
    ================================================== */
 
 -- 리뷰 1번 이미지 (2장)
+
+
+/* ==================================================
+   6. 자동 생성 샘플 (restaurant_id 1~125)
+   - 식당당 0~10개 리뷰
+   - 리뷰 태그 1~3개 매핑
+   - 일부 리뷰에 이미지 1~2장 첨부
+   ================================================== */
+
+-- 6-1. 리뷰 자동 생성 (AUTO_INCREMENT 사용)
+INSERT INTO reviews (restaurant_id, user_id, receipt_id, rating, content, created_at, updated_at, status)
+SELECT
+    r.restaurant_id,
+    u.user_id AS user_id,
+    NULL,
+    3 + (s.n % 3) AS rating,
+    CONCAT('샘플 리뷰 ', r.restaurant_id, '-', s.n),
+    DATE_SUB(NOW(), INTERVAL (s.n + (r.restaurant_id % 7)) DAY),
+    DATE_SUB(NOW(), INTERVAL (s.n + (r.restaurant_id % 7)) DAY),
+    'PUBLIC'
+FROM restaurants r
+JOIN (
+    SELECT 1 AS n UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5
+    UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10
+) s ON s.n <= (r.restaurant_id % 11)
+JOIN (SELECT COUNT(*) AS cnt FROM users) user_cnt
+JOIN (
+    SELECT u.user_id, (@rownum := @rownum + 1) AS rn
+    FROM users u
+    CROSS JOIN (SELECT @rownum := 0) vars
+    ORDER BY u.user_id
+) u
+  ON u.rn = ((r.restaurant_id + s.n - 1) % user_cnt.cnt) + 1
+WHERE r.restaurant_id BETWEEN 1 AND 125;
+
+-- 6-2. 리뷰 태그 매핑/이미지 생성
+-- 아래 블록은 신규로 생성된 리뷰 ID를 선택해 태그/이미지를 매핑합니다.
+-- 필요 시 실행 전에 @review_seed_since 값을 기준으로 조정하세요.
+
+TRUNCATE TABLE review_tag_maps;
+SET @review_seed_since = DATE_SUB(NOW(), INTERVAL 7 DAY);
+
+INSERT INTO review_tag_maps (review_id, tag_id)
+SELECT
+    r.review_id,
+    ((r.restaurant_id + r.review_id + t.t) % 20) + 1 AS tag_id
+FROM reviews r
+JOIN (
+    SELECT 1 AS t UNION ALL SELECT 2 UNION ALL SELECT 3
+) t ON t.t <= ((r.restaurant_id + r.review_id) % 3) + 1
+WHERE r.created_at >= @review_seed_since;

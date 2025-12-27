@@ -9,3 +9,12 @@ mybatis:
   mapper-locations: classpath:mapper/*.xml
   # DTO 패키지 별칭 지정 (XML에서 패키지명 생략 가능)
   type-aliases-package: com.example.LunchGo.dto
+
+trend:
+  newbie-weight: ${TREND_NEWBIE_WEIGHT:50}
+  confirm-weight: ${TREND_CONFIRM_WEIGHT:0.8}
+  # 레거시 키 호환: confirm-weight 미설정 시 visit-weight 값을 사용합니다.
+  # 사용 순서: TREND_CONFIRM_WEIGHT -> TREND_VISIT_WEIGHT -> 기본값(0.8)
+  visit-weight: ${TREND_VISIT_WEIGHT:0.8}
+  view-weight: ${TREND_VIEW_WEIGHT:0.2}
+  default-image-url: ${TREND_DEFAULT_IMAGE_URL:/placeholder.svg}

@@ -76,6 +76,34 @@ INSERT INTO daily_restaurant_stats (stat_date, restaurant_id, view_count, try_co
 INSERT INTO daily_restaurant_stats (stat_date, restaurant_id, view_count, try_count, confirm_count, visit_count, defended_noshow_cnt, penalty_stl_amt, revenue_total) VALUES
     (CURDATE(), 2, 80, 5, 2, 0, 1, 20000, 0);
 
+-- 트렌딩 테스트용 추가 데이터 (최근 7일, 식당 1~5)
+INSERT INTO daily_restaurant_stats (stat_date, restaurant_id, view_count, try_count, confirm_count, visit_count, defended_noshow_cnt, penalty_stl_amt, revenue_total) VALUES
+    (DATE_SUB(CURDATE(), INTERVAL 2 DAY), 1, 120, 18, 14, 12, 0, 0, 1200000),
+    (DATE_SUB(CURDATE(), INTERVAL 3 DAY), 1, 90, 12, 10, 9, 0, 0, 900000),
+    (DATE_SUB(CURDATE(), INTERVAL 4 DAY), 1, 70, 10, 8, 7, 0, 0, 700000),
+    (DATE_SUB(CURDATE(), INTERVAL 5 DAY), 1, 60, 8, 6, 5, 0, 0, 600000),
+    (DATE_SUB(CURDATE(), INTERVAL 6 DAY), 1, 50, 6, 5, 4, 0, 0, 500000),
+    (DATE_SUB(CURDATE(), INTERVAL 2 DAY), 2, 95, 7, 4, 3, 1, 10000, 300000),
+    (DATE_SUB(CURDATE(), INTERVAL 3 DAY), 2, 85, 6, 3, 2, 0, 0, 200000),
+    (DATE_SUB(CURDATE(), INTERVAL 4 DAY), 2, 75, 5, 2, 1, 0, 0, 150000),
+    (DATE_SUB(CURDATE(), INTERVAL 5 DAY), 2, 65, 4, 2, 1, 0, 0, 120000),
+    (DATE_SUB(CURDATE(), INTERVAL 6 DAY), 2, 55, 3, 1, 1, 0, 0, 90000),
+    (DATE_SUB(CURDATE(), INTERVAL 1 DAY), 3, 140, 22, 20, 18, 0, 0, 1600000),
+    (DATE_SUB(CURDATE(), INTERVAL 2 DAY), 3, 130, 20, 18, 16, 0, 0, 1500000),
+    (DATE_SUB(CURDATE(), INTERVAL 3 DAY), 3, 110, 18, 15, 13, 0, 0, 1300000),
+    (DATE_SUB(CURDATE(), INTERVAL 4 DAY), 3, 100, 16, 13, 11, 0, 0, 1200000),
+    (DATE_SUB(CURDATE(), INTERVAL 5 DAY), 3, 90, 14, 12, 10, 0, 0, 1100000),
+    (DATE_SUB(CURDATE(), INTERVAL 2 DAY), 4, 200, 6, 3, 2, 0, 0, 400000),
+    (DATE_SUB(CURDATE(), INTERVAL 3 DAY), 4, 180, 5, 2, 1, 0, 0, 300000),
+    (DATE_SUB(CURDATE(), INTERVAL 4 DAY), 4, 160, 4, 1, 1, 0, 0, 200000),
+    (DATE_SUB(CURDATE(), INTERVAL 5 DAY), 4, 140, 3, 1, 0, 0, 0, 100000),
+    (DATE_SUB(CURDATE(), INTERVAL 6 DAY), 4, 120, 2, 0, 0, 0, 0, 50000),
+    (DATE_SUB(CURDATE(), INTERVAL 2 DAY), 5, 60, 10, 7, 6, 0, 0, 800000),
+    (DATE_SUB(CURDATE(), INTERVAL 3 DAY), 5, 55, 9, 6, 5, 0, 0, 700000),
+    (DATE_SUB(CURDATE(), INTERVAL 4 DAY), 5, 50, 8, 6, 5, 0, 0, 650000),
+    (DATE_SUB(CURDATE(), INTERVAL 5 DAY), 5, 45, 7, 5, 4, 0, 0, 600000),
+    (DATE_SUB(CURDATE(), INTERVAL 6 DAY), 5, 40, 6, 4, 3, 0, 0, 500000);
+
 
 /* ==================================================
    6. 식당별 단골 요약 (Restaurant User Stats)

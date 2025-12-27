@@ -110,3 +110,4 @@ CREATE TABLE daily_global_finance (
 
 
 
+

@@ -23,7 +23,6 @@ import {
   Home,
 } from "lucide-vue-next"; // Import Lucide icons for Vue
 import Button from "@/components/ui/Button.vue"; // Import our custom Button component
-import Card from "@/components/ui/Card.vue";
 import AppFooter from "@/components/ui/AppFooter.vue";
 import BottomNav from "@/components/ui/BottomNav.vue";
 import { RouterLink } from "vue-router"; // Import Vue RouterLink
@@ -32,15 +31,20 @@ import { restaurants as restaurantData } from "@/data/restaurants";
 import AppHeader from "@/components/ui/AppHeader.vue";
 import CafeteriaMenuUploadModal from "@/components/ui/CafeteriaMenuUploadModal.vue";
 import CafeteriaRecommendationList from "@/components/ui/CafeteriaRecommendationList.vue";
+import RestaurantCardList from "@/components/ui/RestaurantCardList.vue";
+import RestaurantCardSkeletonList from "@/components/ui/RestaurantCardSkeletonList.vue";
 import { cafeteriaRecommendationsSample } from "@/data/cafeteriaRecommendations";
+import axios from "axios";
 
 // State management (React's useState -> Vue's ref)
 const isFilterOpen = ref(false);
 const selectedSort = ref("추천순");
 const selectedPriceRange = ref(null);
+const selectedRecommendation = ref(null);
 const isCafeteriaMenuModalOpen = ref(false);
 const cafeteriaRecommendations = ref([]);
 const cafeteriaRecommendationStorageKey = "cafeteriaRecommendations";
+const homeListStateStorageKey = "homeListState";
 const filterForm = reactive({
   sort: selectedSort.value,
   priceRange: selectedPriceRange.value,
@@ -56,6 +60,9 @@ const searchTags = ref([]);
 const avoidIngredients = ref([]);
 const searchDistance = ref("");
 const budget = ref(500000);
+const isTrendingLoading = ref(false);
+const trendingRestaurants = ref([]);
+const trendingError = ref(null);
 
 const selectedDistanceKm = computed(() => {
   if (!searchDistance.value) return null;
@@ -67,6 +74,10 @@ const selectedDistanceKm = computed(() => {
 const restaurants = restaurantData;
 const restaurantsPerPage = 10;
 const currentPage = ref(1);
+const isTrendingSort = computed(() => selectedRecommendation.value === "인기순");
+const restaurantIndexById = new Map(
+  restaurants.map((restaurant) => [String(restaurant.id), restaurant])
+);
 const processedRestaurants = computed(() => {
   let result = restaurants.slice();
 
@@ -113,12 +124,51 @@ const processedRestaurants = computed(() => {
 
   return result;
 });
+const trendingCards = computed(() => {
+  return trendingRestaurants.value.map((restaurant) => {
+    const fallback = restaurantIndexById.get(String(restaurant.restaurantId));
+    const addressParts = [restaurant.roadAddress, restaurant.detailAddress]
+      .filter(Boolean)
+      .join(" ");
+    const apiTags = Array.isArray(restaurant.tags)
+      ? restaurant.tags.map((tag) => ({ name: tag.content }))
+      : [];
+    return {
+      id: String(restaurant.restaurantId),
+      name: restaurant.name || fallback?.name || "",
+      address: addressParts || fallback?.address || "",
+      image: restaurant.imageUrl || fallback?.image || "/placeholder.svg",
+      rating: restaurant.rating ?? fallback?.rating ?? null,
+      reviews: restaurant.reviewCount ?? restaurant.reviews ?? fallback?.reviews ?? 0,
+      price: restaurant.price ?? fallback?.price ?? "가격 정보 없음",
+      reviewTags: restaurant.reviewTags || [],
+      restaurantTags: apiTags.length ? apiTags : fallback?.topTags || [],
+    };
+  });
+});
+const trendingRestaurantIdSet = computed(
+  () =>
+    new Set(
+      trendingRestaurants.value.map((restaurant) =>
+        String(restaurant.restaurantId)
+      )
+    )
+);
+const availableRestaurants = computed(() => {
+  if (!isTrendingSort.value) {
+    return processedRestaurants.value;
+  }
+  return processedRestaurants.value.filter(
+    (restaurant) => !trendingRestaurantIdSet.value.has(String(restaurant.id))
+  );
+});
+const displayRestaurants = computed(() => availableRestaurants.value);
 const totalPages = computed(() =>
-  Math.max(1, Math.ceil(processedRestaurants.value.length / restaurantsPerPage))
+  Math.max(1, Math.ceil(displayRestaurants.value.length / restaurantsPerPage))
 );
 const paginatedRestaurants = computed(() => {
   const start = (currentPage.value - 1) * restaurantsPerPage;
-  return processedRestaurants.value.slice(start, start + restaurantsPerPage);
+  return displayRestaurants.value.slice(start, start + restaurantsPerPage);
 });
 const pageNumbers = computed(() =>
   Array.from({ length: totalPages.value }, (_, index) => index + 1)
@@ -656,6 +706,7 @@ watch(selectedDistanceKm, (distanceLimit) => {
 const openFilterModal = () => {
   filterForm.sort = selectedSort.value;
   filterForm.priceRange = selectedPriceRange.value;
+  filterForm.recommendation = selectedRecommendation.value;
   isFilterOpen.value = true;
 };
 
@@ -689,8 +740,19 @@ const resetFilters = () => {
 const applyFilters = () => {
   selectedSort.value = filterForm.sort || "추천순";
   selectedPriceRange.value = filterForm.priceRange || null;
+  selectedRecommendation.value = filterForm.recommendation || null;
   currentPage.value = 1;
   isFilterOpen.value = false;
+  persistHomeListState();
+};
+
+const clearTrendingRecommendation = () => {
+  selectedRecommendation.value = null;
+  filterForm.recommendation = null;
+  trendingRestaurants.value = [];
+  trendingError.value = null;
+  currentPage.value = 1;
+  persistHomeListState();
 };
 
 const toggleRecommendationOption = (option) => {
@@ -780,6 +842,83 @@ onMounted(() => {
       sessionStorage.removeItem(cafeteriaRecommendationStorageKey);
     }
   }
+
+  const storedHomeState = sessionStorage.getItem(homeListStateStorageKey);
+  if (storedHomeState) {
+    try {
+      const parsed = JSON.parse(storedHomeState);
+      selectedSort.value = parsed.selectedSort ?? selectedSort.value;
+      selectedPriceRange.value =
+        parsed.selectedPriceRange ?? selectedPriceRange.value;
+      selectedRecommendation.value =
+        parsed.selectedRecommendation ?? selectedRecommendation.value;
+      currentPage.value = parsed.currentPage ?? currentPage.value;
+      nextTick(() => {
+        if (Number.isFinite(parsed.scrollY)) {
+          window.scrollTo(0, parsed.scrollY);
+        }
+      });
+    } catch (error) {
+      console.error("홈 리스트 상태 복원 실패:", error);
+      sessionStorage.removeItem(homeListStateStorageKey);
+    }
+  }
+});
+
+const fetchTrendingRestaurants = async () => {
+  isTrendingLoading.value = true;
+  trendingError.value = null;
+  try {
+    const response = await axios.get("/api/restaurants/trending", {
+      params: {
+        days: 7,
+        limit: restaurantsPerPage,
+      },
+    });
+    trendingRestaurants.value = Array.isArray(response.data)
+      ? response.data
+      : [];
+  } catch (error) {
+    console.error("트렌딩 식당 로드 실패:", error);
+    trendingError.value = "트렌딩 식당을 불러오지 못했어요.";
+    trendingRestaurants.value = [];
+  } finally {
+    isTrendingLoading.value = false;
+  }
+};
+
+watch(isTrendingSort, (isActive) => {
+  if (isActive) {
+    fetchTrendingRestaurants();
+    return;
+  }
+  trendingRestaurants.value = [];
+  trendingError.value = null;
+});
+
+const persistHomeListState = () => {
+  sessionStorage.setItem(
+    homeListStateStorageKey,
+    JSON.stringify({
+      selectedSort: selectedSort.value,
+      selectedPriceRange: selectedPriceRange.value,
+      selectedRecommendation: selectedRecommendation.value,
+      currentPage: currentPage.value,
+      scrollY: window.scrollY,
+    })
+  );
+};
+
+watch([selectedSort, selectedPriceRange, selectedRecommendation], () => {
+  persistHomeListState();
+});
+
+watch(currentPage, () => {
+  persistHomeListState();
+});
+
+onBeforeUnmount(() => {
+  persistHomeListState();
 });
 </script>
 
@@ -893,82 +1032,49 @@ onMounted(() => {
           class="mb-6"
         />
 
-        <div v-else class="space-y-3">
-          <RouterLink
-            v-for="restaurant in paginatedRestaurants"
-            :key="restaurant.id"
-            :to="`/restaurant/${restaurant.id}`"
-          >
-            <Card
-              class="relative overflow-hidden border-[#e9ecef] rounded-xl bg-white shadow-card hover:shadow-lg transition-shadow cursor-pointer"
-            >
-              <button
-                type="button"
-                class="absolute top-3 right-3 z-10 p-2 rounded-full bg-white/90 shadow-card text-[#c4c4c4] hover:text-[#ff6b4a] transition-colors"
-                :aria-pressed="isRestaurantFavorite(restaurant.id)"
-                @click.stop.prevent="toggleRestaurantFavorite(restaurant.id)"
-              >
-                <Star
-                  class="w-4 h-4"
-                  :class="
-                    isRestaurantFavorite(restaurant.id)
-                      ? 'fill-current text-[#ff6b4a]'
-                      : 'text-[#adb5bd] fill-white'
-                  "
-                />
-                <span class="sr-only">
-                  {{
-                    isRestaurantFavorite(restaurant.id)
-                      ? "즐겨찾기 해제"
-                      : "즐겨찾기에 추가"
-                  }}
-                </span>
-              </button>
-              <div class="flex gap-3 p-2">
-                <div
-                  class="relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden"
+        <div v-else class="space-y-6">
+          <section v-if="isTrendingSort" class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-base font-semibold text-[#1e3a5f]">
+                트렌딩 인기순 추천
+              </h4>
+              <div class="flex items-center gap-2">
+                <span
+                  v-if="isTrendingLoading"
+                  class="text-xs text-[#6c757d]"
                 >
-                  <img
-                    :src="restaurant.image || '/placeholder.svg'"
-                    :alt="restaurant.name"
-                    class="w-full h-full object-cover"
-                  />
-                </div>
-
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2 mb-1">
-                    <h4 class="font-semibold text-[#1e3a5f] text-sm">
-                      {{ restaurant.name }}
-                    </h4>
-                  </div>
-                  <p class="text-xs text-[#6c757d] mb-1 truncate">
-                    {{ restaurant.address }}
-                  </p>
-                  <div class="flex items-center gap-1 mb-1.5">
-                    <Star class="w-3.5 h-3.5 fill-[#ffc107] text-[#ffc107]" />
-                    <span class="text-sm font-medium text-[#1e3a5f]">{{
-                      restaurant.rating
-                    }}</span>
-                    <span class="text-xs text-[#6c757d]"
-                      >(리뷰수 : {{ restaurant.reviews }})</span
-                    >
-                  </div>
-                  <div class="flex flex-wrap gap-1 mb-2">
-                    <span
-                      v-for="(tag, index) in restaurant.topTags"
-                      :key="index"
-                      class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-gradient-to-r from-[#ff6b4a] to-[#ffc4b8] text-white"
-                    >
-                      {{ tag.name }} {{ tag.count }}
-                    </span>
-                  </div>
-                  <p class="text-sm font-semibold text-[#1e3a5f]">
-                    {{ restaurant.price }}
-                  </p>
-                </div>
+                  불러오는 중...
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  class="h-8 px-3 text-xs border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] hover:text-[#1e3a5f] rounded-lg"
+                  @click="clearTrendingRecommendation"
+                >
+                  추천 해제
+                </Button>
               </div>
-            </Card>
-          </RouterLink>
+            </div>
+            <p v-if="trendingError" class="text-xs text-[#e03131]">
+              {{ trendingError }}
+            </p>
+            <RestaurantCardSkeletonList
+              v-if="isTrendingLoading"
+              :count="3"
+            />
+            <RestaurantCardList
+              v-if="!isTrendingLoading && trendingCards.length"
+              :restaurants="trendingCards"
+              :favoriteRestaurantIds="favoriteRestaurantIds"
+              :onToggleFavorite="toggleRestaurantFavorite"
+            />
+          </section>
+
+          <RestaurantCardList
+            :restaurants="paginatedRestaurants"
+            :favoriteRestaurantIds="favoriteRestaurantIds"
+            :onToggleFavorite="toggleRestaurantFavorite"
+          />
         </div>
 
         <div
