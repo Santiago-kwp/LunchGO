@@ -29,18 +29,8 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, Long> {
                     "r.detail_address AS detailAddress, " +
                     "COALESCE(s.view_recent, 0) AS viewCount, " +
                     "COALESCE(s.confirm_recent, 0) AS confirmCount, " +
-                    "COALESCE((" +
-                    "SELECT COUNT(*) " +
-                    "FROM reviews rv " +
-                    "WHERE rv.restaurant_id = r.restaurant_id " +
-                    "AND rv.status = 'PUBLIC'" +
-                    "), 0) AS reviewCount, " +
-                    "COALESCE((" +
-                    "SELECT ROUND(AVG(rv.rating), 1) " +
-                    "FROM reviews rv " +
-                    "WHERE rv.restaurant_id = r.restaurant_id " +
-                    "AND rv.status = 'PUBLIC'" +
-                    "), 0) AS rating, " +
+                    "COALESCE(rv.reviewCount, 0) AS reviewCount, " +
+                    "COALESCE(rv.rating, 0) AS rating, " +
                     "(" +
                     "(COALESCE(s.confirm_recent, 0) * :confirmWeight) + " +
                     "(COALESCE(s.view_recent, 0) * :viewWeight) + " +
@@ -52,71 +42,12 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, Long> {
                     "ELSE 0 " +
                     "END" +
                     ") AS score, " +
-                    "(" +
-                    "SELECT ri.image_url " +
-                    "FROM restaurant_images ri " +
-                    "WHERE ri.restaurant_id = r.restaurant_id " +
-                    "ORDER BY ri.restaurant_image_id " +
-                    "LIMIT 1" +
-                    ") AS imageUrl, " +
-                    "(" +
-                    "SELECT GROUP_CONCAT(st.tag_id ORDER BY st.tag_id SEPARATOR ',') " +
-                    "FROM restaurant_tag_maps rtm " +
-                    "JOIN search_tags st ON st.tag_id = rtm.tag_id " +
-                    "WHERE rtm.restaurant_id = r.restaurant_id" +
-                    ") AS tagIds, " +
-                    "(" +
-                    "SELECT GROUP_CONCAT(st.content ORDER BY st.tag_id SEPARATOR ',') " +
-                    "FROM restaurant_tag_maps rtm " +
-                    "JOIN search_tags st ON st.tag_id = rtm.tag_id " +
-                    "WHERE rtm.restaurant_id = r.restaurant_id" +
-                    ") AS tagContents " +
-                    ", " +
-                    "(" +
-                    "SELECT GROUP_CONCAT(t.tag_id ORDER BY t.tag_count DESC, t.tag_id SEPARATOR ',') " +
-                    "FROM (" +
-                    "SELECT rt.tag_id AS tag_id, COUNT(*) AS tag_count " +
-                    "FROM reviews rv " +
-                    "JOIN review_tag_maps rtm ON rv.review_id = rtm.review_id " +
-                    "JOIN review_tags rt ON rt.tag_id = rtm.tag_id " +
-                    "WHERE rv.restaurant_id = r.restaurant_id " +
-                    "AND rv.status = 'PUBLIC' " +
-                    "AND rt.tag_type = 'USER' " +
-                    "GROUP BY rt.tag_id " +
-                    "ORDER BY tag_count DESC, rt.tag_id " +
-                    "LIMIT 3" +
-                    ") t" +
-                    ") AS reviewTagIds, " +
-                    "(" +
-                    "SELECT GROUP_CONCAT(t.name ORDER BY t.tag_count DESC, t.tag_id SEPARATOR ',') " +
-                    "FROM (" +
-                    "SELECT rt.tag_id AS tag_id, rt.name AS name, COUNT(*) AS tag_count " +
-                    "FROM reviews rv " +
-                    "JOIN review_tag_maps rtm ON rv.review_id = rtm.review_id " +
-                    "JOIN review_tags rt ON rt.tag_id = rtm.tag_id " +
-                    "WHERE rv.restaurant_id = r.restaurant_id " +
-                    "AND rv.status = 'PUBLIC' " +
-                    "AND rt.tag_type = 'USER' " +
-                    "GROUP BY rt.tag_id, rt.name " +
-                    "ORDER BY tag_count DESC, rt.tag_id " +
-                    "LIMIT 3" +
-                    ") t" +
-                    ") AS reviewTagContents, " +
-                    "(" +
-                    "SELECT GROUP_CONCAT(t.tag_count ORDER BY t.tag_count DESC, t.tag_id SEPARATOR ',') " +
-                    "FROM (" +
-                    "SELECT rt.tag_id AS tag_id, COUNT(*) AS tag_count " +
-                    "FROM reviews rv " +
-                    "JOIN review_tag_maps rtm ON rv.review_id = rtm.review_id " +
-                    "JOIN review_tags rt ON rt.tag_id = rtm.tag_id " +
-                    "WHERE rv.restaurant_id = r.restaurant_id " +
-                    "AND rv.status = 'PUBLIC' " +
-                    "AND rt.tag_type = 'USER' " +
-                    "GROUP BY rt.tag_id " +
-                    "ORDER BY tag_count DESC, rt.tag_id " +
-                    "LIMIT 3" +
-                    ") t" +
-                    ") AS reviewTagCounts " +
+                    "img.imageUrl AS imageUrl, " +
+                    "rt.tagIds AS tagIds, " +
+                    "rt.tagContents AS tagContents, " +
+                    "rvt.reviewTagIds AS reviewTagIds, " +
+                    "rvt.reviewTagContents AS reviewTagContents, " +
+                    "rvt.reviewTagCounts AS reviewTagCounts " +
                     "FROM restaurants r " +
                     "LEFT JOIN (" +
                     "SELECT restaurant_id, " +
@@ -126,6 +57,52 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, Long> {
                     "WHERE stat_date >= DATE_SUB(CURDATE(), INTERVAL :days DAY) " +
                     "GROUP BY restaurant_id" +
                     ") s ON r.restaurant_id = s.restaurant_id " +
+                    "LEFT JOIN (" +
+                    "SELECT restaurant_id, " +
+                    "COUNT(*) AS reviewCount, " +
+                    "ROUND(AVG(rating), 1) AS rating " +
+                    "FROM reviews " +
+                    "WHERE status = 'PUBLIC' " +
+                    "GROUP BY restaurant_id" +
+                    ") rv ON r.restaurant_id = rv.restaurant_id " +
+                    "LEFT JOIN (" +
+                    "SELECT restaurant_id, " +
+                    "SUBSTRING_INDEX(GROUP_CONCAT(image_url ORDER BY restaurant_image_id), ',', 1) AS imageUrl " +
+                    "FROM restaurant_images " +
+                    "GROUP BY restaurant_id" +
+                    ") img ON r.restaurant_id = img.restaurant_id " +
+                    "LEFT JOIN (" +
+                    "SELECT rtm.restaurant_id, " +
+                    "GROUP_CONCAT(st.tag_id ORDER BY st.tag_id SEPARATOR ',') AS tagIds, " +
+                    "GROUP_CONCAT(st.content ORDER BY st.tag_id SEPARATOR ',') AS tagContents " +
+                    "FROM restaurant_tag_maps rtm " +
+                    "JOIN search_tags st ON st.tag_id = rtm.tag_id " +
+                    "GROUP BY rtm.restaurant_id" +
+                    ") rt ON r.restaurant_id = rt.restaurant_id " +
+                    "LEFT JOIN (" +
+                    "SELECT restaurant_id, " +
+                    "GROUP_CONCAT(tag_id ORDER BY tag_count DESC, tag_id SEPARATOR ',') AS reviewTagIds, " +
+                    "GROUP_CONCAT(name ORDER BY tag_count DESC, tag_id SEPARATOR ',') AS reviewTagContents, " +
+                    "GROUP_CONCAT(tag_count ORDER BY tag_count DESC, tag_id SEPARATOR ',') AS reviewTagCounts " +
+                    "FROM (" +
+                    "SELECT " +
+                    "rv.restaurant_id, " +
+                    "rt.tag_id, " +
+                    "rt.name, " +
+                    "COUNT(*) AS tag_count, " +
+                    "ROW_NUMBER() OVER ( " +
+                    "PARTITION BY rv.restaurant_id " +
+                    "ORDER BY COUNT(*) DESC, rt.tag_id " +
+                    ") AS rn " +
+                    "FROM reviews rv " +
+                    "JOIN review_tag_maps rtm ON rv.review_id = rtm.review_id " +
+                    "JOIN review_tags rt ON rt.tag_id = rtm.tag_id " +
+                    "WHERE rv.status = 'PUBLIC' AND rt.tag_type = 'USER' " +
+                    "GROUP BY rv.restaurant_id, rt.tag_id, rt.name" +
+                    ") ranked " +
+                    "WHERE rn <= 3 " +
+                    "GROUP BY restaurant_id" +
+                    ") rvt ON r.restaurant_id = rvt.restaurant_id " +
                     "WHERE r.status = 'OPEN' " +
                     "ORDER BY score DESC " +
                     "LIMIT :limit",
