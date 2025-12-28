@@ -10,6 +10,7 @@ import com.example.LunchGo.restaurant.entity.RegularHoliday;
 import com.example.LunchGo.restaurant.entity.Restaurant;
 import com.example.LunchGo.restaurant.repository.RegularHolidayRepository;
 import com.example.LunchGo.restaurant.repository.RestaurantRepository;
+import com.example.LunchGo.restaurant.stats.RestaurantStatsEventService;
 import com.example.LunchGo.restaurant.dto.RestaurantUpdateRequest;
 import com.example.LunchGo.tag.entity.SearchTag;
 import com.example.LunchGo.tag.repository.SearchTagRepository;
@@ -34,6 +35,7 @@ public class BusinessRestaurantService {
     private final RegularHolidayRepository regularHolidayRepository;
     // private final RestaurantImageRepository restaurantImageRepository; // Removed
     private final SearchTagRepository searchTagRepository; // Needed for restaurant tags
+    private final RestaurantStatsEventService statsEventService;
 
     /**
      * 특정 식당의 상세 정보를 조회합니다. (메뉴 정보 제외)
@@ -43,9 +45,17 @@ public class BusinessRestaurantService {
      * @throws NoSuchElementException 식당을 찾을 수 없는 경우
      */
     public RestaurantDetailResponse getRestaurantDetail(Long restaurantId) {
+        return getRestaurantDetail(restaurantId, null);
+    }
+
+    public RestaurantDetailResponse getRestaurantDetail(Long restaurantId, String userKey) {
         // 1. Restaurant 기본 정보 및 이미지 조회 (Fetch Join 활용)
         Restaurant restaurant = restaurantRepository.findByIdWithImages(restaurantId)
                 .orElseThrow(() -> new NoSuchElementException("Restaurant not found with id: " + restaurantId));
+
+        if (userKey != null && !userKey.isBlank()) {
+            statsEventService.recordView(restaurantId, userKey);
+        }
 
         // 2. RegularHoliday 조회
         List<RegularHoliday> regularHolidays = regularHolidayRepository.findAllByRestaurantId(restaurantId);
@@ -209,6 +219,6 @@ public class BusinessRestaurantService {
         restaurantRepository.save(restaurant);
 
         // 7. 업데이트된 전체 정보 다시 조회하여 반환
-        return getRestaurantDetail(id);
+        return getRestaurantDetail(id, null);
     }
 }

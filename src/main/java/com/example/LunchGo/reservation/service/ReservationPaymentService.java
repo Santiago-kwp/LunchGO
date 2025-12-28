@@ -15,6 +15,7 @@ import com.example.LunchGo.reservation.repository.ReservationRepository;
 import com.example.LunchGo.reservation.repository.ReservationSlotRepository;
 import com.example.LunchGo.restaurant.entity.Restaurant;
 import com.example.LunchGo.restaurant.repository.RestaurantRepository;
+import com.example.LunchGo.restaurant.stats.RestaurantStatsEventService;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
@@ -22,6 +23,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +43,7 @@ public class ReservationPaymentService {
     private final PaymentRepository paymentRepository;
     private final RestaurantRepository restaurantRepository;
     private final PortoneVerificationService portoneVerificationService;
+    private final RestaurantStatsEventService statsEventService;
 
     @Transactional
     public CreatePaymentResponse createPayment(Long reservationId, CreatePaymentRequest request) {
@@ -142,6 +146,8 @@ public class ReservationPaymentService {
 
         Reservation reservation = getReservation(payment.getReservationId());
         reservation.setStatus(resolveReservationStatus(payment.getPaymentType()));
+
+        recordConfirmAfterCommit(payment, reservation);
     }
 
     @Transactional
@@ -197,6 +203,8 @@ public class ReservationPaymentService {
 
         Reservation reservation = getReservation(payment.getReservationId());
         reservation.setStatus(resolveReservationStatus(payment.getPaymentType()));
+
+        recordConfirmAfterCommit(payment, reservation);
     }
 
     @Transactional
@@ -393,6 +401,31 @@ public class ReservationPaymentService {
         }
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy. MM. dd. HH:mm");
         return approvedAt.format(formatter);
+    }
+
+    private void recordConfirmAfterCommit(Payment payment, Reservation reservation) {
+        if (payment == null || reservation == null) {
+            return;
+        }
+        Long paymentId = payment.getPaymentId();
+        if (paymentId == null) {
+            return;
+        }
+        ReservationSlot slot = getSlot(reservation.getSlotId());
+        Long restaurantId = slot.getRestaurantId();
+        String dedupeKey = paymentId.toString();
+
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            statsEventService.recordConfirm(restaurantId, dedupeKey);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                statsEventService.recordConfirm(restaurantId, dedupeKey);
+            }
+        });
     }
 
     private CreatePaymentResponse toCreateResponse(Payment payment) {
