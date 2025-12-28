@@ -1,13 +1,12 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 import { ArrowLeft } from 'lucide-vue-next';
-import { useRouter, RouterLink } from 'vue-router';
-import { getMenuCategoriesByRestaurant } from '@/data/restaurantMenus';
+import { useRouter } from 'vue-router';
+import axios from 'axios';
 import RestaurantMenuList from '@/components/ui/RestaurantMenuList.vue';
 
-// Define props to receive the restaurant ID from the route
 const props = defineProps({
   id: {
     type: String,
@@ -21,10 +20,41 @@ const goBack = () => {
   router.back();
 };
 
-// Data fetching for menus
-const menuCategories = computed(() =>
-  getMenuCategoriesByRestaurant(props.id),
-);
+const fetchedMenus = ref([]); // 백엔드에서 가져온 메뉴 데이터를 저장할 ref
+
+const menuCategories = computed(() => {
+  const categoriesMap = {
+    MAIN: { id: 'MAIN', name: '주메뉴', items: [] },
+    SUB: { id: 'SUB', name: '서브메뉴', items: [] },
+    OTHER: { id: 'OTHER', name: '기타(디저트, 음료)', items: [] },
+  };
+
+  if (fetchedMenus.value && fetchedMenus.value.length > 0) {
+    fetchedMenus.value.forEach(menu => {
+      const categoryCode = menu.category?.code;
+      if (categoryCode && categoriesMap[categoryCode]) {
+        categoriesMap[categoryCode].items.push({
+          id: menu.id,
+          name: menu.name,
+          price: menu.price ? `${menu.price.toLocaleString()}원` : '가격정보 없음',
+          description: menu.description,
+          image: menu.imageUrl || '/placeholder.svg',
+        });
+      }
+    });
+  }
+  return Object.values(categoriesMap).filter(cat => cat.items.length > 0);
+});
+
+onMounted(async () => {
+  try {
+    const response = await axios.get(`/api/restaurants/${props.id}/menus`);
+    fetchedMenus.value = response.data;
+  } catch (error) {
+    console.error('Failed to fetch menus:', error);
+    fetchedMenus.value = [];
+  }
+});
 </script>
 
 <template>
