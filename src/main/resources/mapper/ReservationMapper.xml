@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.LunchGo.reservation.mapper.ReservationMapper">
+
+    <select id="selectSlot" resultType="com.example.LunchGo.reservation.domain.ReservationSlot">
+        SELECT
+            slot_id AS slotId,
+            restaurant_id AS restaurantId,
+            slot_date AS slotDate,
+            slot_time AS slotTime,
+            max_capacity AS maxCapacity,
+            created_at AS createdAt,
+            updated_at AS updatedAt
+        FROM restaurant_reservation_slots
+        WHERE restaurant_id = #{restaurantId}
+          AND slot_date = #{slotDate}
+          AND slot_time = #{slotTime}
+    </select>
+
+    <insert id="insertReservation"
+            parameterType="com.example.LunchGo.reservation.domain.Reservation"
+            useGeneratedKeys="true" keyProperty="reservationId">
+        INSERT INTO reservations
+        (reservation_code, slot_id, user_id, party_size, reservation_type, status, request_message, hold_expires_at, payment_deadline_at)
+        VALUES
+            (#{reservationCode}, #{slotId}, #{userId}, #{partySize}, #{reservationType}, #{status}, #{requestMessage}, #{holdExpiresAt}, #{paymentDeadlineAt})
+    </insert>
+
+    <update id="updateReservationCode">
+        UPDATE reservations
+        SET reservation_code = #{reservationCode}
+        WHERE reservation_id = #{reservationId}
+    </update>
+
+    <select id="selectReservationCreateRow" resultType="com.example.LunchGo.reservation.mapper.row.ReservationCreateRow">
+        SELECT
+            r.reservation_id AS reservationId,
+            r.reservation_code AS reservationCode,
+
+            r.slot_id AS slotId,
+            r.user_id AS userId,
+
+            s.restaurant_id AS restaurantId,
+            s.slot_date AS slotDate,
+            s.slot_time AS slotTime,
+
+            r.party_size AS partySize,
+            r.reservation_type AS reservationType,
+            r.status AS status,
+
+            r.request_message AS requestMessage
+        FROM reservations r
+                 JOIN restaurant_reservation_slots s ON s.slot_id = r.slot_id
+        WHERE r.reservation_id = #{reservationId}
+    </select>
+
+</mapper>
