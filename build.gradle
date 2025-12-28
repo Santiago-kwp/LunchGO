@@ -48,6 +48,8 @@ dependencies {
 
 	//coolSMS 의존성 주입
 	implementation 'net.nurigo:sdk:4.3.0'
+	// ModelMapper
+	implementation 'org.modelmapper:modelmapper:3.2.0'
 }
 
 tasks.named('test') {
