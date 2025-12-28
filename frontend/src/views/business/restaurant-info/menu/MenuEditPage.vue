@@ -27,6 +27,7 @@ const menuData = reactive({
   name: '',
   category: '',
   price: 0,
+  description: '', // 메뉴 설명 추가
   tags: [], // 재료 태그는 메뉴 객체에 포함하여 관리
   imageUrl: '', // 이미지 URL도 메뉴 객체에 포함
 });
@@ -106,6 +107,7 @@ onMounted(async () => {
       // 'category' 객체에서 'code'를 사용해 v-model과 바인딩
       menuData.category = existingMenu.category?.code || '';
       menuData.price = existingMenu.price;
+      menuData.description = existingMenu.description || ''; // description 추가
       menuData.tags = existingMenu.tags || []; // 태그가 없을 수 있으므로 기본값 설정
       menuData.imageUrl = existingMenu.imageUrl || ''; // 이미지 URL이 없을 수 있음
       imageUrl.value = menuData.imageUrl;
@@ -118,6 +120,7 @@ const validationErrors = reactive({
   name: '',
   category: '',
   price: '',
+  description: '', // 메뉴 설명 유효성 검사 에러 필드 추가
 });
 
 // 7. 저장 함수
@@ -166,6 +169,7 @@ const saveMenu = () => {
       value: selectedCategoryObject.text,
     },
     price: menuData.price,
+    description: menuData.description, // 메뉴 설명 추가
     tags: menuData.tags,
     imageUrl: menuData.imageUrl,
   };
@@ -207,6 +211,12 @@ watch(
   () => menuData.imageUrl,
   (newUrl) => {
     if (newUrl) validationErrors.image = '';
+  }
+);
+watch(
+  () => menuData.description, // description 필드에 대한 watch 추가
+  (newValue) => {
+    if (newValue.trim()) validationErrors.description = '';
   }
 );
 </script>
@@ -345,6 +355,25 @@ watch(
                   class="text-red-500 text-sm mt-1"
                 >
                   {{ validationErrors.price }}
+                </p>
+              </div>
+
+              <!-- Menu Description -->
+              <div>
+                <label class="block text-sm font-semibold text-[#1e3a5f] mb-2"
+                  >메뉴 설명</label
+                >
+                <textarea
+                  placeholder="메뉴 설명을 입력하세요"
+                  v-model="menuData.description"
+                  rows="4"
+                  class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B4A] resize-none"
+                ></textarea>
+                <p
+                  v-if="validationErrors.description"
+                  class="text-red-500 text-sm mt-1"
+                >
+                  {{ validationErrors.description }}
                 </p>
               </div>
 
