@@ -9,6 +9,7 @@ import com.example.LunchGo.restaurant.dto.RestaurantCreateRequest; // Import add
 import com.example.LunchGo.restaurant.dto.RestaurantTagDTO;
 import com.example.LunchGo.restaurant.entity.Restaurant;
 import com.example.LunchGo.restaurant.repository.RestaurantRepository;
+import com.example.LunchGo.restaurant.stats.RestaurantStatsEventService;
 import com.example.LunchGo.restaurant.dto.RestaurantUpdateRequest;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
@@ -25,6 +26,10 @@ import java.util.stream.Collectors;
 public class BusinessRestaurantService {
 
     private final RestaurantRepository restaurantRepository;
+    private final RegularHolidayRepository regularHolidayRepository;
+    // private final RestaurantImageRepository restaurantImageRepository; // Removed
+    private final SearchTagRepository searchTagRepository; // Needed for restaurant tags
+    private final RestaurantStatsEventService statsEventService;
 
     private final MenuService menuService;
     private final RegularHolidayService regularHolidayService;
@@ -40,10 +45,26 @@ public class BusinessRestaurantService {
      * @throws NoSuchElementException 식당을 찾을 수 없는 경우
      */
     public RestaurantDetailResponse getRestaurantDetail(Long restaurantId) {
+        return getRestaurantDetail(restaurantId, null);
+    }
+
+    public RestaurantDetailResponse getRestaurantDetail(Long restaurantId, String userKey) {
         // 1. Restaurant 기본 정보 및 이미지 조회 (Fetch Join 활용)
         Restaurant restaurant = restaurantRepository.findByIdWithImages(restaurantId)
                 .orElseThrow(() -> new NoSuchElementException("Restaurant not found with id: " + restaurantId));
 
+        if (userKey != null && !userKey.isBlank()) {
+            statsEventService.recordView(restaurantId, userKey);
+        }
+
+        // 2. RegularHoliday 조회
+        List<RegularHoliday> regularHolidays = regularHolidayRepository.findAllByRestaurantId(restaurantId);
+
+        // 3. Restaurant에 매핑된 태그 ID 조회 및 태그 정보 페치
+        List<Long> restaurantTagIds = restaurantRepository.findTagIdsByRestaurantId(restaurantId);
+        Map<Long, SearchTag> allRestaurantTagsMap = searchTagRepository.findAllById(restaurantTagIds)
+                .stream()
+                .collect(Collectors.toMap(SearchTag::getTagId, tag -> tag));
         // 2. 메뉴, 정기 휴무일, 태그 정보는 각 전문 서비스에 위임
         List<MenuDTO> menuDtos = menuService.getMenusByRestaurant(restaurantId);
         List<RegularHolidayDTO> regularHolidayDtos = regularHolidayService.getRegularHolidaysByRestaurant(restaurantId);
@@ -118,6 +139,6 @@ public class BusinessRestaurantService {
         restaurantRepository.save(restaurant);
 
         // 7. 업데이트된 전체 정보 다시 조회하여 반환
-        return getRestaurantDetail(id);
+        return getRestaurantDetail(id, null);
     }
 }

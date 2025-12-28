@@ -1,6 +1,6 @@
 package com.example.LunchGo.restaurant.controller;
 
-
+import jakarta.servlet.http.HttpServletRequest;
 import com.example.LunchGo.restaurant.dto.RestaurantCreateRequest;
 import com.example.LunchGo.restaurant.dto.RestaurantDetailResponse;
 import com.example.LunchGo.restaurant.dto.RestaurantUpdateRequest;
@@ -9,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 
 @RestController
 @RequestMapping("/api")
@@ -26,9 +25,12 @@ public class BusinessRestaurantController {
      */
     @GetMapping("/business/restaurants/{id}")
     public ResponseEntity<RestaurantDetailResponse> getRestaurantDetail(
-            @PathVariable("id") Long id
+            @PathVariable("id") Long id,
+            HttpServletRequest request
     ) {
-        RestaurantDetailResponse response = businessRestaurantService.getRestaurantDetail(id);
+        String userKey = resolveUserKey(request);
+        // TODO(restaurant): 이 조회수 증가는 현재 사업자 상세 조회에 임시 적용됨. 사용자용 상세 API 구현 시 이동 필요.
+        RestaurantDetailResponse response = businessRestaurantService.getRestaurantDetail(id, userKey);
 
         return ResponseEntity.ok(response);
     }
@@ -66,4 +68,21 @@ public class BusinessRestaurantController {
         return ResponseEntity.ok(updatedRestaurant);
     }
 
+    private String resolveUserKey(HttpServletRequest request) {
+        String userId = request.getHeader("X-User-Id");
+        if (userId != null && !userId.isBlank()) {
+            return "user-" + userId.trim();
+        }
+        if (request.getSession(false) != null) {
+            String sessionId = request.getSession(false).getId();
+            if (sessionId != null && !sessionId.isBlank()) {
+                return "session-" + sessionId;
+            }
+        }
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return "ip-" + forwarded.split(",")[0].trim();
+        }
+        return "ip-" + request.getRemoteAddr();
+    }
 }
