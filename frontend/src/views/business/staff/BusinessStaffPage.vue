@@ -1,7 +1,10 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted} from 'vue';
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
+import axios from 'axios';
+
+const ownerId = 1; //pinia 사용하기
 
 const emailInput = ref('');
 const emailFormatMsg = ref('');
@@ -10,29 +13,34 @@ const currentPage = ref(1);
 const itemsPerPage = 7;
 const maxPageButtons = 5; // 최대 보여질 페이지 번호 개수
 
+//중복 클릭 방지용 로딩 상태
+const isRegistering = ref(false);
+
 // 데이터 20명으로 늘림 (페이지네이션 테스트 용)
 const staffList = ref([
-  { id: 1, name: '김민준', email: 'minjun.kim@example.com' },
-  { id: 2, name: '이서연', email: 'seoyeon.lee@example.com' },
-  { id: 3, name: '박지호', email: 'jiho.park@example.com' },
-  { id: 4, name: '최수빈', email: 'subin.choi@example.com' },
-  { id: 5, name: '정예은', email: 'yeeun.jung@example.com' },
-  { id: 6, name: '강현우', email: 'hyunwoo.kang@example.com' },
-  { id: 7, name: '윤지아', email: 'jia.yoon@example.com' },
-  { id: 8, name: '임도현', email: 'dohyun.lim@example.com' },
-  { id: 9, name: '한소희', email: 'sohee.han@example.com' },
-  { id: 10, name: '송태우', email: 'taewoo.song@example.com' },
-  { id: 11, name: '전정국', email: 'jk.jeon@example.com' },
-  { id: 12, name: '박지민', email: 'jimin.park@example.com' },
-  { id: 13, name: '김태형', email: 'v.kim@example.com' },
-  { id: 14, name: '민윤기', email: 'suga.min@example.com' },
-  { id: 15, name: '정호석', email: 'jhope.jung@example.com' },
-  { id: 16, name: '김남준', email: 'rm.kim@example.com' },
-  { id: 17, name: '김석진', email: 'jin.kim@example.com' },
-  { id: 18, name: '아이유', email: 'iu.lee@example.com' },
-  { id: 19, name: '박효신', email: 'hyoshin.park@example.com' },
-  { id: 20, name: '성시경', email: 'sikyung.sung@example.com' },
 ]);
+
+const fetchStaffInfo = async() => {
+  try {
+    const response = await axios.get(`/api/business/staff/${ownerId}`);
+    
+    if (response.data) {
+      staffList.value = response.data.map((item) => ({
+        id: item.staffId,   // 백엔드 staffId -> 프론트 id
+        name: item.name,    // 이름
+        email: item.email   // 이메일
+      }));
+    }
+    
+  }catch(error){
+    console.error("에러 상세 내용:", error);
+    alert(`오류가 발생했습니다. (Code: ${error.response.status})`);
+  }
+};
+
+onMounted(()=> {
+  fetchStaffInfo();
+});
 
 const totalPages = computed(() => {
   return Math.ceil(staffList.value.length / itemsPerPage);
@@ -91,6 +99,8 @@ const handleInputChange = () => {
 };
 
 const handleAddStaff = async () => {
+  if(isRegistering.value) return;
+
   if (!emailInput.value) {
     emailFormatMsg.value = '이메일을 입력해주세요.';
     return;
@@ -102,25 +112,63 @@ const handleAddStaff = async () => {
     return;
   }
 
-  //백엔드에서 정보 불러오고 유효한지 확인 (이메일이 존재하지 않으면?)
+  isRegistering.value = true;
 
-  const newStaff = {
-    id: staffList.value.length + 1,
-    name: '신규 직원',
-    email: emailInput.value,
-  };
-  staffList.value.push(newStaff);
+  try{
+    await axios.post(`/api/business/staff`, {
+      ownerId: ownerId,
+      email: emailInput.value
+    });
 
-  currentPage.value = Math.ceil(staffList.value.length / itemsPerPage);
+    fetchStaffInfo();
+    emailFormatMsg.value = '';
+    emailInput.value = '';
+    showSuccessMessage.value = true;
+    setTimeout(() => (showSuccessMessage.value = false), 3000);
+  }catch(error){
+    const status = error.response.status;
 
-  emailInput.value = '';
-  emailFormatMsg.value = '';
-  showSuccessMessage.value = true;
-  setTimeout(() => (showSuccessMessage.value = false), 3000);
+    switch(status){
+       case 400:
+        alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+        break;
+      case 404:
+        alert("[404 Not Found] 해당 사용자는 존재하지 않습니다.");
+        break;
+      case 409:
+        alert("[409 Conflict] 이미 등록된 임직원입니다.");
+      default:
+        alert(`오류가 발생했습니다. (Code: ${status})`);
+    }
+  }finally {
+    isRegistering.value = false;
+  }
 };
 
-const handleDeleteStaff = (id) => {
-  staffList.value = staffList.value.filter((staff) => staff.id !== id);
+const handleDeleteStaff = async (targetId) => {
+  try{
+    if (!confirm("정말 삭제하시겠습니까?")) return;
+
+    await axios.delete("/api/business/staff", {data: {
+      staffId: targetId,
+      ownerId: ownerId
+    }})
+
+    staffList.value = staffList.value.filter((staff) => staff.id !== targetId);
+  }catch(error){
+     const status = error.response.status;
+
+    switch(status){
+       case 400:
+        alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+        break;
+      case 404:
+        alert("[404 Not Found] 해당 사업자/임직원은 존재하지 않습니다.");
+        break;
+      default:
+        alert(`오류가 발생했습니다. (Code: ${status})`);
+    }
+  }
 };
 
 // [추가됨] 이전, 다음 페이지 이동 함수
@@ -170,10 +218,15 @@ const nextPage = () => {
 
               <button
                 @click="handleAddStaff"
-                class="px-6 py-3 bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] text-white font-semibold rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap"
-              >
-                임직원 추가
-              </button>
+                :disabled="isRegistering"
+                class="px-6 py-3 text-white font-semibold rounded-lg transition-all whitespace-nowrap flex items-center justify-center min-w-[120px]"
+                :class="isRegistering 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] hover:opacity-90'"
+            >
+                <span v-if="isRegistering">등록 중...</span>
+                <span v-else>임직원 추가</span>
+            </button>
             </div>
           </div>
 

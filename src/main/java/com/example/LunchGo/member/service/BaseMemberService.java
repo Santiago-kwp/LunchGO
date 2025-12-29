@@ -205,10 +205,10 @@ public class BaseMemberService implements MemberService {
 
     @Override
     public void save(StaffInfo staffInfo) {
-        User user = userRepository.findByEmail(staffInfo.getEmail())
+        User user = userRepository.findByEmail(staffInfo.getEmail().trim())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
-        if(staffRepository.existsByEmail(staffInfo.getEmail())){ //만약 이미 등록한 임직원이면
+        if(staffRepository.existsByEmail(staffInfo.getEmail().trim())){ //만약 이미 등록한 임직원이면
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 존재하는 임직원입니다.");
         }
 
