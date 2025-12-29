@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed, onUnmounted } from 'vue';
+import axios from 'axios';
 
 const props = defineProps<{
   isVisible: boolean;
@@ -18,9 +19,10 @@ const phone = ref('');
 
 // 인증번호 및 결과 상태
 const isCodeSent = ref(false);
-const verifyCode = ref('');
+const verifyCode = ref(''); //입력한 인증번호
 const isTimeout = ref(false);
 const foundId = ref(''); // 찾은 아이디를 저장할 변수
+const isPhoneVerified = ref(false);
 
 // 타이머 상태
 const timer = ref(180);
@@ -131,18 +133,58 @@ onUnmounted(() => {
 });
 
 // 인증번호 발송
-const handleSendVerifyCode = () => {
+const handleSendVerifyCode = async () => {
   if (!name.value) return alert('이름을 입력해주세요.');
   if (!business_num.value) return alert('사업자등록번호를 입력해주세요.');
   if (!phone.value) return alert('휴대폰 번호를 입력해주세요.');
 
-  // API 호출 시뮬레이션
-  // await api.sendCode(...)
-  alert(`인증번호를 발송했습니다: ${phone.value}`);
-
-  isCodeSent.value = true;
+  isPhoneVerified.value = false;
   verifyCode.value = '';
-  startTimer();
+
+  alert(`인증번호를 발송했습니다: ${phone.value}`);
+  try {
+    await axios.post('/api/sms/send', {phone: phone.value});
+
+    isCodeSent.value = true;
+    startTimer();
+  }catch(error){
+    const status = error.response.status;
+
+    if(status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else alert(`메시지 전송에 오류가 발생했습니다. (Code: ${status})`);
+  }
+};
+
+// 인증번호 확인
+const handleVerifyCode = async () => {
+  if (!verifyCode.value) return alert('인증번호를 입력해주세요.');
+  if (isTimeout.value) return alert('입력 시간이 초과되었습니다. 재발송해주세요.');
+
+  try {
+    const response = await axios.post('/api/sms/verify', {
+      phone: phone.value,
+      verifyCode: verifyCode.value
+    });
+
+    if(response.data === true){
+      alert('인증이 완료되었습니다.');
+      isPhoneVerified.value = true; // 인증 완료 상태로 변경
+
+      // 타이머 정지
+      if (timerInterval.value) clearInterval(timerInterval.value);
+    } else{
+      alert("인증번호가 일치하지 않습니다. 다시 확인해주세요.");
+
+      isPhoneVerified.value = false;
+    }
+  } catch (error) {
+    // 에러 처리
+    const status = error.response.status;
+    if (status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else alert(`오류가 발생했습니다. (Code: ${status})`);
+    
+    isPhoneVerified.value = false;
+  }
 };
 
 // 아이디 찾기 (폼 제출)
@@ -152,17 +194,16 @@ const handleFindId = async () => {
   if (!phone.value) return alert('휴대폰 번호를 입력해주세요.');
   if (!isCodeSent.value) return alert('인증번호를 먼저 발송해주세요.');
   if (!verifyCode.value) return alert('인증번호를 입력해주세요.');
+  if(!isPhoneVerified.value) return alert('인증번호 확인은 필수입니다.');
 
-  // 실제 백엔드 API 호출로 아이디 조회
-  // const response = await api.findId({ name: name.value, phone: phone.value ... });
+  try{
+    const response = await axios.post('/api/auth/search/loginId', {
+      name: name.value,
+      businessNum: business_num.value,
+      phone: phone.value
+    });
 
-  //사용자 정보가 맞지 않는 경우
-  //인증번호가 틀린 경우
-
-  // 백엔드 응답 시뮬레이션 (0.5초 딜레이)
-  setTimeout(() => {
-    // 백엔드에서 받아온 마스킹된 아이디 예시
-    const realId = 'popsicle0404';
+    const realId = response.data.loginId;
     const totalLen = realId.length;
 
     const visibleLen = Math.ceil(totalLen / 2);
@@ -175,14 +216,26 @@ const handleFindId = async () => {
     step.value = 2;
     // 타이머 정지
     if (timerInterval.value) clearInterval(timerInterval.value);
-  }, 500);
+  }catch(error){
+    const status = error.response.status;
+
+    switch(status){
+      case 400:
+        alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+        break;
+      case 404:
+        alert("[404 Not Found] 해당 아이디는 존재하지 않습니다.");
+        handleGoToLogin(); //모달 닫기
+        break;
+      default:
+        alert(`오류가 발생했습니다. (Code: ${status})`);
+    }
+  }
 };
 
 // 로그인하러 가기 버튼
 const handleGoToLogin = () => {
   emit('close'); // 모달 닫기
-  // 필요한 경우 부모에게 로그인 화면으로 이동하라는 이벤트를 보낼 수 있음
-  // emit('login');
 };
 </script>
 
@@ -247,14 +300,35 @@ const handleGoToLogin = () => {
               </div>
 
               <div v-if="isCodeSent" class="input-group slide-in">
-                <input
-                  v-model="verifyCode"
-                  type="text"
-                  placeholder="인증번호 6자리를 입력하세요"
-                  class="input-field"
-                  maxlength="6"
-                />
-                <p class="timer-text">{{ formattedTimer }}</p>
+                <label for="verify-code">인증번호</label>
+                <div class="input-with-button">
+                  <div style="position: relative; flex: 1;">
+                    <input
+                      id="verify-code"
+                      v-model="verifyCode"
+                      type="text"
+                      placeholder="인증번호 6자리"
+                      class="input-field"
+                      maxlength="6"
+                      style="width: 100%;" 
+                      :disabled="isPhoneVerified"
+                    />
+                    <p class="timer-text">{{ formattedTimer }}</p>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    @click="handleVerifyCode"
+                    :disabled="isPhoneVerified || isTimeout"
+                    :style="isPhoneVerified ? 'color: #20c997; border-color: #20c997;' : ''"
+                  >
+                    {{ isPhoneVerified ? '인증완료' : '확인' }}
+                  </button>
+                </div>
+                 <p v-if="isTimeout" style="color: red; font-size: 12px; margin-top: 4px;">
+                    입력 시간이 초과되었습니다. 재전송해주세요.
+                 </p>
               </div>
 
               <button type="submit" class="btn-confirm">아이디 찾기</button>

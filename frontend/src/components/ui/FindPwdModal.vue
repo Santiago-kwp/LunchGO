@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ReceiptTurkishLiraIcon } from 'lucide-vue-next';
 import { ref, watch, computed, onUnmounted } from 'vue';
+import axios from 'axios';
 
 const props = defineProps<{
   isVisible: boolean;
@@ -12,14 +12,15 @@ const emit = defineEmits(['close']);
 // 도달 번호 관리 (1: 본인인증, 2: 비밀번호 재설정)
 const step = ref(1);
 
-// 첫번째 모달: 본인인증 관련 상태
+//본인인증 관련 상태
 const name = ref('');
-// email 변수는 userType에 따라 '이메일' 또는 '아이디' 값을 담습니다.
+// email 변수는 userType에 따라 '이메일' 또는 '아이디' 값을 담음.
 const email = ref('');
 const phone = ref('');
 const isCodeSent = ref(false);
 const verifyCode = ref('');
 const isTimeout = ref(false);
+const isPhoneVerified  = ref(false);
 
 // 두번째 모달: 비밀번호 재설정 관련 상태
 const newPassword = ref('');
@@ -45,6 +46,8 @@ watch(
         isTimeout.value = false;
         newPassword.value = '';
         confirmPassword.value = '';
+        isPhoneVerified.value = false;
+        timer.value = 180;
       }, 300);
     }
   }
@@ -74,7 +77,7 @@ watch(phone, (newVal) => {
 
 // 타이머 관련 상태
 const timer = ref(180);
-const timerInterval = ref(null);
+const timerInterval = ref<ReturnType<typeof setInterval> | null>(null);
 
 const formattedTimer = computed(() => {
   const m = Math.floor(timer.value / 60)
@@ -94,7 +97,7 @@ const startTimer = () => {
     if (timer.value > 0) {
       timer.value--;
     } else {
-      clearInterval(timerInterval.value);
+      if (timerInterval.value) clearInterval(timerInterval.value);
       isTimeout.value = true;
       alert('인증번호 입력 시간이 초과되었습니다. 재발송이 필요합니다.');
     }
@@ -108,28 +111,60 @@ onUnmounted(() => {
 // 인증번호 발송 핸들러
 const handleSendVerifyCode = async () => {
   // 입력값 검증
+  // 🚨 수정: isOwner.value 사용
   if (!email.value) {
     const label = isOwner.value ? '아이디' : '이메일';
-    alert(`${label}을(를) 입력해주세요.`);
-    return;
+     return alert(`${label}을(를) 입력해주세요.`); 
   }
-  if (!name.value) {
-    alert('이름을 입력해주세요.');
-    return;
-  }
-  if (!phone.value) {
-    alert('휴대폰 번호를 입력해주세요.');
-    return;
-  }
+  if (!name.value) return alert('이름을 입력해주세요.');
+  if (!phone.value) return alert('휴대폰 번호를 입력해주세요.');
 
-  // 실제 API 호출 로직 (비동기)
-  // await api.sendCode(...)
+  isPhoneVerified.value = false;
+  verifyCode.value = '';
 
   alert(`인증번호를 발송했습니다: ${phone.value}`);
+  try {
+    await axios.post('/api/sms/send', {phone: phone.value});
 
-  isCodeSent.value = true;
-  verifyCode.value = '';
-  startTimer();
+    isCodeSent.value = true;
+    startTimer(); 
+  }catch(error: any){
+    const status = error.response?.status;
+
+    if(status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else alert(`메시지 전송에 오류가 발생했습니다. (Code: ${status})`);
+  }  
+};
+
+// 인증번호 확인
+const handleVerifyCode = async () => {
+  if (!verifyCode.value) return alert('인증번호를 입력해주세요.');
+  if (isTimeout.value) return alert('입력 시간이 초과되었습니다. 재발송해주세요.');
+
+  try {
+    const response = await axios.post('/api/sms/verify', {
+      phone: phone.value,
+      verifyCode: verifyCode.value
+    });
+
+    if(response.data === true){
+      alert('인증이 완료되었습니다.');
+      isPhoneVerified.value = true; // 인증 완료 상태로 변경
+
+      // 타이머 정지
+      if (timerInterval.value) clearInterval(timerInterval.value);
+    } else{
+      alert("인증번호가 일치하지 않습니다. 다시 확인해주세요.");
+
+      isPhoneVerified.value = false;
+    }
+  } catch (error: any) {
+    const status = error.response?.status;
+    if (status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else alert(`오류가 발생했습니다. (Code: ${status})`);
+    
+    isPhoneVerified.value = false;
+  }
 };
 
 // 통합 폼 제출 핸들러
@@ -141,12 +176,9 @@ const handleSubmit = () => {
   }
 };
 
-const verifyUserFromData = () => {
-  return null;
-};
-
 // 1단계: 인증 확인
-const handleVerifyUser = () => {
+const handleVerifyUser = async () => {
+  // 🚨 수정: isOwner.value 사용
   if (!email.value) {
     const label = isOwner.value ? '아이디' : '이메일';
     alert(`${label}을(를) 입력해주세요.`);
@@ -164,17 +196,55 @@ const handleVerifyUser = () => {
     alert('인증번호를 입력해주세요.');
     return;
   }
+  if(!isPhoneVerified.value) return alert("인증번호 확인은 필수입니다.");
 
-  if (verifyUserFromData() !== null) {
-    alert(verifyUserFromData);
-    return;
+  let body;
+  
+  // 🚨🚨 [중요] 여기가 문제였습니다. isOwner.value로 수정!
+  if(isOwner.value){
+    body = {
+      loginId: email.value,
+      phone: phone.value,
+      name: name.value
+    };
+  }else{
+    body = {
+      email: email.value,
+      phone: phone.value,
+      name: name.value
+    };
   }
 
-  step.value = 2;
+  try{
+    const response = await axios.post('/api/auth/search/pwd', body);
+
+    step.value = 2;
+    // 타이머 정지
+    if (timerInterval.value) clearInterval(timerInterval.value);
+  }catch(error: any){
+    const status = error.response?.status;
+
+    switch(status){
+      case 400:
+        alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+        break;
+      case 404:
+        alert("[404 Not Found] 해당 사용자/사업자는 존재하지 않습니다.");
+        handleGoToLogin(); //모달 닫기
+        break;
+      default:
+        alert(`오류가 발생했습니다. (Code: ${status})`);
+    }
+  }
+};
+
+// 로그인하러 가기 버튼
+const handleGoToLogin = () => {
+  emit('close'); // 모달 닫기
 };
 
 // 2단계: 비밀번호 변경 요청
-const handleResetPassword = () => {
+const handleResetPassword = async () => {
   if (!newPassword.value) {
     alert('새로운 비밀번호를 입력해주세요.');
     return;
@@ -182,10 +252,9 @@ const handleResetPassword = () => {
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,20}$/;
 
   if (!passwordRegex.test(newPassword.value)) {
-    alert(
+    return alert(
       '비밀번호는 8~20자이어야 하며, 영문 대문자, 소문자, 숫자, 특수문자를 모두 포함해야 합니다.'
     );
-    return;
   }
 
   if (newPassword.value !== confirmPassword.value) {
@@ -193,8 +262,40 @@ const handleResetPassword = () => {
     return;
   }
 
-  alert('비밀번호가 성공적으로 변경되었습니다.');
-  emit('close');
+  let body;
+  // 🚨 수정: isOwner.value 사용
+  if(isOwner.value){
+    body = {
+      loginId: email.value,
+      password: newPassword.value
+    };
+  }else{
+    body = {
+      email: email.value,
+      password: newPassword.value
+    };
+  }
+
+  try{
+    await axios.put('/api/auth/pwd', body);
+
+    alert('비밀번호가 성공적으로 변경되었습니다.');
+    emit('close');
+  }catch(error: any){
+    const status = error.response?.status;
+
+    switch(status){
+      case 400:
+        alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+        break;
+      case 404:
+        alert("[404 Not Found] 해당 아이디/이메일은 존재하지 않습니다.");
+        handleGoToLogin(); //모달 닫기
+        break;
+      default:
+        alert(`오류가 발생했습니다. (Code: ${status})`);
+    }
+  }
 };
 
 const submitButtonText = computed(() => {
@@ -284,14 +385,35 @@ const modalTitle = computed(() => {
               </div>
 
               <div v-if="isCodeSent" class="input-group slide-in">
-                <input
-                  v-model="verifyCode"
-                  type="text"
-                  placeholder="인증번호를 6자리를 입력하세요."
-                  class="input-field"
-                  maxlength="6"
-                />
-                <p class="timer-text">{{ formattedTimer }}</p>
+                <label for="verify-code">인증번호</label>
+                <div class="input-with-button">
+                  <div style="position: relative; flex: 1;">
+                    <input
+                      id="verify-code"
+                      v-model="verifyCode"
+                      type="text"
+                      placeholder="인증번호 6자리"
+                      class="input-field"
+                      maxlength="6"
+                      style="width: 100%;" 
+                      :disabled="isPhoneVerified"
+                    />
+                    <p class="timer-text">{{ formattedTimer }}</p>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    @click="handleVerifyCode"
+                    :disabled="isPhoneVerified || isTimeout"
+                    :style="isPhoneVerified ? 'color: #20c997; border-color: #20c997;' : ''"
+                  >
+                    {{ isPhoneVerified ? '인증완료' : '확인' }}
+                  </button>
+                </div>
+                 <p v-if="isTimeout" style="color: red; font-size: 12px; margin-top: 4px;">
+                   입력 시간이 초과되었습니다. 재전송해주세요.
+                 </p>
               </div>
             </template>
 
@@ -486,22 +608,17 @@ const modalTitle = computed(() => {
   }
 }
 
+/* 🚨 수정: 타이머 위치 CSS 정리 */
 .timer-text {
   position: absolute;
   right: 16px;
   top: 50%;
-  top: 24px;
-  transform: translateY(0);
-  margin-top: 14px;
+  transform: translateY(-50%); /* 정확히 수직 중앙 */
   font-size: 13px;
   color: #ff6b4a;
+  margin: 0; /* 불필요한 마진 제거 */
   pointer-events: none;
-}
-/* timer-text 위치 보정 (input-group 내부에 label이 없는 경우를 위해) */
-.input-group:not(:has(label)) .timer-text {
-  top: 50%;
-  transform: translateY(-50%);
-  margin-top: 0;
+  z-index: 10;
 }
 
 .btn-confirm {

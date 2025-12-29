@@ -9,5 +9,4 @@ public class OwnerFindRequest {
     private String name;
     private String businessNum;
     private String phone;
-    private String verifyCode;
 }

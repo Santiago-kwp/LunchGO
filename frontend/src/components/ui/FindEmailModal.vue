@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed, onUnmounted } from 'vue';
+import axios from 'axios';
 
 const props = defineProps<{
   isVisible: boolean;
@@ -16,9 +17,10 @@ const phone = ref('');
 
 // 인증번호 관련 상태
 const isCodeSent = ref(false);
-const verifyCode = ref('');
+const verificationCode = ref('');
 const isTimeout = ref(false);
 const foundEmail = ref(''); // 찾은 이메일
+const isPhoneVerified = ref(false);
 
 // 타이머 상태
 const timer = ref(180);
@@ -35,10 +37,11 @@ watch(
         step.value = 1;
         name.value = '';
         phone.value = '';
-        verifyCode.value = '';
+        verificationCode.value = '';
         isCodeSent.value = false;
         isTimeout.value = false;
         foundEmail.value = '';
+        isPhoneVerified.value = false;
         timer.value = 180;
       }, 300);
     }
@@ -102,16 +105,57 @@ onUnmounted(() => {
 });
 
 // 인증번호 발송
-const handleSendVerifyCode = () => {
+const handleSendVerifyCode = async () => {
   if (!name.value) return alert('이름을 입력해주세요.');
   if (!phone.value) return alert('휴대폰 번호를 입력해주세요.');
 
-  // API 호출 시뮬레이션
-  alert(`인증번호를 발송했습니다: ${phone.value}`);
+  isPhoneVerified.value = false;
+  verificationCode.value = '';
 
-  isCodeSent.value = true;
-  verifyCode.value = '';
-  startTimer();
+  alert(`인증번호를 발송했습니다: ${phone.value}`);
+  try {
+    await axios.post('/api/sms/send', {phone: phone.value});
+
+    isCodeSent.value = true;
+    startTimer(); 
+  }catch(error){
+    const status = error.response.status;
+
+    if(status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else alert(`메시지 전송에 오류가 발생했습니다. (Code: ${status})`);
+  }  
+};
+
+// 인증번호 확인
+const handleVerifyCode = async () => {
+  if (!verificationCode.value) return alert('인증번호를 입력해주세요.');
+  if (isTimeout.value) return alert('입력 시간이 초과되었습니다. 재발송해주세요.');
+
+  try {
+    const response = await axios.post('/api/sms/verify', {
+      phone: phone.value,
+      verifyCode: verificationCode.value
+    });
+
+    if(response.data === true){
+      alert('인증이 완료되었습니다.');
+      isPhoneVerified.value = true; // 인증 완료 상태로 변경
+
+      // 타이머 정지
+      if (timerInterval.value) clearInterval(timerInterval.value);
+    } else{
+      alert("인증번호가 일치하지 않습니다. 다시 확인해주세요.");
+
+      isPhoneVerified.value = false;
+    }
+  } catch (error) {
+    // 에러 처리
+    const status = error.response.status;
+    if (status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else alert(`오류가 발생했습니다. (Code: ${status})`);
+    
+    isPhoneVerified.value = false;
+  }
 };
 
 // 이메일 찾기 (최종 제출)
@@ -119,11 +163,16 @@ const handleFindEmail = async () => {
   if (!name.value) return alert('이름을 입력해주세요.');
   if (!phone.value) return alert('휴대폰 번호를 입력해주세요.');
   if (!isCodeSent.value) return alert('인증번호를 먼저 발송해주세요.');
-  if (!verifyCode.value) return alert('인증번호를 입력해주세요.');
+  if (!verificationCode.value) return alert('인증번호를 입력해주세요.');
+  if(!isPhoneVerified.value) return alert("인증번호 확인은 필수입니다.");
 
-  // 백엔드 응답 시뮬레이션 (0.5초 딜레이)
-  setTimeout(() => {
-    const realEmail = 'popsicle0404@test.com'; // 백엔드에서 받아온 값 예시
+  try {
+    const response = await axios.post('api/auth/search/email',{
+      name: name.value,
+      phone: phone.value
+    });
+
+    const realEmail = response.data.email;
 
     // 1. 이메일을 @ 기준으로 분리
     const [localPart, domain] = realEmail.split('@');
@@ -147,7 +196,21 @@ const handleFindEmail = async () => {
     step.value = 2;
     // 타이머 정지
     if (timerInterval.value) clearInterval(timerInterval.value);
-  }, 500);
+  }catch(error){
+    const status = error.response.status;
+
+    switch(status){
+      case 400:
+        alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+        break;
+      case 404:
+        alert("[404 Not Found] 해당 이메일은 존재하지 않습니다.");
+        handleGoToLogin(); //모달 닫기
+        break;
+      default:
+        alert(`오류가 발생했습니다. (Code: ${status})`);
+    }
+  }
 };
 
 // 로그인하러 가기 버튼 (모달 닫기)
@@ -205,19 +268,42 @@ const handleGoToLogin = () => {
               </div>
 
               <div v-if="isCodeSent" class="input-group slide-in">
-                <input
-                  v-model="verifyCode"
-                  type="text"
-                  placeholder="인증번호 6자리를 입력하세요"
-                  class="input-field"
-                  maxlength="6"
-                />
-                <p class="timer-text">{{ formattedTimer }}</p>
+                <label for="verify-code">인증번호</label>
+                <div class="input-with-button">
+                  <div style="position: relative; flex: 1;">
+                    <input
+                      id="verify-code"
+                      v-model="verificationCode"
+                      type="text"
+                      placeholder="인증번호 6자리"
+                      class="input-field"
+                      maxlength="6"
+                      style="width: 100%;" 
+                      :disabled="isPhoneVerified"
+                    />
+                    <p class="timer-text">{{ formattedTimer }}</p>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    @click="handleVerifyCode"
+                    :disabled="isPhoneVerified || isTimeout"
+                    :style="isPhoneVerified ? 'color: #20c997; border-color: #20c997;' : ''"
+                  >
+                    {{ isPhoneVerified ? '인증완료' : '확인' }}
+                  </button>
+                </div>
+                 <p v-if="isTimeout" style="color: red; font-size: 12px; margin-top: 4px;">
+                    입력 시간이 초과되었습니다. 재전송해주세요.
+                 </p>
               </div>
 
-              <button type="submit" class="btn-confirm">이메일 찾기</button>
+              <button type="submit" class="btn-confirm" :disabled="!isPhoneVerified">
+                이메일 찾기
+              </button>
 
-              <div v-if="isCodeSent" class="resend-link-container">
+              <div v-if="isCodeSent && !isPhoneVerified" class="resend-link-container">
                 <button
                   type="button"
                   class="btn-text-link"
