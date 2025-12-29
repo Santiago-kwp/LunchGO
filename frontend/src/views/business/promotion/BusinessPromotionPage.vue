@@ -1,7 +1,8 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, TrackOpTypes } from 'vue';
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
+import axios from 'axios';
 
 // --- 상태 관리 변수 ---
 const isPromotionOn = ref(false); // 프로모션 여부 (기본값 끄기)
@@ -28,12 +29,37 @@ const handleRegister = async () => {
     return;
   }
 
-  //백엔드 전송 로직
+  const ownerId = 1; //pinia 사용하기
 
-  // 성공 처리
-  errorMsg.value = '';
-  showSuccessMessage.value = true;
-  setTimeout(() => (showSuccessMessage.value = false), 3000);
+  //백엔드 전송 로직
+  try {
+    await axios.post("/api/business/promotion", {
+      ownerId: ownerId,
+      title: promotionTitle.value,
+      content: promotionContent.value
+    });
+
+    // 성공 처리
+    errorMsg.value = '';
+    showSuccessMessage.value = true;
+    setTimeout(() => (showSuccessMessage.value = false), 3000);
+  }catch(error){
+    const status = error.response.status;
+
+    switch(status){
+      case 400:
+        alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+        break;
+      case 404:
+        alert("[404 Not Found] 해당 사업자가 존재하지 않습니다.");
+        break;
+      case 429:
+        alert("[429 Too Many Requests] 프로모션은 6시간 간격으로 전송가능합니다.");
+        break;
+      default:
+        alert(`오류가 발생했습니다. (Code: ${status})`);
+    }
+  }
 };
 
 // 입력 시 에러 메시지 초기화
