@@ -3,6 +3,8 @@ package com.example.LunchGo.member.service;
 import com.example.LunchGo.account.dto.FindPwdRequest;
 import com.example.LunchGo.account.dto.OwnerJoinRequest;
 import com.example.LunchGo.account.dto.UserJoinRequest;
+import com.example.LunchGo.image.dto.ImageUploadResponse;
+import com.example.LunchGo.image.service.ObjectStorageService;
 import com.example.LunchGo.member.domain.CustomRole;
 import com.example.LunchGo.member.domain.OwnerStatus;
 import com.example.LunchGo.member.domain.UserStatus;
@@ -21,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -35,6 +38,7 @@ public class BaseMemberService implements MemberService {
     private final OwnerRepository ownerRepository;
     private final MemberMapper memberMapper;
     private final StaffRepository staffRepository;
+    private final ObjectStorageService objectStorageService;
 
     @Override
     public void save(UserJoinRequest userReq) {
@@ -141,10 +145,16 @@ public class BaseMemberService implements MemberService {
 
     @Override
     @Transactional
-    public void updateMemberInfo(Long userId, MemberUpdateInfo info) {
+    public void updateMemberInfo(Long userId, MemberUpdateInfo info, MultipartFile image) {
+        String imgUrl = info.getImage();
+        if(image != null && !image.isEmpty()){
+            ImageUploadResponse response = objectStorageService.upload("profile", image);
+            imgUrl = response.getFileUrl();
+        }
+
         Integer result = memberMapper.updateUser(userId, info.getNickname(), info.getBirth(),
                 info.getGender(), info.getPhone(), info.getCompanyName(),
-                info.getCompanyAddress(), info.getEmailAuthentication(), info.getImage());
+                info.getCompanyAddress(), info.getEmailAuthentication(), imgUrl);
 
         if(result <= 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다.");
 

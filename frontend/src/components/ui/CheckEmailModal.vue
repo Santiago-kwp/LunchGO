@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue';
+import axios from 'axios';
 
 // 부모 컴포넌트에서 전달받은 email
 const props = defineProps<{
@@ -52,15 +53,28 @@ onUnmounted(() => {
 
 //인증번호 이메일 발송
 const handleSendEmailCode = async () => {
-  // 실제로는 여기서 이메일 발송 API 호출
-  // await api.sendEmailVerification(props.email);
-  // 발송하면 response에 code를 들고올 수 있나?
-
   alert(`'${props.email}'로 인증번호를 발송했습니다.\n메일함을 확인해주세요.`);
 
-  isCodeSent.value = true;
-  verificationCode.value = ''; // 코드 입력 초기화
-  startTimer();
+  try{
+    await axios.post('/api/email/send', {mail: props.email});
+
+    isCodeSent.value = true;
+    verificationCode.value = ''; // 코드 입력 초기화
+    startTimer();
+  }catch(error){
+    const status = error.response.status;
+
+    switch(status){
+       case 400:
+        alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+        break;
+      case 404:
+        alert("[404 Not Found] 해당 이메일은 존재하지 않습니다.");
+        break;
+      default:
+        alert(`오류가 발생했습니다. (Code: ${status})`);
+    }
+  }
 };
 
 // 인증번호 확인 (최종 완료)
@@ -73,21 +87,22 @@ const handleVerify = async () => {
   isLoading.value = true;
 
   try {
-    // API 인증번호 검증 시뮬레이션
-    //코드 들고올 수 있으면 이거 필요없음
-    // await api.verifyEmailCode({ email: props.email, code: verifyCode.value });
+    const response = await axios.post('/api/email/verify', {mail: props.email, verifyCode: verificationCode.value});
 
-    // 약간의 딜레이 시뮬레이션
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    if(response.data === true){
+      alert('인증이 완료되었습니다.');
 
-    // 성공 시
-    alert('이메일 인증이 완료되었습니다.');
+      emit('verified'); // 부모에게 성공 알림
+      emit('close'); // 모달 닫기
 
-    emit('verified'); // 부모에게 성공 알림
-    emit('close'); // 모달 닫기
+      // 타이머 정지
+      if (timerInterval.value) clearInterval(timerInterval.value);
+    } else{
+      alert("인증번호가 일치하지 않습니다. 다시 확인해주세요.");
+    }    
   } catch (error) {
-    console.error(error);
-    alert('인증번호가 일치하지 않습니다.');
+    if(error.response.status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else alert(`오류가 발생했습니다. (Code: ${error.reponse.status})`);
   } finally {
     isLoading.value = false;
   }

@@ -5,9 +5,11 @@ import com.example.LunchGo.member.entity.Owner;
 import com.example.LunchGo.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -24,9 +26,10 @@ public class MemberController {
         return new ResponseEntity<>(member, HttpStatus.OK);
     }
 
-    @PutMapping("/info/user/{userId}")
-    public ResponseEntity<?> updateUser(@PathVariable Long userId, @RequestBody MemberUpdateInfo memberUpdateInfo) {
-        memberService.updateMemberInfo(userId, memberUpdateInfo); //예외 발생시 404 발생
+    @PutMapping(value = "/info/user/{userId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> updateUser(@PathVariable Long userId, @RequestPart(value = "info") MemberUpdateInfo memberUpdateInfo,
+                                        @RequestPart(value = "image", required = false) MultipartFile image) {
+        memberService.updateMemberInfo(userId, memberUpdateInfo, image); //예외 발생시 404 발생
 
         return new ResponseEntity<>(HttpStatus.OK);
     }

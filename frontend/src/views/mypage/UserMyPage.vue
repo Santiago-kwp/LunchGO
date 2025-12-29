@@ -14,6 +14,7 @@ import ReservationHistory from '@/components/ui/ReservationHistory.vue';
 import UsageHistory from '@/components/ui/UsageHistory.vue';
 import CheckEmailModal from '@/components/ui/CheckEmailModal.vue';
 import UserFavorites from '@/components/ui/UserFavorites.vue';
+import axios from 'axios';
 
 const router = useRouter();
 
@@ -29,7 +30,7 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const activeNav = ref('info');
 
 const showSuccess = ref(false);
-const specialInterests = ref(['']); //특이사항
+const specialInterests =ref<(number | null)[]>([null]); //특이사항 id 저장
 
 // Form fields state
 const email = ref('popsicle0404@test.com');
@@ -56,9 +57,34 @@ const isVerificationRequested = ref(false); // 인증 요청을 한 번이라도
 
 // 인증번호 관련 상태
 const verificationCode = ref(''); //사용자가 입력한 인증번호
-const verifyCode = ref(''); // 시스템이 보낸 인증번호
 const isTimeout = ref(false);
-const isVerified = ref(false);
+const isPhoneVerified = ref(false);
+
+//특이사항 list
+const preferenceOptions = [
+  { id: 1, label: '오이를 못 먹어요' },
+  { id: 2, label: '오이를 좋아해요' },
+  { id: 3, label: '고수를 못 먹어요' },
+  { id: 4, label: '고수를 좋아해요' },
+  { id: 5, label: '해물을 못 먹어요' },
+  { id: 6, label: '해물을 좋아해요' },
+  { id: 7, label: '치즈를 못 먹어요' },
+  { id: 8, label: '치즈를 좋아해요' },
+  { id: 9, label: '매운 음식을 좋아해요' },
+  { id: 10, label: '매운 음식을 못 먹어요' },
+  { id: 11, label: '느끼한 음식을 못 먹어요' },
+  { id: 12, label: '인스타 감성을 좋아해요' },
+  { id: 13, label: '땅콩을 못 먹어요' },
+  { id: 14, label: '견과류를 못 먹어요' },
+  { id: 15, label: '갑각류를 못 먹어요' },
+  { id: 16, label: '우유를 못 먹어요' },
+  { id: 17, label: '계란을 못 먹어요' },
+  { id: 18, label: '밀가루를 못 먹어요' },
+  { id: 19, label: '해산물을 못 먹어요' },
+  { id: 20, label: '비건 음식을 좋아해요' },
+  { id: 21, label: '돼지고기를 못 먹어요' },
+  { id: 22, label: '소고기를 못 먹어요' }
+];
 
 //ref
 const companyBackAddressRef = ref<any>(null);
@@ -154,9 +180,72 @@ const loadDaumPostcodeScript = () => {
   }
 };
 
+// 특이사항: 현재 인덱스(currentIndex)에 보여줄 옵션 목록 계산
+const getAvailableOptions = (currentIndex: number) => {
+  const allSelectedIds = specialInterests.value;
+
+  return preferenceOptions.filter((option) => {
+    // 1. 아직 아무도 선택하지 않은 옵션이거나
+    // 2. 현재 내 줄(currentIndex)에서 선택된 옵션인 경우
+    return !allSelectedIds.includes(option.id) || allSelectedIds[currentIndex] === option.id;
+  });
+};
+
+// 특이사항 추가 버튼
+const addInterestField = () => {
+  // 모든 옵션을 다 썼으면 추가 못하게 막기 (선택사항)
+  if (specialInterests.value.length >= preferenceOptions.length) {
+    return alert("더 이상 선택할 수 있는 옵션이 없습니다.");
+  }
+  specialInterests.value.push(null); // 빈 선택지 추가
+};
+
+//사용자 정보 가져오기
+const fetchUserInfo = async() => {
+  try{
+    const userId = 5; //pinia에서 가져오기
+
+    const response = await axios.get(`/api/info/user/${userId}`);
+    const data = response.data;
+
+    email.value = data.email;
+    name.value = data.name;
+    nickname.value = data.nickname || '';
+    birthDate.value = data.birth || '';
+    gender.value = data.gender || '공개하지 않음';
+    phoneNumber.value = data.phone;
+
+    companyName.value = data.companyName;
+    companyAddress.value = data.companyAddress;
+
+    isEmailVerified.value = data.emailAuthentication;
+
+    if(data.image){
+      profileImage.value = data.image;
+    }
+
+    // 서버에서 온 객체 리스트 -> ID 리스트로 변환
+    // data.specialities = [{ specialityId: 1, keyword: '...', ... }, ...] 형태임
+    if (data.specialities && data.specialities.length > 0) {
+      specialInterests.value = data.specialities.map((item: any) => Number(item.specialityId));
+    } else {
+      specialInterests.value = [null]; // 비어있으면 빈 칸 하나 생성
+    }
+  }catch(error){
+     const status = error.response.status;
+
+      if(status === 404){
+        alert("[404 Not Found] 해당 사용자가 존재하지 않습니다.");
+      }else{
+        alert(`오류가 발생했습니다. (Code: ${status})`);
+      }
+  }
+}
+
 //컴포넌트 마운트 시 스크립트 로드
 onMounted(() => {
   loadDaumPostcodeScript();
+  fetchUserInfo();
 });
 
 // 주소 검색 핸들러
@@ -211,28 +300,48 @@ const handleImageUpload = (event: Event) => {
 const handleVerifyCode = async () => {
   if (!verificationCode.value) return alert('인증번호를 입력해주세요.');
 
-  //여기에 API를 통한 인증번호 체크 로직
-  // 예: await api.checkVerificationCode(...)
+  try {
+    const response = await axios.post('/api/sms/verify', {
+      phone: phoneNumber.value,
+      verifyCode: verificationCode.value
+    });
 
-  // [인증 성공 시 로직]
-  isVerified.value = true;
+    if(response.data === true){
+      alert('인증이 완료되었습니다.');
+      
+      // [인증 성공 시 로직]
+      isPhoneVerified.value = true;
 
-  //인증번호 입력란 숨기기
-  showPhoneVerification.value = false;
+      //인증번호 입력란 숨기기
+      showPhoneVerification.value = false;
 
-  //전화번호 입력창을 다시 Readonly로 변경
-  isPhoneEditable.value = false;
+      //전화번호 입력창을 다시 Readonly로 변경
+      isPhoneEditable.value = false;
 
-  //버튼 상태 초기화 (다시 '번호변경' 버튼으로 돌아가기)
-  isVerificationRequested.value = false;
+      //버튼 상태 초기화 (다시 '번호변경' 버튼으로 돌아가기)
+      isVerificationRequested.value = false;
 
-  //타이머 정지
-  if (timerInterval.value) clearInterval(timerInterval.value);
+      //타이머 정지
+      if (timerInterval.value) clearInterval(timerInterval.value);
+
+    } else{
+      alert("인증번호가 일치하지 않습니다. 다시 확인해주세요.");
+
+      isPhoneVerified.value = false;
+    }
+  } catch (error) {
+    // 에러 처리
+    const status = error.response.status;
+    if (status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else alert(`오류가 발생했습니다. (Code: ${status})`);
+    
+    isPhoneVerified.value = false;
+  }
 };
 
 const checkInputElement = () => {
   if (isPhoneEditable.value) {
-    if (!isVerified.value) return alert('전화번호 수정 시 인증은 필수입니다.');
+    if (!isPhoneVerified.value) return alert('전화번호 수정 시 인증은 필수입니다.');
   }
 
   if (!companyName.value) return alert('회사명은 필수 입력입니다.');
@@ -243,22 +352,19 @@ const checkInputElement = () => {
   return null;
 };
 
-const handleVerifyEmail = () => {
-  if (!email.value) return alert('이메일을 먼저 입력해주세요.');
-
+const handleVerifyEmail = async () => {
   showEmailModal.value = true;
 };
 
 const handleEmailSuccess = () => {
   isEmailVerified.value = true;
-
   showEmailModal.value = false;
 };
 
 // 전화번호 변경 및 인증 요청 핸들러
 const handlePhoneBtn = async () => {
   if (!isPhoneEditable.value) {
-    isVerified.value = false; //변경하는 순간 다시 인증해야함
+    isPhoneVerified.value = false; //변경하는 순간 다시 인증해야함
     isPhoneEditable.value = true;
     isVerificationRequested.value = false;
     showPhoneVerification.value = false;
@@ -267,26 +373,29 @@ const handlePhoneBtn = async () => {
       alert('올바른 전화번호를 입력해주세요.');
       return;
     }
-    //인증번호 받아오기 api 이용
-    alert('인증번호가 발송되었습니다.');
+
+    isPhoneVerified.value = false;
+    verificationCode.value = '';
+
+  alert(`인증번호를 발송했습니다: ${phoneNumber.value}`);
+  try {
+    await axios.post('/api/sms/send', {phone: phoneNumber.value});
+
     showPhoneVerification.value = true;
     isVerificationRequested.value = true;
-    startTimer();
-  }
+    startTimer(); 
+  }catch(error){
+    const status = error.response.status;
+
+    if(status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else alert(`메시지 전송에 오류가 발생했습니다. (Code: ${status})`);
+  }  
+}
 };
 
 // 주소 변경 버튼 핸들러
 const handleAddressChangeBtn = () => {
   isAddressEditable.value = true;
-};
-
-const addInterestField = () => {
-  specialInterests.value.push('');
-};
-
-const updateInterest = (event: Event, index: number) => {
-  const target = event.target as HTMLInputElement;
-  specialInterests.value[index] = target.value;
 };
 
 const removeInterest = (index: number) => {
@@ -301,30 +410,41 @@ const handleSave = async () => {
     companyAddress.value = `${companyFrontAddress.value} ${companyBackAddress.value}`;
     isAddressEditable.value = false;
   }
-  try {
-    let finalImageUrl = profileImage.value; // 기본값은 현재 이미지 경로
 
-    //새로 선택된 이미지가 있다면 먼저 업로드하여 경로를 받아오기
-    if (selectedImageFile.value) {
+    try{
       const formData = new FormData();
-      formData.append('profileImage', selectedImageFile.value);
-      // 'profileImage'는 백엔드에서 받는 키 값과 일치해야 합니다.
 
-      // [가상 코드] 이미지 업로드 API 호출
-      // const uploadRes = await api.post('/api/upload/image', formData, {
-      //   headers: { 'Content-Type': 'multipart/form-data' }
-      // });
+      const specialityIds = specialInterests.value
+      .filter((id) => id !== null) // null 제거
+      .map((id) => Number(id));    // 숫자로 확실하게 변환
+      
+      const infoData = {
+        nickname: nickname.value,
+        birth: birthDate.value ? birthDate.value:null,
+        gender: gender.value,
+        phone: phoneNumber.value,
+        companyName: companyName.value,
+        companyAddress: companyAddress.value,
+        image: selectedImageFile.value ? null: profileImage.value,
+        emailAuthentication: isEmailVerified.value,
+        specialities: specialityIds
+      }
 
-      // 서버가 반환해준 저장된 이미지 경로 (예: '/uploads/abc.jpg' 또는 'https://s3...')
-      // finalImageUrl = uploadRes.data.filePath;
-    }
+      const jsonBlob = new Blob([JSON.stringify(infoData)], {type: "application/json"});
+      formData.append("info",jsonBlob);
 
-    //받아온 이미지 경로와 나머지 폼 데이터를 DB에 저장 요청-payload (profileImageURL: finalImageUrl)
+      if(selectedImageFile.value){
+        formData.append('image', selectedImageFile.value);
+      }
 
-    // [가상 코드] 회원 정보 수정 API 호출
-    // await api.put('/api/user/profile', payload);
-
-    //성공 처리
+      const userId = 5; //pinia 수정 필요
+      await axios.put(`/api/info/user/${userId}`,formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      //성공 처리
     showSuccess.value = true;
     isAddressEditable.value = false;
     isPhoneEditable.value = false;
@@ -333,10 +453,16 @@ const handleSave = async () => {
     selectedImageFile.value = null;
 
     setTimeout(() => (showSuccess.value = false), 3000);
-  } catch (error) {
-    console.error('저장 실패:', error);
-    alert('저장 중 오류가 발생했습니다.');
-  }
+
+    }catch(error){
+      const status = error.response.status;
+
+      if(status === 404){
+        alert("[404 Not Found] 해당 사용자가 존재하지 않습니다.");
+      }else{
+        alert(`오류가 발생했습니다. (Code: ${status})`);
+      }
+    }
 };
 
 //회원 탈퇴 핸들러
@@ -543,7 +669,7 @@ const handleWithdraw = () => {
                 </button>
               </div>
               <p
-                v-if="!isTimeout && isVerified"
+                v-if="!isTimeout && isPhoneVerified"
                 class="text-xs text-red-500 mt-1 pl-1"
               >
                 인증되었습니다.
@@ -638,46 +764,54 @@ const handleWithdraw = () => {
         </div>
 
         <div class="info-card">
-          <div class="card-title">기타</div>
+  <div class="card-title">기타</div>
 
-          <p class="px-6 pt-4 text-xs text-[#868E96] leading-relaxed">
-            팀원의 특이사항도 입력해보세요! 함께 반영됩니다.
-          </p>
+  <p class="px-6 pt-4 text-xs text-[#868E96] leading-relaxed">
+    팀원의 특이사항도 입력해보세요! 함께 반영됩니다.
+  </p>
 
-          <div class="p-6 space-y-5">
-            <div class="input-group">
-              <label>특이사항</label>
-              <div class="space-y-2">
-                <div
-                  v-for="(interest, index) in specialInterests"
-                  :key="index"
-                  class="flex items-center gap-2"
-                >
-                  <input
-                    :value="interest"
-                    @input="updateInterest($event, index)"
-                    placeholder="특이사항을 입력해주세요."
-                    class="input-field flex-1"
-                  />
-                  <button
-                    @click="removeInterest(index)"
-                    class="p-2 text-[#ADB5BD] hover:text-[#FF6B4A] transition-colors rounded-lg hover:bg-[#FFF9F8]"
-                    title="삭제"
-                  >
-                    <X class="w-5 h-5" />
-                  </button>
-                </div>
+  <div class="p-6 space-y-5">
+    <div class="input-group">
+      <label>특이사항</label>
+      <div class="space-y-2">
+        <div
+          v-for="(interestId, index) in specialInterests"
+          :key="index"
+          class="flex items-center gap-2"
+        >
+          <select
+            v-model="specialInterests[index]"
+            class="input-field flex-1 appearance-none bg-white cursor-pointer"
+          >
+            <option :value="null" disabled>특이사항을 선택해주세요.</option>
+            <option
+              v-for="option in getAvailableOptions(index)"
+              :key="option.id"
+              :value="option.id"
+            >
+              {{ option.label }}
+            </option>
+          </select>
 
-                <button
-                  @click="addInterestField"
-                  class="w-full h-10 border-2 border-dashed border-[#E9ECEF] rounded-lg text-[#ADB5BD] hover:bg-[#F8F9FA] transition-colors"
-                >
-                  + 추가하기
-                </button>
-              </div>
-            </div>
-          </div>
+          <button
+            @click="removeInterest(index)"
+            class="p-2 text-[#ADB5BD] hover:text-[#FF6B4A] transition-colors rounded-lg hover:bg-[#FFF9F8] border border-transparent hover:border-[#ffece9]"
+            title="삭제"
+          >
+            <X class="w-5 h-5" />
+          </button>
         </div>
+
+        <button
+          @click="addInterestField"
+          class="w-full h-10 border-2 border-dashed border-[#E9ECEF] rounded-lg text-[#ADB5BD] hover:bg-[#F8F9FA] transition-colors flex items-center justify-center gap-1 font-medium text-sm"
+        >
+          <span>+</span> 추가하기
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
         <CheckEmailModal
           v-if="showEmailModal"

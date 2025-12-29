@@ -200,7 +200,6 @@ const handleVerifyUser = async () => {
 
   let body;
   
-  // 🚨🚨 [중요] 여기가 문제였습니다. isOwner.value로 수정!
   if(isOwner.value){
     body = {
       loginId: email.value,

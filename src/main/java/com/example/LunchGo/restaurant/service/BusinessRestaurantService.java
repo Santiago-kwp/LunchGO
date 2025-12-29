@@ -7,16 +7,21 @@ import com.example.LunchGo.restaurant.dto.RegularHolidayDTO;
 import com.example.LunchGo.restaurant.dto.RestaurantDetailResponse;
 import com.example.LunchGo.restaurant.dto.RestaurantCreateRequest; // Import added
 import com.example.LunchGo.restaurant.dto.RestaurantTagDTO;
+import com.example.LunchGo.restaurant.entity.RegularHoliday;
 import com.example.LunchGo.restaurant.entity.Restaurant;
+import com.example.LunchGo.restaurant.repository.RegularHolidayRepository;
 import com.example.LunchGo.restaurant.repository.RestaurantRepository;
 import com.example.LunchGo.restaurant.stats.RestaurantStatsEventService;
 import com.example.LunchGo.restaurant.dto.RestaurantUpdateRequest;
+import com.example.LunchGo.tag.entity.SearchTag;
+import com.example.LunchGo.tag.repository.SearchTagRepository;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 

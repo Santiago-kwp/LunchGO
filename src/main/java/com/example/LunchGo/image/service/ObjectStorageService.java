@@ -113,13 +113,14 @@ public class ObjectStorageService {
             case "reviews" -> String.format("reviews/%s/%s/%s.%s", year, month, uuid, extension);
             case "receipts" -> String.format("receipts/%s/%s/%s.%s", year, month, uuid, extension);
             case "cafeteria" -> String.format("cafeteria/%s/%s/%s/%s.%s", year, month, day, uuid, extension);
+            case "profile" -> String.format("profile/%s/%s/%s/%s.%s", year, month, day, uuid, extension);
             default -> throw new IllegalArgumentException("unsupported domain: " + domain);
         };
     }
 
     private boolean isPublicDomain(String domain) {
         String normalized = domain.toLowerCase(Locale.ROOT);
-        return "reviews".equals(normalized) || "cafeteria".equals(normalized);
+        return "reviews".equals(normalized) || "cafeteria".equals(normalized) || "profile".equals(normalized);
     }
 
     private String buildPublicUrl(String key) {
