@@ -10,4 +10,6 @@ import org.springframework.stereotype.Repository;
 public interface SearchTagRepository extends JpaRepository<SearchTag, Long> {
 
     List<SearchTag> findByCategoryIn(List<TagCategory> categories);
+
+    List<SearchTag> findByContentInAndCategory(List<String> contents, TagCategory category);
 }

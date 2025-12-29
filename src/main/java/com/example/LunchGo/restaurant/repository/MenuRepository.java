@@ -44,6 +44,11 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
     @Query(value = "DELETE FROM menu_tag_maps WHERE menu_id = :menuId", nativeQuery = true)
     void deleteMenuTagMappingsByMenuId(@Param("menuId") Long menuId);
 
+    @Query(value = "SELECT DISTINCT restaurant_id FROM menus WHERE name LIKE %:keyword%", nativeQuery = true)
+    List<Long> findRestaurantIdsByMenuNameContaining(@Param("keyword") String keyword);
+
+    @Query(value = "SELECT DISTINCT m.restaurant_id FROM menus m JOIN menu_tag_maps mt ON m.menu_id = mt.menu_id WHERE mt.tag_id IN (:tagIds)", nativeQuery = true)
+    List<Long> findRestaurantIdsByMenuTagIds(@Param("tagIds") List<Long> tagIds);
     @Query(value = "SELECT image_url FROM menu_images WHERE menu_id = :menuId", nativeQuery = true)
     List<String> findMenuImageUrls(@Param("menuId") Long menuId);
 }

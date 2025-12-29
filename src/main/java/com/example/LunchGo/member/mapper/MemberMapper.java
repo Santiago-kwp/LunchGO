@@ -14,6 +14,7 @@ public interface MemberMapper {
      * */
     MemberInfo selectUser(@Param("userId") Long userId);
 
+
     /**
      * 마이페이지에서 유저 정보 업데이트(특이사항 제외)
      * */

@@ -11,6 +11,9 @@ INSERT INTO users (email, password, name, nickname, phone, birth, gender, compan
                                                                                                                                                             ('park@lunch.com', '1234', '박휴면', '잠자는유저', '010-1111-2222', '1988-08-15', 'M', '삼성전자', '서울 서초구', 'DORMANT', 1, 1),
                                                                                                                                                             ('choi@lunch.com', '1234', '최탈퇴', NULL, '010-3333-4444', '1990-01-01', 'F', '무소속', '서울', 'WITHDRAWAL', 0, 0);
 
+-- 테스트용: user_id=2 활성 상태로 설정
+UPDATE users SET status = 'ACTIVE' WHERE user_id = 2;
+
 -- [1-2] Owners (점주)
 INSERT INTO owners (login_id, password, business_num, name, phone, status, role, start_at) VALUES
                                                                                      ('owner_korean', '1234', '111-22-33333', '백종원', '010-5555-6666', 'ACTIVE', 'OWNER', '2002-01-01'),
@@ -63,6 +66,13 @@ INSERT INTO speciality_mappings (user_id, speciality_id) VALUES
                                                              (1, 5), -- 김판교: 가성비 선호
                                                              (2, 2), -- 이강남: 일식 선호
                                                              (2, 6); -- 이강남: 오이 싫어함
+
+-- [2-1-1] 테스트용 기피 키워드 추가 (userId=2)
+INSERT INTO speciality_mappings (user_id, speciality_id)
+SELECT 2, speciality_id
+FROM specialities
+WHERE is_liked = 0
+  AND keyword IN ('오이', '고수', '돼지고기', '계란', '김치');
 
 -- [2-2] Staffs (직원) -> Owner 참조
 INSERT INTO staffs (email, password, name, role, owner_id) VALUES

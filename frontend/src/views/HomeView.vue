@@ -14,7 +14,6 @@ import {
   User,
   Star,
   X,
-  Search,
   Minus,
   Plus,
   SlidersHorizontal,
@@ -29,21 +28,40 @@ import { RouterLink } from "vue-router"; // Import Vue RouterLink
 import { loadKakaoMaps, geocodeAddress } from "@/utils/kakao";
 import { restaurants as restaurantData } from "@/data/restaurants";
 import AppHeader from "@/components/ui/AppHeader.vue";
-import CafeteriaMenuUploadModal from "@/components/ui/CafeteriaMenuUploadModal.vue";
-import CafeteriaRecommendationList from "@/components/ui/CafeteriaRecommendationList.vue";
+import CafeteriaRecommendationSection from "@/components/ui/CafeteriaRecommendationSection.vue";
 import RestaurantCardList from "@/components/ui/RestaurantCardList.vue";
-import RestaurantCardSkeletonList from "@/components/ui/RestaurantCardSkeletonList.vue";
-import { cafeteriaRecommendationsSample } from "@/data/cafeteriaRecommendations";
-import axios from "axios";
+import { useCafeteriaRecommendation } from "@/composables/useCafeteriaRecommendation";
+import TrendingRecommendationSection from "@/components/ui/TrendingRecommendationSection.vue";
+import { useTrendingRestaurants } from "@/composables/useTrendingRestaurants";
+
+const DEFAULT_USER_ID = 2;
 
 // State management (React's useState -> Vue's ref)
 const isFilterOpen = ref(false);
 const selectedSort = ref("추천순");
 const selectedPriceRange = ref(null);
 const selectedRecommendation = ref(null);
-const isCafeteriaMenuModalOpen = ref(false);
-const cafeteriaRecommendations = ref([]);
-const cafeteriaRecommendationStorageKey = "cafeteriaRecommendations";
+const {
+  cafeteriaRecommendations,
+  cafeteriaOcrResult,
+  cafeteriaOcrError,
+  cafeteriaDaysDraft,
+  cafeteriaImageUrl: cafeteriaImageUrlRef,
+  isCafeteriaOcrLoading,
+  isCafeteriaModalOpen,
+  hasConfirmedMenus,
+  isCheckingMenus,
+  loadRecommendationsFromStorage,
+  clearCafeteriaRecommendations,
+  handleCafeteriaFileChange,
+  handleCafeteriaOcr,
+  handleCafeteriaConfirm,
+  checkCafeteriaMenuStatus,
+  openCafeteriaModal,
+  openCafeteriaModalWithExisting,
+  requestCafeteriaRecommendations,
+} = useCafeteriaRecommendation({ userId: DEFAULT_USER_ID });
+const cafeteriaImageUrl = computed(() => cafeteriaImageUrlRef.value);
 const homeListStateStorageKey = "homeListState";
 const filterForm = reactive({
   sort: selectedSort.value,
@@ -60,9 +78,13 @@ const searchTags = ref([]);
 const avoidIngredients = ref([]);
 const searchDistance = ref("");
 const budget = ref(500000);
-const isTrendingLoading = ref(false);
-const trendingRestaurants = ref([]);
-const trendingError = ref(null);
+const {
+  isTrendingLoading,
+  trendingRestaurants,
+  trendingError,
+  fetchTrendingRestaurants,
+  clearTrendingRestaurants,
+} = useTrendingRestaurants();
 
 const selectedDistanceKm = computed(() => {
   if (!searchDistance.value) return null;
@@ -749,21 +771,44 @@ const applyFilters = () => {
 const clearTrendingRecommendation = () => {
   selectedRecommendation.value = null;
   filterForm.recommendation = null;
-  trendingRestaurants.value = [];
-  trendingError.value = null;
+  clearTrendingRestaurants();
   currentPage.value = 1;
   persistHomeListState();
 };
 
 const toggleRecommendationOption = (option) => {
   if (option === "구내식당 대체 추천") {
-    isCafeteriaMenuModalOpen.value = true;
     filterForm.recommendation = option;
+    const baseDate = resolveCafeteriaBaseDate();
+    checkCafeteriaMenuStatus(baseDate);
     return;
   }
 
   filterForm.recommendation =
     filterForm.recommendation === option ? null : option;
+};
+
+const handleCafeteriaMenuEdit = () => {
+  if (hasConfirmedMenus.value) {
+    openCafeteriaModalWithExisting(resolveCafeteriaBaseDate());
+    return;
+  }
+  openCafeteriaModal();
+};
+
+const handleCafeteriaRecommendNow = async () => {
+  await requestCafeteriaRecommendations(resolveCafeteriaBaseDate());
+  isFilterOpen.value = false;
+};
+
+const handleCafeteriaConfirmAndClose = async (days) => {
+  const saved = await handleCafeteriaConfirm(
+    days,
+    resolveCafeteriaBaseDate()
+  );
+  if (saved) {
+    isFilterOpen.value = false;
+  }
 };
 
 const toggleSearchCategory = (category) => {
@@ -815,33 +860,15 @@ const closeMapRestaurantModal = () => {
   selectedMapRestaurant.value = null;
 };
 
-const handleCafeteriaRecommend = () => {
-  cafeteriaRecommendations.value = cafeteriaRecommendationsSample;
-  sessionStorage.setItem(
-    cafeteriaRecommendationStorageKey,
-    JSON.stringify(cafeteriaRecommendations.value)
-  );
-  isCafeteriaMenuModalOpen.value = false;
-  isFilterOpen.value = false;
-};
-
-const clearCafeteriaRecommendations = () => {
-  cafeteriaRecommendations.value = [];
-  sessionStorage.removeItem(cafeteriaRecommendationStorageKey);
+const resolveCafeteriaBaseDate = () => {
+  if (searchDate.value) {
+    return searchDate.value;
+  }
+  return new Date().toISOString().slice(0, 10);
 };
 
 onMounted(() => {
-  const storedRecommendations = sessionStorage.getItem(
-    cafeteriaRecommendationStorageKey
-  );
-  if (storedRecommendations) {
-    try {
-      cafeteriaRecommendations.value = JSON.parse(storedRecommendations);
-    } catch (error) {
-      console.error("추천 데이터 복원 실패:", error);
-      sessionStorage.removeItem(cafeteriaRecommendationStorageKey);
-    }
-  }
+  loadRecommendationsFromStorage();
 
   const storedHomeState = sessionStorage.getItem(homeListStateStorageKey);
   if (storedHomeState) {
@@ -865,35 +892,12 @@ onMounted(() => {
   }
 });
 
-const fetchTrendingRestaurants = async () => {
-  isTrendingLoading.value = true;
-  trendingError.value = null;
-  try {
-    const response = await axios.get("/api/restaurants/trending", {
-      params: {
-        days: 7,
-        limit: restaurantsPerPage,
-      },
-    });
-    trendingRestaurants.value = Array.isArray(response.data)
-      ? response.data
-      : [];
-  } catch (error) {
-    console.error("트렌딩 식당 로드 실패:", error);
-    trendingError.value = "트렌딩 식당을 불러오지 못했어요.";
-    trendingRestaurants.value = [];
-  } finally {
-    isTrendingLoading.value = false;
-  }
-};
-
 watch(isTrendingSort, (isActive) => {
   if (isActive) {
-    fetchTrendingRestaurants();
+    fetchTrendingRestaurants({ days: 7, limit: restaurantsPerPage });
     return;
   }
-  trendingRestaurants.value = [];
-  trendingError.value = null;
+  clearTrendingRestaurants();
 });
 
 const persistHomeListState = () => {
@@ -982,34 +986,23 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="px-4 py-5">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-[#1e3a5f]">
-            {{
-              cafeteriaRecommendations.length
-                ? "구내식당 대체 추천"
-                : "오늘의 추천 회식 맛집"
-            }}
-          </h3>
-          <Button
-            v-if="!cafeteriaRecommendations.length"
-            @click="isSearchOpen = true"
-            variant="outline"
-            size="sm"
-            class="h-8 px-3 text-xs border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] hover:text-[#1e3a5f] rounded-lg flex items-center gap-1"
-          >
-            <Search class="w-3.5 h-3.5" />
-            검색
-          </Button>
-          <Button
-            v-else
-            @click="clearCafeteriaRecommendations"
-            variant="outline"
-            size="sm"
-            class="h-8 px-3 text-xs border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] hover:text-[#1e3a5f] rounded-lg flex items-center gap-1"
-          >
-            추천 해제
-          </Button>
-        </div>
+        <CafeteriaRecommendationSection
+          :recommendations="cafeteriaRecommendations"
+          :favoriteRestaurantIds="favoriteRestaurantIds"
+          :onToggleFavorite="toggleRestaurantFavorite"
+          :onOpenSearch="() => (isSearchOpen = true)"
+          :onClearRecommendations="clearCafeteriaRecommendations"
+          :isModalOpen="isCafeteriaModalOpen"
+          :isProcessing="isCafeteriaOcrLoading"
+          :ocrResult="cafeteriaOcrResult"
+          :days="cafeteriaDaysDraft"
+          :errorMessage="cafeteriaOcrError"
+          :initialImageUrl="cafeteriaImageUrl"
+          :onModalClose="() => (isCafeteriaModalOpen = false)"
+          :onFileChange="handleCafeteriaFileChange"
+          :onRunOcr="() => handleCafeteriaOcr(resolveCafeteriaBaseDate())"
+          :onConfirm="handleCafeteriaConfirmAndClose"
+        />
 
         <div
           v-if="!cafeteriaRecommendations.length"
@@ -1024,51 +1017,16 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <CafeteriaRecommendationList
-          v-if="cafeteriaRecommendations.length"
-          :recommendations="cafeteriaRecommendations"
-          :favoriteRestaurantIds="favoriteRestaurantIds"
-          :onToggleFavorite="toggleRestaurantFavorite"
-          class="mb-6"
-        />
-
-        <div v-else class="space-y-6">
-          <section v-if="isTrendingSort" class="space-y-3">
-            <div class="flex items-center justify-between">
-              <h4 class="text-base font-semibold text-[#1e3a5f]">
-                트렌딩 인기순 추천
-              </h4>
-              <div class="flex items-center gap-2">
-                <span
-                  v-if="isTrendingLoading"
-                  class="text-xs text-[#6c757d]"
-                >
-                  불러오는 중...
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  class="h-8 px-3 text-xs border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] hover:text-[#1e3a5f] rounded-lg"
-                  @click="clearTrendingRecommendation"
-                >
-                  추천 해제
-                </Button>
-              </div>
-            </div>
-            <p v-if="trendingError" class="text-xs text-[#e03131]">
-              {{ trendingError }}
-            </p>
-            <RestaurantCardSkeletonList
-              v-if="isTrendingLoading"
-              :count="3"
-            />
-            <RestaurantCardList
-              v-if="!isTrendingLoading && trendingCards.length"
-              :restaurants="trendingCards"
-              :favoriteRestaurantIds="favoriteRestaurantIds"
-              :onToggleFavorite="toggleRestaurantFavorite"
-            />
-          </section>
+        <div v-if="!cafeteriaRecommendations.length" class="space-y-6">
+          <TrendingRecommendationSection
+            :isActive="isTrendingSort"
+            :isLoading="isTrendingLoading"
+            :error="trendingError"
+            :cards="trendingCards"
+            :favoriteRestaurantIds="favoriteRestaurantIds"
+            :onToggleFavorite="toggleRestaurantFavorite"
+            :onClear="clearTrendingRecommendation"
+          />
 
           <RestaurantCardList
             :restaurants="paginatedRestaurants"
@@ -1258,6 +1216,30 @@ onBeforeUnmount(() => {
                 {{ option }}
               </button>
             </div>
+            <div
+              v-if="filterForm.recommendation === '구내식당 대체 추천'"
+              class="mt-3 flex items-center justify-end gap-2"
+            >
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="px-3 py-2 rounded-lg text-xs font-semibold border border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] disabled:opacity-60 disabled:cursor-not-allowed"
+                  :disabled="isCheckingMenus"
+                  @click="handleCafeteriaMenuEdit"
+                >
+                  {{ hasConfirmedMenus ? '구내식당 메뉴 수정' : '구내식당 메뉴 입력' }}
+                </button>
+                <button
+                  v-if="hasConfirmedMenus"
+                  type="button"
+                  class="px-3 py-2 rounded-lg text-xs font-semibold gradient-primary text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                  :disabled="isCheckingMenus"
+                  @click="handleCafeteriaRecommendNow"
+                >
+                  추천받기
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1280,12 +1262,6 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
-
-    <CafeteriaMenuUploadModal
-      v-if="isCafeteriaMenuModalOpen"
-      @close="isCafeteriaMenuModalOpen = false"
-      @recommend="handleCafeteriaRecommend"
-    />
 
     <!-- Search Modal -->
     <div

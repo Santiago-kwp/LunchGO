@@ -30,6 +30,7 @@
         WHERE u.user_id = #{userId} and status = 'ACTIVE'
    </select>
 
+
     <update id="updateUser">
         UPDATE users set nickname = #{nickname}, birth = #{birth}, gender=#{gender}, phone= #{phone}, company_name=#{companyName},
                          company_address = #{companyAddress}, email_authentication = #{emailAuthentication}, image = #{image}, updated_at = now()

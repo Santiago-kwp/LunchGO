@@ -1,11 +1,39 @@
 <script setup>
-import { ref, computed, onBeforeUnmount } from "vue";
+import { ref, computed, onBeforeUnmount, watch } from "vue";
 
-const emit = defineEmits(["close", "recommend"]);
+const props = defineProps({
+  isProcessing: {
+    type: Boolean,
+    default: false,
+  },
+  initialImageUrl: {
+    type: String,
+    default: "",
+  },
+  ocrResult: {
+    type: Object,
+    default: null,
+  },
+  days: {
+    type: Array,
+    default: () => [],
+  },
+  errorMessage: {
+    type: String,
+    default: "",
+  },
+});
+
+const emit = defineEmits(["close", "run-ocr", "confirm", "file-change"]);
 
 const previewUrl = ref("");
+const localDays = ref([]);
 let currentObjectUrl = "";
-const canRecommend = computed(() => Boolean(previewUrl.value));
+const displayUrl = computed(() => previewUrl.value || props.initialImageUrl);
+const hasFile = computed(() => Boolean(previewUrl.value));
+const canConfirm = computed(
+  () => localDays.value.some((day) => day.menus?.length)
+);
 
 const handleFileChange = (event) => {
   const file = event.target.files?.[0];
@@ -15,6 +43,7 @@ const handleFileChange = (event) => {
       currentObjectUrl = "";
     }
     previewUrl.value = "";
+    emit("file-change", null);
     return;
   }
 
@@ -24,7 +53,34 @@ const handleFileChange = (event) => {
 
   currentObjectUrl = URL.createObjectURL(file);
   previewUrl.value = currentObjectUrl;
+  emit("file-change", file);
 };
+
+const updateDayMenus = (index, value) => {
+  const menus = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  localDays.value[index] = {
+    ...localDays.value[index],
+    menus,
+  };
+};
+
+const handleConfirm = () => {
+  emit("confirm", localDays.value);
+};
+
+watch(
+  () => props.days,
+  (value) => {
+    localDays.value = (value || []).map((day) => ({
+      ...day,
+      menus: Array.isArray(day.menus) ? [...day.menus] : [],
+    }));
+  },
+  { immediate: true }
+);
 
 onBeforeUnmount(() => {
   if (currentObjectUrl) {
@@ -39,7 +95,7 @@ onBeforeUnmount(() => {
       class="fixed inset-0 z-[110] bg-black/50 flex items-center justify-center"
       @click.self="emit('close')"
     >
-      <div class="w-full max-w-[520px] bg-white rounded-2xl shadow-xl mx-4">
+      <div class="w-full max-w-[520px] bg-white rounded-2xl shadow-xl mx-4 max-h-[85vh] flex flex-col">
         <div class="px-5 py-4 border-b border-[#e9ecef] flex items-center justify-between">
           <h3 class="text-lg font-semibold text-[#1e3a5f]">
             구내식당 주간 메뉴
@@ -53,9 +109,9 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <div class="p-5 space-y-4">
+        <div class="p-5 space-y-4 overflow-y-auto">
           <p class="text-sm text-[#6c757d]">
-            이번주 구내식당 메뉴 사진을 올리면 날짜별로 대체 식당을 추천해줄게요.
+            이번주 기준(월~금)으로 날짜가 분류됩니다. 메뉴 사진을 올리면 대체 식당을 추천해줄게요.
           </p>
 
           <div class="space-y-2">
@@ -73,9 +129,9 @@ onBeforeUnmount(() => {
           <div
             class="border border-dashed border-[#dee2e6] rounded-xl p-4 text-center bg-[#f8f9fa]"
           >
-            <template v-if="previewUrl">
+            <template v-if="displayUrl">
               <img
-                :src="previewUrl"
+                :src="displayUrl"
                 alt="주간 메뉴 미리보기"
                 class="max-h-[280px] w-full object-contain rounded-lg bg-white"
               />
@@ -86,9 +142,50 @@ onBeforeUnmount(() => {
               </p>
             </template>
           </div>
+
+          <div class="space-y-4">
+            <div
+              v-if="ocrResult || localDays.length"
+              class="rounded-xl border border-[#e9ecef] bg-white p-4 space-y-3"
+            >
+              <p class="text-sm font-semibold text-[#1e3a5f]">
+                OCR 인식 결과
+              </p>
+              <p v-if="ocrResult && !ocrResult.ocrSuccess" class="text-xs text-[#e03131]">
+                OCR 인식이 불완전해요. 날짜별 주요 메뉴를 직접 입력해주세요.
+              </p>
+              <p v-else-if="ocrResult" class="text-xs text-[#6c757d]">
+                날짜별 메뉴를 확인하고 수정할 수 있어요.
+              </p>
+              <div class="space-y-3">
+                <div v-for="(day, index) in localDays" :key="day.date">
+                  <label class="text-xs font-semibold text-[#1e3a5f]">
+                    {{ day.day }} ({{ day.date }})
+                  </label>
+                  <input
+                    type="text"
+                    class="mt-1 w-full rounded-lg border border-[#dee2e6] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff6b4a]"
+                    :value="day.menus?.join(', ')"
+                    placeholder="예: 제육, 된장찌개"
+                    @input="updateDayMenus(index, $event.target.value)"
+                  />
+                </div>
+              </div>
+              <div
+                v-if="ocrResult && ocrResult.detectedMenus?.length"
+                class="text-xs text-[#6c757d]"
+              >
+                인식된 메뉴: {{ ocrResult.detectedMenus.join(', ') }}
+              </div>
+            </div>
+
+            <p v-if="errorMessage" class="text-xs text-[#e03131]">
+              {{ errorMessage }}
+            </p>
+          </div>
         </div>
 
-        <div class="px-5 py-4 border-t border-[#e9ecef] flex justify-end gap-2">
+        <div class="px-5 py-4 border-t border-[#e9ecef] flex justify-end gap-2 bg-white">
           <button
             type="button"
             class="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]"
@@ -99,10 +196,19 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="px-4 py-2 rounded-lg text-sm font-medium transition-colors gradient-primary text-white disabled:opacity-60 disabled:cursor-not-allowed"
-            :disabled="!canRecommend"
-            @click="emit('recommend')"
+            :disabled="!hasFile || isProcessing"
+            @click="emit('run-ocr')"
           >
-            추천받기
+            OCR 인식하기
+          </button>
+          <button
+            v-if="ocrResult"
+            type="button"
+            class="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-[#1e3a5f] text-white disabled:opacity-60 disabled:cursor-not-allowed"
+            :disabled="!canConfirm || isProcessing"
+            @click="handleConfirm"
+          >
+            확정 후 추천
           </button>
         </div>
       </div>
