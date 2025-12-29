@@ -18,8 +18,8 @@ import org.springframework.http.HttpStatus;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.ObjectCannedACL;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
@@ -64,7 +64,7 @@ public class ObjectStorageService {
 
         String fileUrl = null;
         if (isPublicDomain(domain)) {
-            fileUrl = buildPublicUrl(key);
+            fileUrl = buildPublicUrlInternal(key);
         }
         return new ImageUploadResponse(fileUrl, key, contentType, file.getSize());
     }
@@ -113,17 +113,21 @@ public class ObjectStorageService {
             case "reviews" -> String.format("reviews/%s/%s/%s.%s", year, month, uuid, extension);
             case "receipts" -> String.format("receipts/%s/%s/%s.%s", year, month, uuid, extension);
             case "cafeteria" -> String.format("cafeteria/%s/%s/%s/%s.%s", year, month, day, uuid, extension);
-            case "profile" -> String.format("profile/%s/%s/%s/%s.%s", year, month, day, uuid, extension);
+            case "restaurants" -> String.format("restaurants/%s/%s/%s.%s", year, month, uuid, extension);
+            case "menus" -> String.format("menus/%s/%s/%s.%s", year, month, uuid, extension);
             default -> throw new IllegalArgumentException("unsupported domain: " + domain);
         };
     }
 
     private boolean isPublicDomain(String domain) {
         String normalized = domain.toLowerCase(Locale.ROOT);
-        return "reviews".equals(normalized) || "cafeteria".equals(normalized) || "profile".equals(normalized);
+        return "reviews".equals(normalized)
+            || "cafeteria".equals(normalized)
+            || "restaurants".equals(normalized)
+            || "menus".equals(normalized);
     }
 
-    private String buildPublicUrl(String key) {
+    private String buildPublicUrlInternal(String key) {
         return properties.getEndpoint() + "/" + properties.getBucket() + "/" + key;
     }
 

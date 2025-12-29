@@ -115,6 +115,46 @@ export const useRestaurantStore = defineStore('restaurant', () => {
     restaurantInfo.value.images[0].imageUrl = url;
   }
 
+  async function createMenuForRestaurant(restaurantId, menu) {
+    try {
+      const response = await axios.post(
+        `/api/business/restaurants/${restaurantId}/menus`,
+        menu
+      );
+      addMenu(response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to create menu:', error);
+      throw error;
+    }
+  }
+
+  async function updateMenuForRestaurant(restaurantId, menuId, menu) {
+    try {
+      const response = await axios.put(
+        `/api/business/restaurants/${restaurantId}/menus/${menuId}`,
+        menu
+      );
+      updateMenu(response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to update menu:', error);
+      throw error;
+    }
+  }
+
+  async function deleteMenuForRestaurant(restaurantId, menuId) {
+    try {
+      await axios.delete(
+        `/api/business/restaurants/${restaurantId}/menus/${menuId}`
+      );
+      deleteMenu(menuId);
+    } catch (error) {
+      console.error('Failed to delete menu:', error);
+      throw error;
+    }
+  }
+
   return { 
     restaurantInfo,
     menus, 
@@ -126,6 +166,9 @@ export const useRestaurantStore = defineStore('restaurant', () => {
     addMenu, 
     updateMenu, 
     deleteMenu,
+    createMenuForRestaurant,
+    updateMenuForRestaurant,
+    deleteMenuForRestaurant,
     deleteMenus,
     getMenuById,
     getNextId,

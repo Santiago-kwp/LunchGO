@@ -8,11 +8,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 import com.example.LunchGo.restaurant.dto.MenuTagMappingDTO; // MenuTagMappingDto import 예정
 
 public interface MenuRepository extends JpaRepository<Menu, Long> {
 
     List<Menu> findAllByRestaurantIdAndIsDeletedFalse(Long restaurantId);
+
+    Optional<Menu> findByMenuIdAndRestaurantIdAndIsDeletedFalse(Long menuId, Long restaurantId);
 
     // 참고: `updateMenu` 메서드는 제거되었습니다. 이제 메뉴 업데이트는 `MenuService.updateMenusForRestaurant`에서
     // JPA의 변경 감지(dirty checking) 메커니즘을 통해 처리됩니다. `isDeleted = false` 조건 검사는
@@ -40,4 +43,7 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
     @Modifying
     @Query(value = "DELETE FROM menu_tag_maps WHERE menu_id = :menuId", nativeQuery = true)
     void deleteMenuTagMappingsByMenuId(@Param("menuId") Long menuId);
+
+    @Query(value = "SELECT image_url FROM menu_images WHERE menu_id = :menuId", nativeQuery = true)
+    List<String> findMenuImageUrls(@Param("menuId") Long menuId);
 }

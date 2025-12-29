@@ -56,6 +56,78 @@ public class MenuService {
     }
 
     /**
+     * 특정 식당의 단일 메뉴를 생성합니다.
+     *
+     * @param restaurantId 메뉴를 추가할 식당 ID
+     * @param menuDto      생성할 메뉴 정보 DTO
+     * @return 생성된 메뉴 DTO
+     */
+    public MenuDTO createMenu(Long restaurantId, MenuDTO menuDto) {
+        Menu menu = Menu.builder()
+                .restaurantId(restaurantId)
+                .name(menuDto.getName())
+                .price(menuDto.getPrice())
+                .category(menuDto.getCategory())
+                .description(menuDto.getDescription() != null ? menuDto.getDescription() : "")
+                .build();
+        Menu savedMenu = menuRepository.save(menu);
+        updateMenuTags(savedMenu.getMenuId(), menuDto.getTags());
+
+        MenuDTO response = modelMapper.map(savedMenu, MenuDTO.class);
+        response.setTags(menuDto.getTags() != null ? menuDto.getTags() : Collections.emptyList());
+        response.setImageUrl(menuDto.getImageUrl());
+        return response;
+    }
+
+    /**
+     * 특정 식당의 단일 메뉴를 업데이트합니다.
+     *
+     * @param restaurantId 식당 ID
+     * @param menuId       메뉴 ID
+     * @param menuDto      업데이트할 메뉴 정보 DTO
+     * @return 업데이트된 메뉴 DTO
+     */
+    public MenuDTO updateMenu(Long restaurantId, Long menuId, MenuDTO menuDto) {
+        Menu menu = menuRepository.findByMenuIdAndRestaurantIdAndIsDeletedFalse(menuId, restaurantId)
+                .orElseThrow(() -> new NoSuchElementException("Menu not found with id: " + menuId));
+
+        if (menuDto.getName() != null) {
+            menu.setName(menuDto.getName());
+        }
+        if (menuDto.getCategory() != null) {
+            menu.setCategory(menuDto.getCategory());
+        }
+        if (menuDto.getDescription() != null) {
+            menu.setDescription(menuDto.getDescription());
+        }
+        if (menuDto.getPrice() != null) {
+            menu.setPrice(menuDto.getPrice());
+        }
+
+        Menu savedMenu = menuRepository.save(menu);
+        updateMenuTags(savedMenu.getMenuId(), menuDto.getTags());
+
+        MenuDTO response = modelMapper.map(savedMenu, MenuDTO.class);
+        response.setTags(menuDto.getTags() != null ? menuDto.getTags() : Collections.emptyList());
+        response.setImageUrl(menuDto.getImageUrl());
+        return response;
+    }
+
+    /**
+     * 특정 식당의 단일 메뉴를 삭제합니다. (소프트 삭제)
+     *
+     * @param restaurantId 식당 ID
+     * @param menuId       메뉴 ID
+     */
+    public void deleteMenu(Long restaurantId, Long menuId) {
+        int updated = menuRepository.softDeleteMenu(restaurantId, menuId);
+        if (updated == 0) {
+            throw new NoSuchElementException("Menu not found with id: " + menuId);
+        }
+        menuRepository.deleteMenuTagMappingsByMenuId(menuId);
+    }
+
+    /**
      * 특정 식당의 메뉴 리스트를 업데이트합니다. (변경분 비교 방식 + ModelMapper)
      *
      * @param restaurantId    업데이트할 식당 ID
@@ -170,5 +242,49 @@ public class MenuService {
             return menuDto;
         }).collect(Collectors.toList());
     }
-}
 
+    /**
+     * 특정 식당의 단일 메뉴 정보를 조회합니다.
+     *
+     * @param restaurantId 식당 ID
+     * @param menuId       메뉴 ID
+     * @return 메뉴 DTO
+     */
+    @Transactional(readOnly = true)
+    public MenuDTO getMenuByRestaurant(Long restaurantId, Long menuId) {
+        Menu menu = menuRepository.findByMenuIdAndRestaurantIdAndIsDeletedFalse(menuId, restaurantId)
+                .orElseThrow(() -> new NoSuchElementException("Menu not found with id: " + menuId));
+
+        List<MenuTagMappingDTO> mappings = menuRepository.findTagsForMenus(List.of(menuId));
+        List<Long> tagIds = mappings.stream().map(MenuTagMappingDTO::getTagId).distinct().collect(Collectors.toList());
+        Map<Long, SearchTag> tagMap = tagIds.isEmpty()
+                ? Collections.emptyMap()
+                : searchTagRepository.findAllById(tagIds).stream()
+                        .collect(Collectors.toMap(SearchTag::getTagId, tag -> tag));
+
+        List<MenuTagDTO> menuTagDtos = mappings.stream()
+                .map(mapping -> tagMap.get(mapping.getTagId()))
+                .filter(Objects::nonNull)
+                .map(tag -> modelMapper.map(tag, MenuTagDTO.class))
+                .collect(Collectors.toList());
+
+        MenuDTO menuDto = modelMapper.map(menu, MenuDTO.class);
+        menuDto.setTags(menuTagDtos);
+        return menuDto;
+    }
+
+    /**
+     * 특정 식당의 메뉴 이미지 목록을 조회합니다.
+     *
+     * @param restaurantId 식당 ID
+     * @param menuId       메뉴 ID
+     * @return 이미지 URL 리스트
+     */
+    @Transactional(readOnly = true)
+    public List<String> getMenuImages(Long restaurantId, Long menuId) {
+        menuRepository.findByMenuIdAndRestaurantIdAndIsDeletedFalse(menuId, restaurantId)
+                .orElseThrow(() -> new NoSuchElementException("Menu not found with id: " + menuId));
+
+        return menuRepository.findMenuImageUrls(menuId);
+    }
+}
