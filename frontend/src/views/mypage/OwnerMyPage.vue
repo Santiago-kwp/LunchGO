@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, watch, computed, onUnmounted } from 'vue';
+import { ref, watch, computed, onUnmounted, onMounted } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { ArrowLeft, User, Camera } from 'lucide-vue-next';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 import BusinessSideBar from '@/components/ui/BusinessSideBar.vue';
+import axios from 'axios';
 
 const router = useRouter();
 
@@ -28,7 +29,7 @@ const isVerificationRequested = ref(false);
 // 인증번호 관련 상태
 const verificationCode = ref('');
 const isTimeout = ref(false);
-const isVerified = ref(false);
+const isPhoneVerified = ref(false);
 
 // 타이머 상태
 const timer = ref(180);
@@ -81,6 +82,37 @@ onUnmounted(() => {
   if (timerInterval.value) clearInterval(timerInterval.value);
 });
 
+const fetchOwnerInfo = async() => {
+  try {
+    const ownerId = 4; //pinia에서 가져오기
+
+    const response = await axios.get(`/api/info/business/${ownerId}`);
+    const data = response.data;
+
+    loginId.value = data.loginId;
+    name.value = data.name;
+    phoneNumber.value = data.phone;
+    businessNum.value = data.businessNum;
+    startAt.value = data.startAt;
+
+    if(data.image){
+      profileImage.value = data.image;
+    }
+  }catch(error){
+     const status = error.response.status;
+
+      if(status === 404){
+        alert("[404 Not Found] 해당 사용자가 존재하지 않습니다.");
+      }else{
+        alert(`오류가 발생했습니다. (Code: ${status})`);
+      }
+  }
+}
+
+onMounted(()=>{
+  fetchOwnerInfo();
+});
+
 const triggerFileInput = () => {
   fileInput.value?.click();
 };
@@ -99,24 +131,56 @@ const handleImageUpload = (event: Event) => {
 
 const handleVerifyCode = async () => {
   if (!verificationCode.value) return alert('인증번호를 입력해주세요.');
-  // API 체크 로직 생략
-  isVerified.value = true;
-  showPhoneVerification.value = false;
-  isPhoneEditable.value = false;
-  isVerificationRequested.value = false;
-  if (timerInterval.value) clearInterval(timerInterval.value);
+  
+  try {
+    const response = await axios.post('/api/sms/verify', {
+      phone: phoneNumber.value,
+      verifyCode: verificationCode.value
+    });
+
+    if(response.data === true){
+      alert('인증이 완료되었습니다.');
+      
+      // [인증 성공 시 로직]
+      isPhoneVerified.value = true;
+
+      //인증번호 입력란 숨기기
+      showPhoneVerification.value = false;
+
+      //전화번호 입력창을 다시 Readonly로 변경
+      isPhoneEditable.value = false;
+
+      //버튼 상태 초기화 (다시 '번호변경' 버튼으로 돌아가기)
+      isVerificationRequested.value = false;
+
+      //타이머 정지
+      if (timerInterval.value) clearInterval(timerInterval.value);
+
+    } else{
+      alert("인증번호가 일치하지 않습니다. 다시 확인해주세요.");
+
+      isPhoneVerified.value = false;
+    }
+  } catch (error) {
+    // 에러 처리
+    const status = error.response.status;
+    if (status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else alert(`오류가 발생했습니다. (Code: ${status})`);
+    
+    isPhoneVerified.value = false;
+  }
 };
 
 const checkInputElement = () => {
   if (isPhoneEditable.value) {
-    if (!isVerified.value) return alert('전화번호 수정 시 인증은 필수입니다.');
+    if (!isPhoneVerified.value) return alert('전화번호 수정 시 인증은 필수입니다.');
   }
   return null;
 };
 
 const handlePhoneBtn = async () => {
   if (!isPhoneEditable.value) {
-    isVerified.value = false;
+    isPhoneVerified.value = false;
     isPhoneEditable.value = true;
     isVerificationRequested.value = false;
     showPhoneVerification.value = false;
@@ -125,25 +189,68 @@ const handlePhoneBtn = async () => {
       alert('올바른 전화번호를 입력해주세요.');
       return;
     }
-    alert('인증번호가 발송되었습니다.');
+    
+    isPhoneVerified.value = false;
+    verificationCode.value = '';
+
+  alert(`인증번호를 발송했습니다: ${phoneNumber.value}`);
+  try {
+    await axios.post('/api/sms/send', {phone: phoneNumber.value});
+
     showPhoneVerification.value = true;
     isVerificationRequested.value = true;
-    startTimer();
-  }
+    startTimer(); 
+  }catch(error){
+    const status = error.response.status;
+
+    if(status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else alert(`메시지 전송에 오류가 발생했습니다. (Code: ${status})`);
+  }  
+}
 };
 
 //최종적 수정
 const handleSave = async () => {
   if (checkInputElement() !== null) return;
-  try {
-    // 저장 로직 생략 api
+  
+  try{
+    const formData = new FormData();
+
+    const infoData = {
+      phone: phoneNumber.value,
+      image: selectedImageFile.value? null: profileImage.value
+    }
+
+    const jsonBlob = new Blob([JSON.stringify(infoData)], {type: "application/json"});
+      formData.append("info",jsonBlob);
+
+    if(selectedImageFile.value){
+      formData.append('image', selectedImageFile.value);
+    }
+
+    const ownerId = 4; //pinia에서 가져오기
+    await axios.put(`/api/info/business/${ownerId}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+    });
+    
+     //성공 처리
     showSuccess.value = true;
     isPhoneEditable.value = false;
+
+    //파일 객체 초기화 (저장 후에는 다시 선택 전까지 비워둠)
     selectedImageFile.value = null;
+
     setTimeout(() => (showSuccess.value = false), 3000);
-  } catch (error) {
-    console.error('저장 실패:', error);
-    alert('저장 중 오류가 발생했습니다.');
+  }catch(error){
+    const status = error.response.status;
+
+      if(status === 404){
+        alert("[404 Not Found] 해당 사용자가 존재하지 않습니다.");
+      }else{
+        alert(`오류가 발생했습니다. (Code: ${status})`);
+      }
   }
 };
 
@@ -248,7 +355,7 @@ const handleWithdraw = () => {
                 </div>
 
                 <p
-                  v-if="!isTimeout && isVerified"
+                  v-if="!isTimeout && isPhoneVerified"
                   class="text-xs text-blue-500 mt-2 pl-1 font-medium"
                 >
                   ✓ 인증되었습니다.

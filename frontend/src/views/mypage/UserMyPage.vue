@@ -83,7 +83,8 @@ const preferenceOptions = [
   { id: 19, label: '해산물을 못 먹어요' },
   { id: 20, label: '비건 음식을 좋아해요' },
   { id: 21, label: '돼지고기를 못 먹어요' },
-  { id: 22, label: '소고기를 못 먹어요' }
+  { id: 22, label: '소고기를 못 먹어요' },
+  { id: 23, label: '김치 싫어해요' }
 ];
 
 //ref
