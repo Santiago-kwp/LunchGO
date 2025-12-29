@@ -3,6 +3,7 @@ package com.example.LunchGo.sms.controller;
 import com.example.LunchGo.sms.dto.SmsDTO;
 import com.example.LunchGo.sms.service.SmsService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api")
+@Log4j2
 public class SmsController {
     private final SmsService smsService;
 
@@ -30,7 +32,8 @@ public class SmsController {
     public ResponseEntity<Boolean> verifySMS(@RequestBody SmsDTO smsDTO) {
         if(!StringUtils.hasLength(smsDTO.getPhone()) || !StringUtils.hasLength(smsDTO.getVerifyCode())) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
 
-        Boolean result = smsService.verifySMSCode(smsDTO.getPhone(), smsDTO.getVerifyCode());
+        log.info("들어온 전화번호: " + smsDTO.getPhone()+" 들어온 인증코드: "+smsDTO.getVerifyCode());
+        Boolean result = smsService.verifySMSCode(smsDTO.getPhone().replace("-", ""), smsDTO.getVerifyCode());
         //인증코드 일치하면 true, 안맞으면 false
         return ResponseEntity.ok(result);
     }

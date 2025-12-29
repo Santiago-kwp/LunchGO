@@ -62,12 +62,12 @@ public class SmsServiceImpl implements SmsService {
         coolsms.setTo(phone);
         coolsms.setText("[LunchGo] 인증번호 [" + randomNum + "]를 입력해 주세요.");
 
-        long expireTime = 1000*60*3L; //유효기간 설정 후 redis에 저장
-        redisUtil.setDataExpire(phone, randomNum, expireTime);
-
         if(redisUtil.existData(phone)){
             redisUtil.deleteData(phone); //이미 존재하면 데이터 지우고 다시 보내기
         }
+
+        long expireTime = 1000*60*3L; //유효기간 설정 후 redis에 저장
+        redisUtil.setDataExpire(phone, randomNum, expireTime);
 
         try { //인증번호 전송
             SingleMessageSentResponse response = this.messageService.sendOne(new SingleMessageSendingRequest(coolsms));

@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, watch, computed, onUnmounted, onMounted } from 'vue';
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRouter } from 'vue-router';
 import { ArrowLeft, ChevronRight, Check, X } from 'lucide-vue-next'; // 아이콘 추가
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import Input from '@/components/ui/Input.vue';
+import axios from 'axios';
+
+const router = useRouter();
 
 const name = ref('');
 const email = ref('');
@@ -24,8 +27,8 @@ const companyBackAddressRef = ref<any>(null);
 
 // 인증번호 관련 상태
 const isCodeSent = ref(false);
-const verifyCode = ref('');
 const isTimeout = ref(false);
+const isPhoneVerified = ref(false);
 
 // 타이머 상태
 const timer = ref(180);
@@ -177,6 +180,13 @@ const checkInputElement = () => {
     return alert('이메일 양식에 맞지 않습니다.');
   if (!isEmailUnique.value) return alert('이메일 중복확인이 필요합니다.');
   if (!password.value) return alert('비밀번호를 입력해주세요.');
+
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,20}$/;
+
+  if (!passwordRegex.test(password.value))
+    return alert(
+      '비밀번호는 8~20자이어야 하며, 영문 대문자, 소문자, 숫자, 특수문자를 모두 포함해야 합니다.'
+    );
   if (!passwordConfirm.value) return alert('비밀번호 재입력이 필요합니다.');
   if (!name.value) return alert('이름을 입력해주세요.');
   if (!companyName.value) return alert('회사명을 입력해주세요.');
@@ -185,17 +195,58 @@ const checkInputElement = () => {
 };
 
 // 인증번호 발송
-const handleSendVerifyCode = () => {
+const handleSendVerifyCode = async () => {
   if (checkInputElement() !== null) {
     return;
   }
 
-  // API 호출 시뮬레이션
-  alert(`인증번호를 발송했습니다: ${phone.value}`);
-
-  isCodeSent.value = true;
+  isPhoneVerified.value = false;
   verificationCode.value = '';
-  startTimer();
+
+  alert(`인증번호를 발송했습니다: ${phone.value}`);
+  try {
+    await axios.post('/api/sms/send', {phone: phone.value});
+
+    isCodeSent.value = true;
+    startTimer(); 
+  }catch(error){
+    const status = error.response.status;
+
+    if(status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else alert(`메시지 전송에 오류가 발생했습니다. (Code: ${status})`);
+  }  
+};
+
+// 인증번호 확인
+const handleVerifyCode = async () => {
+  if (!verificationCode.value) return alert('인증번호를 입력해주세요.');
+  if (isTimeout.value) return alert('입력 시간이 초과되었습니다. 재발송해주세요.');
+
+  try {
+    const response = await axios.post('/api/sms/verify', {
+      phone: phone.value,
+      verifyCode: verificationCode.value
+    });
+
+    if(response.data === true){
+      alert('인증이 완료되었습니다.');
+      isPhoneVerified.value = true; // 인증 완료 상태로 변경
+
+      // 타이머 정지
+      if (timerInterval.value) clearInterval(timerInterval.value);
+    } else{
+      alert("인증번호가 일치하지 않습니다. 다시 확인해주세요.");
+
+      isPhoneVerified.value = false;
+    }
+  } catch (error) {
+    // 에러 처리
+    const status = error.response.status;
+    if (status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else alert(`오류가 발생했습니다. (Code: ${status})`);
+    
+    isPhoneVerified.value = false;
+  }
 };
 
 // 모달 관련 상태
@@ -207,9 +258,28 @@ const handleEmailDuplicateCheck = async () => {
   if (!email.value) return alert('이메일을 먼저 입력해주세요.');
 
   //백엔드 연동해서 이메일 unique한지 check
-  alert('사용 가능한 이메일입니다.');
+  try{
+    await axios.post('/api/auth/email',{
+      email: email.value
+    });
 
-  isEmailUnique.value = true;
+    alert('사용 가능한 이메일입니다.');
+    isEmailUnique.value = true;
+  }catch(error){
+    const status = error.response.status;
+
+    switch(status){
+      case 400:
+        alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+        break;
+      case 409:
+        alert("이미 사용중인 이메일입니다.");
+        email.value = '';
+        break;
+      default:
+        alert(`오류가 발생했습니다. (Code: ${status})`);
+    }
+  }
 };
 
 // 이용약관 모달 열기 -> 내용 수정 필수!!
@@ -236,24 +306,22 @@ const closeModal = () => {
   isTermsModalOpen.value = false;
 };
 
-const handleSignup = () => {
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,20}$/;
-
+const handleSignup = async () => {
   if (checkInputElement() !== null) return;
   if (!isCodeSent.value) return alert('휴대전화 인증은 필수입니다.');
-  if (!passwordRegex.test(password.value))
-    return alert(
-      '비밀번호는 8~20자이어야 하며, 영문 대문자, 소문자, 숫자, 특수문자를 모두 포함해야 합니다.'
-    );
 
   if (password.value !== passwordConfirm.value) {
     alert('비밀번호가 일치하지 않습니다.');
 
     //비밀번호 확인 입력창 비우고 포커스 이동
     passwordConfirm.value = '';
-    passwordConfirmRef.value?.focus(); // 포커스 함수 실행
+    passwordConfirmRef.value?.focus(); 
     return;
   }
+
+  // 인증번호 체크
+  if (!isPhoneVerified.value) return alert('휴대전화 인증은 필수입니다.');
+
   if (!agreeTerms.value || !agreePrivacy.value) {
     alert('필수 약관에 동의해주세요.');
     return;
@@ -262,11 +330,23 @@ const handleSignup = () => {
   //회원가입 시 도로명주소와 상세주소를 합쳐서 백엔드로 전달
   let totalAddress = companyFrontAddress.value + ' ' + companyBackAddress.value;
 
-  //인증번호가 잘못된 경우 (시스템이 보낸 인증번호 넣는 변수는 verifyCode임)
+  try {
+    await axios.post('/api/join/user', {
+      email: email.value, password: password.value, name: name.value, 
+      phone: phone.value, companyName: companyName.value,
+      companyAddress: totalAddress, marketingAgree: agreeMarketing.value
+    });
 
-  //타이머 실행되고 있으면 정지
-  if (timerInterval.value) clearInterval(timerInterval.value);
-  alert('회원가입 완료!');
+    //타이머 실행되고 있으면 정지
+    if (timerInterval.value) clearInterval(timerInterval.value);
+    alert('회원가입 완료!');
+    router.push('/');
+  }catch(error){
+    const status = error.response.status;
+
+    if(status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else alert(`오류가 발생했습니다. (Code: ${status})`);
+  }  
 };
 </script>
 
@@ -313,6 +393,7 @@ const handleSignup = () => {
                 type="email"
                 placeholder="example@email.com"
                 v-model="email"
+                :readonly="isEmailUnique"
                 class="flex-1 h-12 px-4 border-[#dee2e6] rounded-lg focus:border-[#ff6b4a] focus:ring-1 focus:ring-[#ff6b4a] text-[#1e3a5f]"
               />
               <Button
@@ -431,11 +512,13 @@ const handleSignup = () => {
                 placeholder="010-0000-0000"
                 maxlength="13"
                 v-model="phone"
-                class="flex-1 h-12 px-4 border-[#dee2e6] rounded-lg focus:border-[#ff6b4a] focus:ring-1 focus:ring-[#ff6b4a] text-[#1e3a5f]"
+                :readonly="isPhoneVerified"
+                :class="`flex-1 h-12 px-4 border-[#dee2e6] rounded-lg focus:border-[#ff6b4a] focus:ring-1 focus:ring-[#ff6b4a] text-[#1e3a5f] ${isPhoneVerified ? 'bg-gray-100 text-gray-500 cursor-not-allowed focus:ring-0 focus:border-[#dee2e6] !important' : ''}`"
               />
               <Button
                 type="button"
                 @click="handleSendVerifyCode"
+                :disabled="isPhoneVerified"
                 variant="outline"
                 class="h-12 px-4 border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] rounded-lg whitespace-nowrap"
               >
@@ -454,23 +537,42 @@ const handleSignup = () => {
             >
               인증번호
             </label>
-            <div class="relative">
-              <Input
-                id="verify"
-                type="text"
-                placeholder="인증번호를 입력하세요"
-                v-model="verificationCode"
-                class="w-full h-12 px-4 border-[#dee2e6] rounded-lg focus:border-[#ff6b4a] focus:ring-1 focus:ring-[#ff6b4a] text-[#1e3a5f] pr-16"
-              />
-              <span
-                class="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium"
-                :class="isTimeout ? 'text-red-500' : 'text-[#ff6b4a]'"
+            
+            <div class="flex gap-2">
+              <div class="relative flex-1">
+                <Input
+                  id="verify"
+                  type="text"
+                  placeholder="인증번호 6자리"
+                  v-model="verificationCode"
+                  :disabled="isPhoneVerified || isTimeout"
+                  @keydown.enter.prevent="handleVerifyCode"
+                  class="w-full h-12 px-4 border-[#dee2e6] rounded-lg focus:border-[#ff6b4a] focus:ring-1 focus:ring-[#ff6b4a] text-[#1e3a5f] pr-16 disabled:bg-gray-100 disabled:text-gray-500"
+                />
+                <span
+                  class="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium"
+                  :class="{
+                    'text-red-500': isTimeout,
+                    'text-[#20c997]': isPhoneVerified, 
+                    'text-[#ff6b4a]': !isTimeout && !isPhoneVerified
+                  }"
+                >
+                  {{ isPhoneVerified ? '인증되었습니다.' : formattedTimer }}
+                </span>
+              </div>
+
+              <Button
+                type="button"
+                @click="handleVerifyCode"
+                :disabled="isPhoneVerified || isTimeout"
+                variant="outline"
+                class="h-12 px-4 border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] rounded-lg whitespace-nowrap disabled:bg-gray-50 disabled:text-gray-400"
               >
-                {{ formattedTimer }}
-              </span>
+                확인
+              </Button>
             </div>
 
-            <p v-if="isTimeout" class="text-xs text-red-500 mt-1 pl-1">
+            <p v-if="isTimeout && !isPhoneVerified" class="text-xs text-red-500 mt-1 pl-1">
               입력 시간이 초과되었습니다. 재발송 버튼을 눌러주세요.
             </p>
           </div>

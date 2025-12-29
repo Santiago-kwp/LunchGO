@@ -11,5 +11,4 @@ public class FindPwdRequest {
     private String name;
     private String phone;
     private String password;
-    private String verifyCode;
 }

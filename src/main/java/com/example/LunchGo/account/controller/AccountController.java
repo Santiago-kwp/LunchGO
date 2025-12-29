@@ -62,7 +62,7 @@ public class AccountController {
 
     @PostMapping("/auth/search/email")
     public ResponseEntity<?> searchEmail(@RequestBody UserFindRequest userReq) {
-        if(!StringUtils.hasLength(userReq.getName()) || !StringUtils.hasLength(userReq.getPhone()) || !StringUtils.hasLength(userReq.getVerifyCode())){
+        if(!StringUtils.hasLength(userReq.getName()) || !StringUtils.hasLength(userReq.getPhone())){
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
 
@@ -75,8 +75,7 @@ public class AccountController {
 
     @PostMapping("/auth/search/loginId")
     public ResponseEntity<?> searchLoginId(@RequestBody OwnerFindRequest ownerReq) {
-        if(!StringUtils.hasLength(ownerReq.getName()) || !StringUtils.hasLength(ownerReq.getBusinessNum()) || !StringUtils.hasLength(ownerReq.getPhone()) ||
-                !StringUtils.hasLength(ownerReq.getVerifyCode())){
+        if(!StringUtils.hasLength(ownerReq.getName()) || !StringUtils.hasLength(ownerReq.getBusinessNum())||!StringUtils.hasLength(ownerReq.getPhone())){
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
 
@@ -89,7 +88,7 @@ public class AccountController {
 
     @PostMapping("/auth/search/pwd")
     public ResponseEntity<?> searchPwd(@RequestBody FindPwdRequest findPwdReq) {
-        if(!StringUtils.hasLength(findPwdReq.getPhone()) || !StringUtils.hasLength(findPwdReq.getVerifyCode()) || !StringUtils.hasLength(findPwdReq.getName())){
+        if(!StringUtils.hasLength(findPwdReq.getPhone()) || !StringUtils.hasLength(findPwdReq.getName())){
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
 
