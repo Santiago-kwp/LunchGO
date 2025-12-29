@@ -124,7 +124,7 @@ const validationErrors = reactive({
 });
 
 // 7. 저장 함수
-const saveMenu = () => {
+const saveMenu = async () => {
   // 에러 초기화
   for (const key in validationErrors) {
     validationErrors[key] = '';
@@ -174,15 +174,37 @@ const saveMenu = () => {
     imageUrl: menuData.imageUrl,
   };
 
-  if (isEditMode.value) {
-    store.updateMenu(menuToSave);
-    alert('메뉴가 수정되었습니다.');
-  } else {
-    menuToSave.id = store.getNextId();
-    store.addMenu(menuToSave);
-    alert('메뉴가 추가되었습니다.');
+  const restaurantId = store.restaurantInfo?.restaurantId;
+
+  try {
+    if (restaurantId) {
+      if (isEditMode.value) {
+        await store.updateMenuForRestaurant(
+          restaurantId,
+          menuData.id,
+          menuToSave
+        );
+        alert('메뉴가 수정되었습니다.');
+      } else {
+        menuToSave.id = null;
+        await store.createMenuForRestaurant(restaurantId, menuToSave);
+        alert('메뉴가 추가되었습니다.');
+      }
+    } else {
+      if (isEditMode.value) {
+        store.updateMenu(menuToSave);
+        alert('메뉴가 수정되었습니다.');
+      } else {
+        menuToSave.id = store.getNextId();
+        store.addMenu(menuToSave);
+        alert('메뉴가 추가되었습니다.');
+      }
+    }
+    router.back();
+  } catch (error) {
+    console.error('메뉴 저장 실패:', error);
+    alert('메뉴 저장에 실패했습니다.');
   }
-  router.back();
 };
 
 // Watchers for clearing errors

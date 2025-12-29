@@ -392,7 +392,34 @@ const handleBulkDelete = () => {
 
   if (confirmDelete) {
     const idsToDelete = filteredMenus.value.map((menu) => menu.id);
-    store.deleteMenus(idsToDelete); // 스토어 액션 호출
+    const restaurantId = store.restaurantInfo?.restaurantId;
+
+    if (restaurantId) {
+      Promise.all(
+        idsToDelete.map((menuId) =>
+          store.deleteMenuForRestaurant(restaurantId, menuId)
+        )
+      ).catch((error) => {
+        console.error('메뉴 삭제 실패:', error);
+        alert('메뉴 삭제에 실패했습니다.');
+      });
+    } else {
+      store.deleteMenus(idsToDelete); // 스토어 액션 호출
+    }
+  }
+};
+
+const deleteMenuItem = async (menuId) => {
+  const restaurantId = store.restaurantInfo?.restaurantId;
+  if (restaurantId) {
+    try {
+      await store.deleteMenuForRestaurant(restaurantId, menuId);
+    } catch (error) {
+      console.error('메뉴 삭제 실패:', error);
+      alert('메뉴 삭제에 실패했습니다.');
+    }
+  } else {
+    store.deleteMenu(menuId);
   }
 };
 
@@ -893,7 +920,7 @@ watch(paginatedMenus, (newPaginatedMenus) => {
                           수정
                         </RouterLink>
                         <button
-                          @click="store.deleteMenu(menu.id)"
+                          @click="deleteMenuItem(menu.id)"
                           class="px-3 py-2 border border-[#dc3545] text-[#dc3545] rounded-lg text-sm hover:bg-[#fff5f5] transition-colors"
                         >
                           삭제
