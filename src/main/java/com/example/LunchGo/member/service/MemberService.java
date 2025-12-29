@@ -33,7 +33,7 @@ public interface MemberService {
 
     OwnerInfo getOwnerInfo(Long ownerId);
 
-    void updateOwnerInfo(Long ownerId, OwnerUpdateInfo ownerUpdateInfo);
+    void updateOwnerInfo(Long ownerId, OwnerUpdateInfo ownerUpdateInfo, MultipartFile image);
 
     List<String> getEmails(Long ownerId);
 

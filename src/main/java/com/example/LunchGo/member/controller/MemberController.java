@@ -41,12 +41,13 @@ public class MemberController {
         return new ResponseEntity<>(owner, HttpStatus.OK);
     }
 
-    @PutMapping("/info/business/{ownerId}")
-    public ResponseEntity<?> updateOwner(@PathVariable Long ownerId, @RequestBody OwnerUpdateInfo ownerUpdateInfo) {
+    @PutMapping(value = "/info/business/{ownerId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> updateOwner(@PathVariable Long ownerId, @RequestPart(value = "info") OwnerUpdateInfo ownerUpdateInfo,
+                                         @RequestPart(value = "image", required = false) MultipartFile image) {
         if(!StringUtils.hasLength(ownerUpdateInfo.getPhone()) && !StringUtils.hasLength(ownerUpdateInfo.getImage())) {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST); //아무 변경없이 수정하기 남발 금지
         }
-        memberService.updateOwnerInfo(ownerId, ownerUpdateInfo);
+        memberService.updateOwnerInfo(ownerId, ownerUpdateInfo, image);
         return new ResponseEntity<>(HttpStatus.OK);
     }
 

@@ -176,13 +176,20 @@ public class BaseMemberService implements MemberService {
                 .phone(owner.getPhone())
                 .businessNum(owner.getBusinessNum())
                 .startAt(owner.getStartAt())
+                .image(owner.getImage())
                 .build();
     }
 
     @Override
     @Transactional
-    public void updateOwnerInfo(Long ownerId , OwnerUpdateInfo ownerUpdateInfo) {
-        int result = ownerRepository.updateOwner(ownerId, ownerUpdateInfo.getPhone(), ownerUpdateInfo.getImage());
+    public void updateOwnerInfo(Long ownerId , OwnerUpdateInfo ownerUpdateInfo, MultipartFile image) {
+        String imgUrl = ownerUpdateInfo.getImage();
+
+        if(image != null && !image.isEmpty()){
+            ImageUploadResponse response = objectStorageService.upload("profile", image);
+            imgUrl = response.getFileUrl();
+        }
+        int result = ownerRepository.updateOwner(ownerId, ownerUpdateInfo.getPhone(), imgUrl);
 
         if(result <= 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사업자를 찾을 수 없습니다.");
     }
