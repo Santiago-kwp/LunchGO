@@ -85,6 +85,10 @@ const {
   fetchTrendingRestaurants,
   clearTrendingRestaurants,
 } = useTrendingRestaurants();
+const isGeocodeExportMode = ref(false);
+const isGeocodeExporting = ref(false);
+const geocodeExportProgress = ref({ done: 0, total: 0 });
+const geocodeExportMissing = ref([]);
 
 const selectedDistanceKm = computed(() => {
   if (!searchDistance.value) return null;
@@ -408,15 +412,96 @@ const resolveRestaurantCoords = async (restaurant) => {
     return restaurantGeocodeCache.get(cacheKey);
   }
 
+  const rawAddress = restaurant.address?.trim();
+  const candidates = [];
+  if (rawAddress) {
+    candidates.push(rawAddress);
+    const withoutParens = rawAddress.split(" (")[0].trim();
+    if (withoutParens && withoutParens !== rawAddress) {
+      candidates.push(withoutParens);
+    }
+    const withoutSemicolon = rawAddress.split(";")[0].trim();
+    if (withoutSemicolon && !candidates.includes(withoutSemicolon)) {
+      candidates.push(withoutSemicolon);
+    }
+  }
+
   try {
-    const coords = await geocodeAddress(restaurant.address);
-    restaurantGeocodeCache.set(cacheKey, coords);
-    restaurant.coords = coords;
-    return coords;
+    for (const candidate of candidates) {
+      try {
+        const coords = await geocodeAddress(candidate);
+        restaurantGeocodeCache.set(cacheKey, coords);
+        restaurant.coords = coords;
+        return coords;
+      } catch (candidateError) {
+        continue;
+      }
+    }
+    throw new Error("geocode-failed");
   } catch (error) {
     console.error("주소 지오코딩 실패:", cacheKey, error);
     return null;
   }
+};
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const downloadJsonFile = (data, filename) => {
+  if (typeof window === "undefined") return;
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+};
+
+const startGeocodeExport = async () => {
+  if (isGeocodeExporting.value) return;
+  isGeocodeExporting.value = true;
+  geocodeExportMissing.value = [];
+  geocodeExportProgress.value = {
+    done: 0,
+    total: restaurants.length,
+  };
+
+  for (const restaurant of restaurants) {
+    try {
+      const coords = await resolveRestaurantCoords(restaurant);
+      if (!coords) {
+        geocodeExportMissing.value.push({
+          id: restaurant.id,
+          name: restaurant.name,
+          address: restaurant.address,
+        });
+      }
+    } catch (error) {
+      geocodeExportMissing.value.push({
+        id: restaurant.id,
+        name: restaurant.name,
+        address: restaurant.address,
+      });
+    } finally {
+      geocodeExportProgress.value.done += 1;
+      await delay(200);
+    }
+  }
+
+  const exportPayload = restaurants.map((restaurant) => ({
+    id: restaurant.id,
+    name: restaurant.name,
+    address: restaurant.address,
+    coords: restaurant.coords ?? null,
+  }));
+
+  downloadJsonFile(exportPayload, "restaurant_coords.json");
+  if (geocodeExportMissing.value.length) {
+    console.warn("좌표 변환 실패 목록:", geocodeExportMissing.value);
+  }
+  isGeocodeExporting.value = false;
 };
 
 const renderMapMarkers = async (kakaoMaps) => {
@@ -568,6 +653,13 @@ const initializeMap = async () => {
 
 onMounted(() => {
   initializeMap();
+  if (typeof window !== "undefined") {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("geocode") === "1") {
+      isGeocodeExportMode.value = true;
+      startGeocodeExport();
+    }
+  }
 });
 
 onBeforeUnmount(() => {
@@ -929,6 +1021,22 @@ onBeforeUnmount(() => {
 <template>
   <div class="min-h-screen bg-[#f8f9fa]">
     <AppHeader />
+    <div
+      v-if="isGeocodeExportMode"
+      class="bg-white border-b border-[#e9ecef]"
+    >
+      <div class="max-w-[500px] mx-auto px-4 py-3 text-xs text-[#495057]">
+        <p class="font-semibold text-[#1e3a5f]">주소 좌표 생성 모드</p>
+        <p v-if="isGeocodeExporting">
+          진행 중: {{ geocodeExportProgress.done }} /
+          {{ geocodeExportProgress.total }}
+        </p>
+        <p v-else>완료되었습니다. 다운로드된 파일을 확인하세요.</p>
+        <p v-if="geocodeExportMissing.length">
+          실패 {{ geocodeExportMissing.length }}건 (콘솔 확인)
+        </p>
+      </div>
+    </div>
 
     <main class="max-w-[500px] mx-auto pb-20">
       <div class="bg-white px-4 py-4 border-b border-[#e9ecef]">
