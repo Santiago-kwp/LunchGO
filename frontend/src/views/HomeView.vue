@@ -33,6 +33,7 @@ import RestaurantCardList from "@/components/ui/RestaurantCardList.vue";
 import { useCafeteriaRecommendation } from "@/composables/useCafeteriaRecommendation";
 import TrendingRecommendationSection from "@/components/ui/TrendingRecommendationSection.vue";
 import { useTrendingRestaurants } from "@/composables/useTrendingRestaurants";
+import axios from "axios";
 
 const DEFAULT_USER_ID = 2;
 
@@ -106,6 +107,18 @@ const restaurantIndexById = new Map(
 );
 const restaurantImageCache = new Map();
 const restaurantImageOverrides = ref({});
+const reviewSummaryCache = ref({});
+const reviewSummaryInFlight = new Set();
+
+const applyReviewSummary = (restaurant) => {
+  const summary = reviewSummaryCache.value[String(restaurant.id)];
+  if (!summary) return restaurant;
+  return {
+    ...restaurant,
+    rating: summary.rating ?? restaurant.rating,
+    reviews: summary.reviews ?? restaurant.reviews,
+  };
+};
 const processedRestaurants = computed(() => {
   let result = restaurants.slice();
 
@@ -198,15 +211,28 @@ const displayRestaurants = computed(() => availableRestaurants.value);
 const totalPages = computed(() =>
   Math.max(1, Math.ceil(displayRestaurants.value.length / restaurantsPerPage))
 );
-const paginatedRestaurants = computed(() => {
+const paginatedRestaurantsRaw = computed(() => {
   const start = (currentPage.value - 1) * restaurantsPerPage;
   return displayRestaurants.value.slice(start, start + restaurantsPerPage);
 });
-const pageNumbers = computed(() =>
-  Array.from({ length: totalPages.value }, (_, index) => index + 1)
+const paginatedRestaurants = computed(() =>
+  paginatedRestaurantsRaw.value.map((restaurant) =>
+    applyReviewSummary(restaurant)
+  )
 );
-const canGoPrevious = computed(() => currentPage.value > 1);
-const canGoNext = computed(() => currentPage.value < totalPages.value);
+const pageGroupSize = 5;
+const currentPageGroupStart = computed(
+  () => Math.floor((currentPage.value - 1) / pageGroupSize) * pageGroupSize + 1
+);
+const currentPageGroupEnd = computed(() =>
+  Math.min(totalPages.value, currentPageGroupStart.value + pageGroupSize - 1)
+);
+const pageNumbers = computed(() => {
+  const length = currentPageGroupEnd.value - currentPageGroupStart.value + 1;
+  return Array.from({ length }, (_, index) => currentPageGroupStart.value + index);
+});
+const canGoPrevious = computed(() => currentPageGroupStart.value > 1);
+const canGoNext = computed(() => currentPageGroupEnd.value < totalPages.value);
 const restaurantGeocodeCache = new Map();
 
 const mapContainer = ref(null);
@@ -389,20 +415,53 @@ watch(selectedPriceRange, () => {
 const goToPage = (page) => {
   if (page < 1 || page > totalPages.value) return;
   currentPage.value = page;
-  if (typeof window !== "undefined") {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
 };
 
 const goToPreviousPage = () => {
   if (!canGoPrevious.value) return;
-  goToPage(currentPage.value - 1);
+  goToPage(Math.max(1, currentPageGroupStart.value - pageGroupSize));
 };
 
 const goToNextPage = () => {
   if (!canGoNext.value) return;
-  goToPage(currentPage.value + 1);
+  goToPage(currentPageGroupStart.value + pageGroupSize);
 };
+
+const fetchReviewSummary = async (restaurantId) => {
+  const key = String(restaurantId);
+  if (reviewSummaryCache.value[key] || reviewSummaryInFlight.has(key)) return;
+  reviewSummaryInFlight.add(key);
+  try {
+    const response = await axios.get(`/api/restaurants/${restaurantId}/reviews`, {
+      params: { page: 1, size: 1, sort: "RECOMMEND" },
+    });
+    const data = response.data?.data ?? response.data;
+    const summary = data?.summary;
+    if (summary) {
+      reviewSummaryCache.value = {
+        ...reviewSummaryCache.value,
+        [key]: {
+          rating: summary.avgRating ?? 0,
+          reviews: summary.reviewCount ?? 0,
+        },
+      };
+    }
+  } catch (error) {
+    // ignore summary failures for list rendering
+  } finally {
+    reviewSummaryInFlight.delete(key);
+  }
+};
+
+watch(
+  paginatedRestaurantsRaw,
+  (restaurants) => {
+    restaurants.forEach((restaurant) => {
+      fetchReviewSummary(restaurant.id);
+    });
+  },
+  { immediate: true }
+);
 
 const resolveRestaurantCoords = async (restaurant) => {
   if (restaurant.coords?.lat && restaurant.coords?.lng) {
@@ -533,11 +592,14 @@ const renderMapMarkers = async (kakaoMaps) => {
     try {
       marker.setMap(mapInstance.value);
       kakaoMaps.event.addListener(marker, "click", () => {
+        const summary = reviewSummaryCache.value[String(restaurant.id)];
         selectedMapRestaurant.value = {
           ...restaurant,
           image:
             restaurantImageOverrides.value[String(restaurant.id)] ??
             restaurant.image,
+          rating: summary?.rating ?? restaurant.rating,
+          reviews: summary?.reviews ?? restaurant.reviews,
         };
       });
       mapMarkers.push(marker);

@@ -94,11 +94,10 @@ const highlightTags = computed(() => {
 const restaurantName = computed(() => restaurantInfo.value?.name || '식당명');
 
 const ratingDisplay = computed(() => {
-  const rating = restaurantInfo.value?.rating;
-  if (typeof rating === 'number') {
-    return rating.toFixed(1);
-  }
-  return '0.0';
+  const summaryRating = restaurantReviewSummary.value?.avgRating;
+  const rawRating = summaryRating ?? restaurantInfo.value?.rating;
+  const value = Number(rawRating);
+  return Number.isFinite(value) ? value.toFixed(1) : '0.0';
 });
 
 const reviewCountDisplay = computed(() => restaurantReviewSummary.value?.reviewCount ?? restaurantInfo.value?.reviews ?? 0);

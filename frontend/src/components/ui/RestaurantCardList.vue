@@ -59,6 +59,11 @@ const formatTagLabel = (tag) => {
   }
   return `${tag.name} ${tag.count}`;
 };
+
+const formatRating = (rating) => {
+  const value = Number(rating);
+  return Number.isFinite(value) ? value.toFixed(1) : "-";
+};
 </script>
 
 <template>
@@ -115,9 +120,9 @@ const formatTagLabel = (tag) => {
             </p>
             <div class="flex items-center gap-1 mb-1.5">
               <Star class="w-3.5 h-3.5 fill-[#ffc107] text-[#ffc107]" />
-              <span class="text-sm font-medium text-[#1e3a5f]">{{
-                restaurant.rating ?? "-"
-              }}</span>
+              <span class="text-sm font-medium text-[#1e3a5f]">
+                {{ formatRating(restaurant.rating) }}
+              </span>
               <span class="text-xs text-[#6c757d]"
                 >(리뷰수 : {{ restaurant.reviews ?? 0 }})</span
               >

@@ -38,7 +38,7 @@ const handleLogout = async () => {
           alt="런치고"
           width="56"
           height="56"
-          class="w-14 h-14 object-contain"
+          class="w-14 h-14 object-contain -ml-2"
         />
         <RouterLink
           to="/intro"
