@@ -104,6 +104,8 @@ const isTrendingSort = computed(() => selectedRecommendation.value === "인기�
 const restaurantIndexById = new Map(
   restaurants.map((restaurant) => [String(restaurant.id), restaurant])
 );
+const restaurantImageCache = new Map();
+const restaurantImageOverrides = ref({});
 const processedRestaurants = computed(() => {
   let result = restaurants.slice();
 
@@ -148,7 +150,11 @@ const processedRestaurants = computed(() => {
   const sorter = sorters[selectedSort.value] || sorters.추천순;
   result.sort(sorter);
 
-  return result;
+  const overrides = restaurantImageOverrides.value;
+  return result.map((restaurant) => ({
+    ...restaurant,
+    image: overrides[restaurant.id] ?? restaurant.image,
+  }));
 });
 const trendingCards = computed(() => {
   return trendingRestaurants.value.map((restaurant) => {
@@ -527,12 +533,38 @@ const renderMapMarkers = async (kakaoMaps) => {
     try {
       marker.setMap(mapInstance.value);
       kakaoMaps.event.addListener(marker, "click", () => {
-        selectedMapRestaurant.value = restaurant;
+        selectedMapRestaurant.value = {
+          ...restaurant,
+          image:
+            restaurantImageOverrides.value[String(restaurant.id)] ??
+            restaurant.image,
+        };
       });
       mapMarkers.push(marker);
     } catch (error) {
       console.error("지도 마커 표시 실패:", restaurant?.name, error);
     }
+  }
+};
+
+const fetchRestaurantImage = async (restaurantId) => {
+  const key = String(restaurantId);
+  if (restaurantImageCache.has(key)) return;
+  restaurantImageCache.set(key, null);
+  try {
+    const response = await axios.get(
+      `/api/business/restaurants/${restaurantId}/images`
+    );
+    const imageUrl = response.data?.[0]?.imageUrl;
+    if (imageUrl) {
+      restaurantImageCache.set(key, imageUrl);
+      restaurantImageOverrides.value = {
+        ...restaurantImageOverrides.value,
+        [key]: imageUrl,
+      };
+    }
+  } catch (error) {
+    restaurantImageCache.set(key, null);
   }
 };
 
@@ -1012,6 +1044,14 @@ watch([selectedSort, selectedPriceRange, selectedRecommendation], () => {
 watch(currentPage, () => {
   persistHomeListState();
 });
+
+watch(
+  paginatedRestaurants,
+  (list) => {
+    list.forEach((restaurant) => fetchRestaurantImage(restaurant.id));
+  },
+  { immediate: true }
+);
 
 onBeforeUnmount(() => {
   persistHomeListState();

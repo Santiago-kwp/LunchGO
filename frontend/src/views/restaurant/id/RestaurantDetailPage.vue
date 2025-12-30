@@ -191,6 +191,33 @@ const toggleRestaurantFavorite = () => {
   isRestaurantFavorite.value = !isRestaurantFavorite.value;
 };
 
+const applyRestaurantImages = (imageUrls = []) => {
+  if (!Array.isArray(imageUrls) || imageUrls.length === 0) return;
+  restaurantImages.value = imageUrls.map((url, index) => ({
+    url,
+    alt: `${restaurantInfo.value?.name || '식당'} 이미지 ${index + 1}`,
+  }));
+  restaurantInfo.value = {
+    ...restaurantInfo.value,
+    image: imageUrls[0],
+    gallery: imageUrls,
+  };
+};
+
+const loadRestaurantImages = async () => {
+  try {
+    const response = await axios.get(
+      `/api/business/restaurants/${restaurantId}/images`,
+    );
+    const imageUrls = (response.data || [])
+      .map((item) => item?.imageUrl)
+      .filter(Boolean);
+    applyRestaurantImages(imageUrls);
+  } catch (error) {
+    console.error('식당 이미지 데이터를 불러오지 못했습니다:', error);
+  }
+};
+
 const loadRepresentativeReviews = async () => {
   try {
     const response = await axios.get(`/api/restaurants/${restaurantId}/reviews`, {
@@ -338,6 +365,7 @@ onMounted(() => {
   });
   initializeDetailMap();
   loadRepresentativeReviews();
+  loadRestaurantImages();
 });
 
 onBeforeUnmount(() => {
