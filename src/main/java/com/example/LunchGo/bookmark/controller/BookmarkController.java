@@ -1,6 +1,7 @@
 package com.example.LunchGo.bookmark.controller;
 
 import com.example.LunchGo.bookmark.dto.BookmarkInfo;
+import com.example.LunchGo.bookmark.dto.BookmarkListItem;
 import com.example.LunchGo.bookmark.dto.BookmarkVisibilityRequest;
 import com.example.LunchGo.bookmark.dto.SharedBookmarkItem;
 import com.example.LunchGo.bookmark.service.BookmarkService;
@@ -50,5 +51,18 @@ public class BookmarkController {
     public ResponseEntity<List<SharedBookmarkItem>> getSharedBookmarks(@RequestParam Long requesterId,
                                                                        @RequestParam Long targetUserId) {
         return ResponseEntity.ok(bookmarkService.getSharedBookmarks(requesterId, targetUserId));
+    }
+
+    @GetMapping("/bookmark/list")
+    public ResponseEntity<List<BookmarkListItem>> getBookmarks(@RequestParam Long userId) {
+        return ResponseEntity.ok(bookmarkService.getBookmarks(userId));
+    }
+
+    @PatchMapping("/bookmark/promotion")
+    public ResponseEntity<?> updateBookmarkPromotion(@RequestParam Long userId,
+                                                     @RequestParam Long restaurantId,
+                                                     @RequestParam Boolean promotionAgree) {
+        bookmarkService.updatePromotionAgree(userId, restaurantId, promotionAgree);
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 }

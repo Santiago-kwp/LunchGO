@@ -1,91 +1,110 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { RouterLink } from 'vue-router';
-import { Star, Bell } from 'lucide-vue-next';
+import { ref, onMounted, computed } from 'vue';
+import { RouterLink, useRouter } from 'vue-router';
+import { Star, Bell, Link2, UserPlus, RefreshCw } from 'lucide-vue-next';
 import FavoriteHeart from '@/components/ui/FavoriteHeart.vue';
-// import axios from 'axios'; // 실제 API 연동 시 주석 해제
+import { useBookmarkShare } from '@/composables/useBookmarkShare';
 
 // 타입 정의
 interface Restaurant {
   id: number;
   name: string;
-  category: string;
-  rating: number;
-  reviews: number;
   description: string;
-  price: string;
-  badgeColor: string;
-  hasPromotion: boolean; // 프로모션 알림 수신 여부
+  avgMainPrice: number | null;
+  reservationLimit: number | null;
+  promotionAgree: boolean;
   isFavorite: boolean;
+  isPublic: boolean;
+  imageUrl: string | null;
+  rating: number;
+  reviewCount: number;
 }
 
-//api 호출 시 필요한 정보(변수명과 매핑)
-const userId = ref('');
-const restaurantId = ref('');
-const promotionAgree = ref('');
+interface LinkItem {
+  linkId: number;
+  requesterId: number;
+  receiverId: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
+  respondedAt: string | null;
+  counterpartId: number;
+  counterpartEmail: string;
+  counterpartNickname: string | null;
+  counterpartName: string;
+}
+
+interface SharedBookmark {
+  restaurantId: number;
+  name: string;
+  roadAddress: string;
+  detailAddress: string;
+  imageUrl: string | null;
+  rating: number;
+  reviewCount: number;
+}
+
+interface UserSearchResult {
+  userId: number;
+  email: string;
+  nickname: string | null;
+  name: string;
+}
+
+const props = defineProps<{ userId: number | null }>();
+const router = useRouter();
+
+const {
+  searchUserByEmail,
+  searchUsersByEmail,
+  requestLink,
+  respondLink,
+  getSentLinks,
+  getReceivedLinks,
+  deleteLink,
+  toggleBookmarkVisibility,
+  togglePromotionAgree,
+  getSharedBookmarks,
+  getMyBookmarks,
+} = useBookmarkShare();
 
 // 상태 관리
 const favorites = ref<Restaurant[]>([]);
 const isLoading = ref(true); // 로딩 상태
+const linkSearchEmail = ref('');
+const searchResult = ref<UserSearchResult | null>(null);
+const searchResults = ref<UserSearchResult[]>([]);
+const searchError = ref('');
+const sentLinks = ref<LinkItem[]>([]);
+const receivedLinks = ref<LinkItem[]>([]);
+const isLinkLoading = ref(false);
+const selectedSharedUserId = ref<number | null>(null);
+const sharedBookmarks = ref<SharedBookmark[]>([]);
+const isSharedLoading = ref(false);
 
 // 1. [API 로직] 즐겨찾기 목록 불러오기
 const fetchFavorites = async () => {
   try {
     isLoading.value = true;
-    
-    // [실제 API 호출 예시]
+    if (!props.userId) {
+      favorites.value = [];
+      return;
+    }
 
-    // 보통 헤더에 토큰을 담아서 보냄
-
-    // const token = localStorage.getItem('accessToken');
-
-    // const response = await axios.get('/api/user/favorites', {
-
-    //   headers: { Authorization: `Bearer ${token}` }
-
-    // });
-
-    // favorites.value = response.data;
-    
-    // 더미 데이터에 hasPromotion 필드 포함
-    favorites.value = [
-      {
-        id: 1,
-        name: '판교 숯불갈비',
-        category: '한식',
-        rating: 4.8,
-        reviews: 245,
-        description: '회식 분위기 최고, 술 사실이 풍부해요',
-        price: '18,000원 · 4인 ~ 12인',
-        badgeColor: 'bg-emerald-500',
-        hasPromotion: true, // 이미 알림 받는 중
-        isFavorite:true,
-      },
-      {
-        id: 2,
-        name: '중화요리 맛집',
-        category: '중식',
-        rating: 4.7,
-        reviews: 189,
-        description: '단체석 완비, 룸 예약 가능',
-        price: '15,000원 · 4인 ~ 10인',
-        badgeColor: 'bg-emerald-600',
-        hasPromotion: false, // 알림 안 받는 중
-        isFavorite: true,
-      },
-      {
-        id: 3,
-        name: '이탈리안 레스토랑',
-        category: '양식',
-        rating: 4.9,
-        reviews: 312,
-        description: '분위기 좋고, 와인 선택 다양',
-        price: '22,000원 · 4인 ~ 8인',
-        badgeColor: 'bg-emerald-500',
-        hasPromotion: false,
-        isFavorite: true,
-      },
-    ];
+    const response = await getMyBookmarks(props.userId);
+    const data = Array.isArray(response.data) ? response.data : [];
+    favorites.value = data.map((item) => ({
+      id: item.restaurantId,
+      name: item.name,
+      description: item.description || '설명이 없습니다.',
+      avgMainPrice: item.avgMainPrice ?? null,
+      reservationLimit: item.reservationLimit ?? null,
+      promotionAgree: Boolean(item.promotionAgree),
+      isFavorite: true,
+      isPublic: Boolean(item.isPublic),
+      imageUrl: item.imageUrl || null,
+      rating: Number(item.rating || 0),
+      reviewCount: Number(item.reviewCount || 0),
+    }));
   } catch (error) {
     console.error('데이터 로드 실패:', error);
   } finally {
@@ -93,9 +112,31 @@ const fetchFavorites = async () => {
   }
 };
 
+const fetchLinkLists = async () => {
+  if (!props.userId) return;
+  isLinkLoading.value = true;
+  try {
+    const [sentResponse, receivedResponse] = await Promise.all([
+      getSentLinks(props.userId),
+      getReceivedLinks(props.userId),
+    ]);
+    sentLinks.value = Array.isArray(sentResponse.data)
+      ? sentResponse.data
+      : [];
+    receivedLinks.value = Array.isArray(receivedResponse.data)
+      ? receivedResponse.data
+      : [];
+  } catch (error) {
+    console.error('링크 목록 로드 실패:', error);
+  } finally {
+    isLinkLoading.value = false;
+  }
+};
+
 // 컴포넌트 마운트 시 데이터 호출
 onMounted(() => {
   fetchFavorites();
+  fetchLinkLists();
 });
 
 
@@ -106,34 +147,371 @@ const handleRemoveFromList = (id:number) => {
 
 // [프로모션 토글 핸들러]
 const handlePromotionToggle = async (restaurant: Restaurant) => {
-  const previousState = restaurant.hasPromotion;
-  restaurant.hasPromotion = !previousState;
+  const previousState = restaurant.promotionAgree;
+  restaurant.promotionAgree = !previousState;
   
-  const actionName = restaurant.hasPromotion ? '설정' : '해제';
+  const actionName = restaurant.promotionAgree ? '설정' : '해제';
 
   try {
-    // API 호출
-    // if (restaurant.hasPromotion) {
-    //   await axios.post(`/api/promotion/${restaurant.id}`);
-    // } else {
-    //   await axios.delete(`/api/promotion/${restaurant.id}`);
-    // }
+    if (!props.userId) {
+      throw new Error('사용자 정보가 없습니다.');
+    }
+
+    await togglePromotionAgree(props.userId, restaurant.id, restaurant.promotionAgree);
     
   } catch (error) {
     // 실패 시 롤백
-    restaurant.hasPromotion = previousState;
+    restaurant.promotionAgree = previousState;
     alert(`프로모션 ${actionName} 중 오류가 발생했습니다.`);
   }
+};
+
+const handleSearchUser = async () => {
+  searchError.value = '';
+  searchResult.value = null;
+  searchResults.value = [];
+
+  if (!linkSearchEmail.value.trim()) {
+    searchError.value = '이메일을 입력해주세요.';
+    return;
+  }
+
+  try {
+    const response = await searchUsersByEmail(linkSearchEmail.value.trim());
+    const data = Array.isArray(response.data) ? response.data : [];
+    searchResults.value = data;
+    if (data.length === 1) {
+      searchResult.value = data[0];
+    }
+  } catch (error) {
+    searchError.value = '해당 이메일을 찾을 수 없습니다.';
+  }
+};
+
+const handleRequestLink = async (targetUser?: UserSearchResult) => {
+  const target = targetUser || searchResult.value;
+  if (!props.userId || !target) return;
+  try {
+    await requestLink(props.userId, target.userId);
+    await fetchLinkLists();
+  } catch (error) {
+    alert('링크 요청에 실패했습니다.');
+  }
+};
+
+const handleRespondLink = async (linkId: number, status: LinkItem['status']) => {
+  try {
+    await respondLink(linkId, status);
+    await fetchLinkLists();
+  } catch (error) {
+    alert('링크 처리에 실패했습니다.');
+  }
+};
+
+const handleDeleteLink = async (counterpartId: number) => {
+  if (!props.userId) return;
+  try {
+    await deleteLink(props.userId, counterpartId);
+    await fetchLinkLists();
+  } catch (error) {
+    alert('링크 해제에 실패했습니다.');
+  }
+};
+
+const handleTogglePublic = async (restaurant: Restaurant) => {
+  if (!props.userId) return;
+  const nextState = !restaurant.isPublic;
+  const previousState = restaurant.isPublic;
+  restaurant.isPublic = nextState;
+  try {
+    await toggleBookmarkVisibility(props.userId, restaurant.id, nextState);
+  } catch (error) {
+    restaurant.isPublic = previousState;
+    alert('공개 설정 변경에 실패했습니다.');
+  }
+};
+
+const handleOpenRestaurant = (restaurantId: number) => {
+  router.push(`/restaurant/${restaurantId}`);
+};
+
+const handleOpenSharedFolder = async (counterpartId: number) => {
+  if (!props.userId) return;
+  selectedSharedUserId.value = counterpartId;
+  isSharedLoading.value = true;
+  try {
+    const response = await getSharedBookmarks(props.userId, counterpartId);
+    const data = Array.isArray(response.data) ? response.data : [];
+    sharedBookmarks.value = data.map((item) => ({
+      restaurantId: item.restaurantId,
+      name: item.name,
+      roadAddress: item.roadAddress,
+      detailAddress: item.detailAddress,
+      imageUrl: item.imageUrl || null,
+      rating: Number(item.rating || 0),
+      reviewCount: Number(item.reviewCount || 0),
+    }));
+  } catch (error) {
+    sharedBookmarks.value = [];
+  } finally {
+    isSharedLoading.value = false;
+  }
+};
+
+const sharedFolders = computed(() => {
+  const approvedSent = sentLinks.value.filter(
+    (item) => item.status === 'APPROVED'
+  );
+  const approvedReceived = receivedLinks.value.filter(
+    (item) => item.status === 'APPROVED'
+  );
+  return [...approvedSent, ...approvedReceived];
+});
+
+const statusLabel = (status: LinkItem['status']) => {
+  if (status === 'APPROVED') return '승인됨';
+  if (status === 'REJECTED') return '거절됨';
+  return '대기 중';
 };
 </script>
 
 <template>
   <div class="h-full">
-    <div v-if="isLoading" class="py-20 flex justify-center items-center">
-       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-[#ff6b4a]"></div>
+    <div v-if="isLoading" class="py-10 space-y-4">
+      <div
+        v-for="index in 3"
+        :key="index"
+        class="bg-white border border-[#e9ecef] rounded-xl p-4 shadow-sm"
+      >
+        <div class="flex gap-3">
+          <div class="w-24 h-24 rounded-lg skeleton"></div>
+          <div class="flex-1 space-y-2">
+            <div class="h-4 w-2/3 rounded skeleton"></div>
+            <div class="h-3 w-1/3 rounded skeleton"></div>
+            <div class="h-3 w-4/5 rounded skeleton"></div>
+            <div class="h-3 w-2/5 rounded skeleton"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <template v-else>
+      <div class="mb-6 space-y-4">
+        <div class="bg-white border border-[#e9ecef] rounded-xl p-4 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold text-[#1e3a5f] text-sm flex items-center gap-2">
+              <Link2 class="w-4 h-4" />
+              즐겨찾기 공유
+            </h3>
+            <button
+              class="text-xs text-[#868e96] flex items-center gap-1"
+              @click="fetchLinkLists"
+            >
+              <RefreshCw class="w-3 h-3" />
+              새로고침
+            </button>
+          </div>
+
+          <div class="flex gap-2">
+            <input
+              v-model="linkSearchEmail"
+              type="email"
+              placeholder="공유할 사용자 이메일"
+              class="input-field flex-1"
+            />
+            <button class="btn-outline-sm whitespace-nowrap" @click="handleSearchUser">
+              검색
+            </button>
+          </div>
+          <p v-if="searchError" class="text-xs text-red-500 mt-2">{{ searchError }}</p>
+
+          <div v-if="searchResults.length > 0" class="mt-3 space-y-2">
+            <div
+              v-for="user in searchResults"
+              :key="user.userId"
+              class="p-3 border border-[#e9ecef] rounded-lg bg-[#f8f9fa]"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm font-semibold text-[#1e3a5f]">
+                    {{ user.nickname || user.name }}
+                  </p>
+                  <p class="text-xs text-[#868e96]">{{ user.email }}</p>
+                </div>
+                <button class="btn-outline-sm" @click="handleRequestLink(user)">
+                  <UserPlus class="w-4 h-4 mr-1" />
+                  링크 요청
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white border border-[#e9ecef] rounded-xl p-4 shadow-sm">
+          <h4 class="font-semibold text-[#1e3a5f] text-sm mb-3">링크 요청함</h4>
+          <div v-if="isLinkLoading" class="text-xs text-[#adb5bd]">불러오는 중...</div>
+          <div v-else-if="sentLinks.length === 0" class="text-xs text-[#adb5bd]">
+            요청한 링크가 없습니다.
+          </div>
+          <div v-else class="space-y-2">
+            <div
+              v-for="link in sentLinks"
+              :key="link.linkId"
+              class="flex items-center justify-between text-xs border border-[#e9ecef] rounded-lg px-3 py-2"
+            >
+              <div>
+                <p class="font-semibold text-[#1e3a5f]">
+                  {{ link.counterpartNickname || link.counterpartName }}
+                </p>
+                <p class="text-[#868e96]">{{ link.counterpartEmail }}</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[#868e96]">{{ statusLabel(link.status) }}</span>
+                <button
+                  class="text-xs text-[#ff6b4a]"
+                  @click="handleDeleteLink(link.counterpartId)"
+                >
+                  삭제
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white border border-[#e9ecef] rounded-xl p-4 shadow-sm">
+          <h4 class="font-semibold text-[#1e3a5f] text-sm mb-3">링크 수신함</h4>
+          <div v-if="isLinkLoading" class="text-xs text-[#adb5bd]">불러오는 중...</div>
+          <div v-else-if="receivedLinks.length === 0" class="text-xs text-[#adb5bd]">
+            수신된 링크가 없습니다.
+          </div>
+          <div v-else class="space-y-2">
+            <div
+              v-for="link in receivedLinks"
+              :key="link.linkId"
+              class="flex items-center justify-between text-xs border border-[#e9ecef] rounded-lg px-3 py-2"
+            >
+              <div>
+                <p class="font-semibold text-[#1e3a5f]">
+                  {{ link.counterpartNickname || link.counterpartName }}
+                </p>
+                <p class="text-[#868e96]">{{ link.counterpartEmail }}</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[#868e96]">{{ statusLabel(link.status) }}</span>
+                <div v-if="link.status === 'PENDING'" class="flex gap-2">
+                  <button
+                    class="text-xs text-[#1e3a5f]"
+                    @click="handleRespondLink(link.linkId, 'APPROVED')"
+                  >
+                    수락
+                  </button>
+                  <button
+                    class="text-xs text-[#ff6b4a]"
+                    @click="handleRespondLink(link.linkId, 'REJECTED')"
+                  >
+                    거절
+                  </button>
+                </div>
+                <button
+                  v-else
+                  class="text-xs text-[#ff6b4a]"
+                  @click="handleDeleteLink(link.counterpartId)"
+                >
+                  삭제
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white border border-[#e9ecef] rounded-xl p-4 shadow-sm">
+          <h4 class="font-semibold text-[#1e3a5f] text-sm mb-3">공유 폴더</h4>
+          <div v-if="sharedFolders.length === 0" class="text-xs text-[#adb5bd]">
+            승인된 링크가 없습니다.
+          </div>
+          <div v-else class="space-y-2">
+            <button
+              v-for="link in sharedFolders"
+              :key="link.linkId"
+              class="w-full text-left border border-[#e9ecef] rounded-lg px-3 py-2 text-xs hover:bg-[#f8f9fa]"
+              @click="handleOpenSharedFolder(link.counterpartId)"
+            >
+              <p class="font-semibold text-[#1e3a5f]">
+                {{ link.counterpartNickname || link.counterpartName }}
+              </p>
+              <p class="text-[#868e96]">{{ link.counterpartEmail }}</p>
+            </button>
+          </div>
+
+          <div v-if="selectedSharedUserId !== null" class="mt-3">
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-xs font-semibold text-[#1e3a5f]">공유된 즐겨찾기</p>
+              <button
+                class="text-xs text-[#868e96]"
+                @click="handleOpenSharedFolder(selectedSharedUserId)"
+              >
+                새로고침
+              </button>
+            </div>
+            <div v-if="isSharedLoading" class="space-y-2">
+              <div
+                v-for="index in 2"
+                :key="index"
+                class="border border-[#e9ecef] rounded-lg px-3 py-2 flex gap-3"
+              >
+                <div class="w-16 h-16 rounded-lg skeleton"></div>
+                <div class="flex-1 space-y-2">
+                  <div class="h-3 w-1/2 rounded skeleton"></div>
+                  <div class="h-3 w-1/3 rounded skeleton"></div>
+                  <div class="h-3 w-4/5 rounded skeleton"></div>
+                </div>
+              </div>
+            </div>
+            <div v-else-if="sharedBookmarks.length === 0" class="text-xs text-[#adb5bd]">
+              공유된 즐겨찾기가 없습니다.
+            </div>
+            <div v-else class="space-y-2">
+              <RouterLink
+                v-for="restaurant in sharedBookmarks"
+                :key="restaurant.restaurantId"
+                :to="`/restaurant/${restaurant.restaurantId}`"
+                class="group border border-[#e9ecef] rounded-lg px-3 py-2 text-xs flex gap-3 hover:bg-[#f8f9fa] transition-all hover:border-[#ffd5cb] hover:shadow-sm"
+              >
+                <div class="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                  <img
+                    v-if="restaurant.imageUrl"
+                    :src="restaurant.imageUrl"
+                    :alt="restaurant.name"
+                    class="w-full h-full object-cover"
+                  />
+                  <div
+                    v-else
+                    class="w-full h-full flex items-center justify-center text-[10px] text-gray-400"
+                  >
+                    이미지
+                  </div>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-[#1e3a5f] truncate group-hover:text-[#ff6b4a] transition-colors">
+                    {{ restaurant.name }}
+                  </p>
+                  <div class="flex items-center gap-1 mt-1">
+                    <Star class="w-3 h-3 fill-[#ffc107] text-[#ffc107]" />
+                    <span class="text-[11px] font-semibold text-[#1e3a5f]">
+                      {{ restaurant.reviewCount > 0 ? restaurant.rating.toFixed(1) : '리뷰 없음' }}
+                    </span>
+                    <span class="text-[10px] text-[#868e96]">({{ restaurant.reviewCount }})</span>
+                  </div>
+                  <p class="text-[10px] text-[#868e96] mt-1 truncate">
+                    {{ restaurant.roadAddress }} {{ restaurant.detailAddress }}
+                  </p>
+                </div>
+              </RouterLink>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div v-if="favorites.length > 0">
         <div class="px-2 py-4 border-b border-[#e9ecef] mb-2">
           <p class="text-sm text-[#495057]">
@@ -145,51 +523,77 @@ const handlePromotionToggle = async (restaurant: Restaurant) => {
           <div
             v-for="restaurant in favorites"
             :key="restaurant.id"
-            class="bg-white border border-[#e9ecef] rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+            class="group bg-white border border-[#e9ecef] rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all hover:border-[#ffd5cb]"
           >
-            <div class="flex gap-3 p-3">
-              <div class="relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-200">
-                <div class="absolute top-2 left-2 z-10">
-                  <span
-                    :class="`${restaurant.badgeColor} text-white text-[10px] font-medium px-2 py-0.5 rounded shadow-sm`"
-                  >
-                    {{ restaurant.category }}
-                  </span>
-                </div>
-                <div class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs font-medium bg-gray-100">
+            <button
+              type="button"
+              class="w-full text-left"
+              @click="handleOpenRestaurant(restaurant.id)"
+            >
+              <div class="flex gap-3 p-3">
+                <div class="relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-200">
+                  <img
+                    v-if="restaurant.imageUrl"
+                  :src="restaurant.imageUrl"
+                  :alt="restaurant.name"
+                  class="absolute inset-0 w-full h-full object-cover"
+                />
+                <div
+                  v-else
+                  class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs font-medium bg-gray-100"
+                >
                   이미지
-                </div>
-              </div>
-
-              <div class="flex-1 min-w-0 flex flex-col justify-center">
-                <div class="flex items-start justify-between mb-1">
-                  <h4 class="font-bold text-[#1e3a5f] text-sm truncate pr-2">{{ restaurant.name }}</h4>
-                  <div class="-mt-1 -mr-1">
-                    <FavoriteHeart
-                      :restaurant-id="restaurant.id"
-                      :initial-favorite="restaurant.isFavorite"
-                      @remove="handleRemoveFromList(restaurant.id)" 
-                    />
                   </div>
                 </div>
+
+                <div class="flex-1 min-w-0 flex flex-col justify-center">
+                  <div class="flex items-start justify-between mb-1">
+                    <h4 class="font-bold text-[#1e3a5f] text-sm truncate pr-2 group-hover:text-[#ff6b4a] transition-colors">
+                      {{ restaurant.name }}
+                    </h4>
+                    <div class="-mt-1 -mr-1">
+                      <FavoriteHeart
+                        :restaurant-id="restaurant.id"
+                        :initial-favorite="restaurant.isFavorite"
+                        @remove="handleRemoveFromList(restaurant.id)" 
+                      />
+                    </div>
+                  </div>
                 
                 <div class="flex items-center gap-1 mb-1.5">
                   <Star class="w-3 h-3 fill-[#ffc107] text-[#ffc107]" />
-                  <span class="text-sm font-bold text-[#1e3a5f]">{{ restaurant.rating }}</span>
-                  <span class="text-xs text-[#868e96]">({{ restaurant.reviews }})</span>
+                  <span class="text-sm font-bold text-[#1e3a5f]">
+                    {{ restaurant.reviewCount > 0 ? restaurant.rating.toFixed(1) : '리뷰 없음' }}
+                  </span>
+                  <span class="text-xs text-[#868e96]">({{ restaurant.reviewCount }})</span>
                 </div>
-                
+
                 <p class="text-xs text-[#868e96] mb-1.5 truncate">{{ restaurant.description }}</p>
-                <p class="text-sm font-bold text-[#1e3a5f]">{{ restaurant.price }}</p>
+                <p class="text-sm font-bold text-[#1e3a5f]">
+                  {{ restaurant.avgMainPrice ? `${restaurant.avgMainPrice.toLocaleString()}원` : '가격 미정' }}
+                  <span v-if="restaurant.reservationLimit" class="text-xs text-[#868e96]">
+                    · 최대 {{ restaurant.reservationLimit }}인
+                  </span>
+                  </p>
+                </div>
               </div>
-            </div>
+            </button>
 
             <div class="flex gap-2 px-3 pb-3">
+              <button
+                class="flex-1 h-9 text-xs font-semibold border rounded-lg transition-all"
+                :class="restaurant.isPublic
+                  ? 'bg-[#fff9f8] border-[#ff6b4a] text-[#ff6b4a]'
+                  : 'bg-white border-[#dee2e6] text-[#1e3a5f]'"
+                @click.stop="handleTogglePublic(restaurant)"
+              >
+                {{ restaurant.isPublic ? '공개중' : '비공개' }}
+              </button>
               <button 
-                @click="handlePromotionToggle(restaurant)"
+                @click.stop="handlePromotionToggle(restaurant)"
                 :class="[
                   'flex-1 h-9 flex items-center justify-center gap-1.5 text-xs font-semibold border rounded-lg transition-all',
-                  restaurant.hasPromotion
+                  restaurant.promotionAgree
                     ? 'bg-[#fff9f8] border-[#ff6b4a] text-[#ff6b4a] hover:bg-[#fff0ed]' 
                     : 'bg-white border-[#dee2e6] text-[#1e3a5f] hover:bg-[#f8f9fa] group'
                 ]"
@@ -197,12 +601,12 @@ const handlePromotionToggle = async (restaurant: Restaurant) => {
                 <Bell 
                   :class="[
                     'w-3.5 h-3.5 transition-colors',
-                    restaurant.hasPromotion 
+                    restaurant.promotionAgree 
                       ? 'fill-[#ff6b4a] text-[#ff6b4a]' 
                       : 'text-[#1e3a5f] group-hover:text-[#ff6b4a]'
                   ]" 
                 />
-                {{ restaurant.hasPromotion ? '알림 받는 중' : '프로모션 받기' }}
+                {{ restaurant.promotionAgree ? '알림 받는 중' : '프로모션 받기' }}
               </button>
 
               <RouterLink :to="`/restaurant/${restaurant.id}?type=preorder`" class="flex-1">
@@ -226,5 +630,48 @@ const handlePromotionToggle = async (restaurant: Restaurant) => {
 <style scoped>
 .btn-gradient {
   background: linear-gradient(135deg, #ff6b4a 0%, #ff8e72 100%);
+}
+
+.input-field {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  font-size: 13px;
+  border: 1.5px solid #e9ecef;
+  border-radius: 10px;
+  color: #1e3a5f;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #ff6b4a;
+  box-shadow: 0 0 0 3px rgba(255, 107, 74, 0.1);
+}
+
+.btn-outline-sm {
+  height: 40px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #495057;
+  background: white;
+  border: 1.5px solid #e9ecef;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.skeleton {
+  background: linear-gradient(120deg, #f8f9fa 0%, #f1f3f5 50%, #f8f9fa 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 </style>

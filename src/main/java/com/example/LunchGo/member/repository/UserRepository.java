@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -40,4 +41,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * email로 사용자 정보 뽑아내기 (임직원 등록 시 사용)
      * */
     Optional<User> findByEmail(String email);
+
+    List<User> findTop10ByEmailContainingIgnoreCaseOrderByEmailAsc(String email);
 }

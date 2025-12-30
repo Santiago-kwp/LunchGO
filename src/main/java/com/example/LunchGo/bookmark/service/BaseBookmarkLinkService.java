@@ -128,6 +128,22 @@ public class BaseBookmarkLinkService implements BookmarkLinkService {
     }
 
     @Override
+    public List<BookmarkLinkUserInfo> searchUsersByEmail(String query) {
+        if (query == null || query.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "검색어가 필요합니다.");
+        }
+
+        return userRepository.findTop10ByEmailContainingIgnoreCaseOrderByEmailAsc(query).stream()
+            .map(user -> BookmarkLinkUserInfo.builder()
+                .userId(user.getUserId())
+                .email(user.getEmail())
+                .nickname(user.getNickname())
+                .name(user.getName())
+                .build())
+            .toList();
+    }
+
+    @Override
     @Transactional
     public void deleteLink(Long requesterId, Long receiverId) {
         if (requesterId == null || receiverId == null) {

@@ -16,5 +16,6 @@ public interface BookmarkLinkService {
     List<BookmarkLinkListItem> getSentLinks(Long requesterId, BookmarkLinkStatus status);
     List<BookmarkLinkListItem> getReceivedLinks(Long receiverId, BookmarkLinkStatus status);
     BookmarkLinkUserInfo searchUserByEmail(String email);
+    List<BookmarkLinkUserInfo> searchUsersByEmail(String query);
     void deleteLink(Long requesterId, Long receiverId);
 }

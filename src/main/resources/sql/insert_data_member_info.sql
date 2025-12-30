@@ -166,7 +166,11 @@ INSERT INTO bookmarks (user_id, restaurant_id, promotion_agree, is_public) VALUE
     (1, 1, 1, 1), -- 김판교 -> 판교 숯불갈비 (알림 ON, 공개)
     (1, 3, 0, 0), -- 김판교 -> 스시 오마카세 (알림 OFF, 비공개)
     (2, 3, 1, 1), -- 이강남 -> 스시 오마카세 (알림 ON, 공개)
-    (3, 2, 0, 0); -- 박휴면 -> 판교 김치찌개 (알림 OFF, 비공개)
+    (3, 2, 0, 0), -- 박휴면 -> 판교 김치찌개 (알림 OFF, 비공개)
+    (5, 1, 1, 1), -- 전예원 -> 판교 숯불갈비 (알림 ON, 공개)
+    (5, 2, 0, 1), -- 전예원 -> 판교 김치찌개 (알림 OFF, 공개)
+    (6, 1, 0, 1), -- 김철수 -> 판교 숯불갈비 (알림 OFF, 공개)
+    (6, 3, 1, 1); -- 김철수 -> 스시 오마카세 (알림 ON, 공개)
 
 -- [2-5] Bookmark links (링크 요청/승인)
 INSERT INTO bookmark_links (requester_id, receiver_id, status, created_at, responded_at) VALUES

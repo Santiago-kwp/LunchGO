@@ -1,9 +1,12 @@
 package com.example.LunchGo.bookmark.service;
 
 import com.example.LunchGo.bookmark.dto.BookmarkInfo;
+import com.example.LunchGo.bookmark.dto.BookmarkListItem;
 import com.example.LunchGo.bookmark.dto.BookmarkVisibilityRequest;
 import com.example.LunchGo.bookmark.dto.SharedBookmarkItem;
 import com.example.LunchGo.bookmark.entity.Bookmark;
+import com.example.LunchGo.bookmark.repository.BookmarkListRow;
+import com.example.LunchGo.bookmark.repository.SharedBookmarkRow;
 import com.example.LunchGo.bookmark.repository.BookmarkLinkRepository;
 import com.example.LunchGo.bookmark.repository.BookmarkRepository;
 import java.util.List;
@@ -70,6 +73,55 @@ public class BaseBookmarkService implements BookmarkService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "링크가 승인되지 않았습니다.");
         }
 
-        return bookmarkRepository.findPublicBookmarksWithRestaurant(targetUserId);
+        List<SharedBookmarkRow> rows = bookmarkRepository.findPublicBookmarksWithRestaurant(targetUserId);
+        return rows.stream()
+            .map(row -> SharedBookmarkItem.builder()
+                .restaurantId(row.getRestaurantId())
+                .name(row.getName())
+                .roadAddress(row.getRoadAddress())
+                .detailAddress(row.getDetailAddress())
+                .imageUrl(row.getImageUrl())
+                .rating(row.getRating())
+                .reviewCount(row.getReviewCount())
+                .build())
+            .toList();
+    }
+
+    @Override
+    public List<BookmarkListItem> getBookmarks(Long userId) {
+        if (userId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "사용자 정보가 필요합니다.");
+        }
+
+        List<BookmarkListRow> rows = bookmarkRepository.findBookmarksByUserId(userId);
+        return rows.stream()
+            .map(row -> BookmarkListItem.builder()
+                .bookmarkId(row.getBookmarkId())
+                .restaurantId(row.getRestaurantId())
+                .name(row.getName())
+                .description(row.getDescription())
+                .avgMainPrice(row.getAvgMainPrice())
+                .reservationLimit(row.getReservationLimit())
+                .promotionAgree(row.getPromotionAgree() != null && row.getPromotionAgree() == 1)
+                .isPublic(row.getIsPublic() != null && row.getIsPublic() == 1)
+                .imageUrl(row.getImageUrl())
+                .rating(row.getRating())
+                .reviewCount(row.getReviewCount())
+                .build())
+            .toList();
+    }
+
+    @Override
+    @Transactional
+    public void updatePromotionAgree(Long userId, Long restaurantId, Boolean promotionAgree) {
+        if (userId == null || restaurantId == null || promotionAgree == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "프로모션 설정 정보가 필요합니다.");
+        }
+
+        Bookmark bookmark = bookmarkRepository.findTopByUserIdAndRestaurantIdOrderByBookmarkIdDesc(
+                userId, restaurantId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "즐겨찾기를 찾을 수 없습니다."));
+
+        bookmark.updatePromotionAgree(promotionAgree);
     }
 }

@@ -62,6 +62,11 @@ public class BookmarkLinkController {
         return ResponseEntity.ok(bookmarkLinkService.searchUserByEmail(email));
     }
 
+    @GetMapping("/search/list")
+    public ResponseEntity<List<BookmarkLinkUserInfo>> searchUsersByEmail(@RequestParam String query) {
+        return ResponseEntity.ok(bookmarkLinkService.searchUsersByEmail(query));
+    }
+
     @DeleteMapping
     public ResponseEntity<Void> deleteLink(@RequestParam Long requesterId,
                                            @RequestParam Long receiverId) {

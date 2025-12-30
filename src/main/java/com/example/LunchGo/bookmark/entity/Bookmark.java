@@ -40,4 +40,8 @@ public class Bookmark {
     public void updatePublic(Boolean isPublic) {
         this.isPublic = isPublic != null && isPublic;
     }
+
+    public void updatePromotionAgree(Boolean promotionAgree) {
+        this.promotionAgree = promotionAgree != null && promotionAgree;
+    }
 }

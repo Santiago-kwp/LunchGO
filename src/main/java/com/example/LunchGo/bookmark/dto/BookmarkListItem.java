@@ -7,11 +7,15 @@ import lombok.Getter;
 @Getter
 @Builder
 @AllArgsConstructor
-public class SharedBookmarkItem {
+public class BookmarkListItem {
+    private Long bookmarkId;
     private Long restaurantId;
     private String name;
-    private String roadAddress;
-    private String detailAddress;
+    private String description;
+    private Integer avgMainPrice;
+    private Integer reservationLimit;
+    private Boolean promotionAgree;
+    private Boolean isPublic;
     private String imageUrl;
     private Double rating;
     private Long reviewCount;

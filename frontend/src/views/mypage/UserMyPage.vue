@@ -31,6 +31,7 @@ const activeNav = ref('info');
 
 const showSuccess = ref(false);
 const specialInterests =ref<(number | null)[]>([null]); //특이사항 id 저장
+const currentUserId = ref<number | null>(null);
 
 // Form fields state
 const email = ref('popsicle0404@test.com');
@@ -204,7 +205,8 @@ const addInterestField = () => {
 //사용자 정보 가져오기
 const fetchUserInfo = async() => {
   try{
-    const userId = 5; //pinia에서 가져오기
+    const userId = 1; //pinia에서 가져오기
+    currentUserId.value = userId;
 
     const response = await axios.get(`/api/info/user/${userId}`);
     const data = response.data;
@@ -438,7 +440,7 @@ const handleSave = async () => {
         formData.append('image', selectedImageFile.value);
       }
 
-      const userId = 5; //pinia 수정 필요
+      const userId = currentUserId.value; //pinia 수정 필요
       await axios.put(`/api/info/user/${userId}`,formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -839,7 +841,10 @@ const handleWithdraw = () => {
 
       <UsageHistory v-else-if="activeNav === 'usage'" />
 
-      <UserFavorites v-else-if="activeNav === 'favorite'" />
+      <UserFavorites
+        v-else-if="activeNav === 'favorite'"
+        :user-id="currentUserId"
+      />
     </main>
 
     <Transition name="fade">
