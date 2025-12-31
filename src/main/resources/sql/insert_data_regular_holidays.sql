@@ -1,5 +1,4 @@
 # 실제 식당에 관한 데이터가 1번부터 시작할 때를 기준으로 식당번호와 정기휴무일을 매핑합니다.
-
 INSERT INTO regular_holidays (restaurant_id, day_of_week) VALUES (5, 1);
 INSERT INTO regular_holidays (restaurant_id, day_of_week) VALUES (6, 1);
 INSERT INTO regular_holidays (restaurant_id, day_of_week) VALUES (10, 1);
