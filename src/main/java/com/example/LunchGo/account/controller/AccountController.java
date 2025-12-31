@@ -2,10 +2,13 @@ package com.example.LunchGo.account.controller;
 
 import com.example.LunchGo.account.dto.*;
 import com.example.LunchGo.account.helper.AccountHelper;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -103,4 +106,48 @@ public class AccountController {
         accountHelper.changePwd(findPwdReq); //update 시 문제 404, 이메일이나 아이디가 전달되지 않았으면 400 던짐
         return new ResponseEntity<>(HttpStatus.OK);
     }
+
+    /**
+     * Spring Security
+     * */
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(HttpServletRequest request, HttpServletResponse response) {
+        String newAccessToken = accountHelper.regenerate(request, response);
+
+        if(newAccessToken == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED); //401
+        }
+
+        return new ResponseEntity<>(newAccessToken, HttpStatus.OK);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(HttpServletRequest request, HttpServletResponse response, @RequestBody LoginRequest loginReq) {
+        if(!StringUtils.hasLength(loginReq.getEmail()) || !StringUtils.hasLength(loginReq.getPassword()) ||
+        !StringUtils.hasLength(loginReq.getUserType())) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+
+        try {
+            MemberLogin memberLogin = accountHelper.login(loginReq, request, response);
+            return new ResponseEntity<>(memberLogin, HttpStatus.OK);
+        }catch(BadCredentialsException e) {
+            //password 틀렸거나 id가 존재하지 않음
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED); //401 return
+        }catch(Exception e){ //그 외의 오류
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("로그인 중 오류가 발생했습니다.");
+        }
+    }
+
+    @GetMapping("/auth/check")
+    public ResponseEntity<?> check(HttpServletRequest request) {
+        //프론트에서 true, false 처리해야함
+        return new ResponseEntity<>(accountHelper.isLoggedIn(request), HttpStatus.OK);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
+        accountHelper.logout(request, response);
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+
 }

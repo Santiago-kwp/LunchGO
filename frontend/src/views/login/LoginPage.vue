@@ -1,16 +1,20 @@
-<script setup lang="ts">
-import { ref, computed, watch } from 'vue'; // watch 추가
-import { RouterLink, useRouter } from 'vue-router';
-import { ArrowLeft, TruckElectric } from 'lucide-vue-next';
+﻿<script setup lang="ts">
+import { ref, computed } from 'vue';
+import { RouterLink, useRouter, useRoute } from 'vue-router';
+import httpRequest from '@/router/httpRequest';
+import { ArrowLeft } from 'lucide-vue-next';
 import FindIdModal from '@/components/ui/FindIdModal.vue';
 import FindEmailModal from '@/components/ui/FindEmailModal.vue';
 import FindPwdModal from '@/components/ui/FindPwdModal.vue';
 import UserDormantModal from '@/components/ui/UserDormantModal.vue';
+import { useAccountStore } from '@/stores/account';
 
 const router = useRouter();
+const route = useRoute();
+const accountStore = useAccountStore();
+
 type UserType = 'user' | 'staff' | 'owner' | 'admin';
 
-// 모달 상태 관리 (아이디/이메일/비밀번호)
 const showFindIdModal = ref(false);
 const showFindEmailModal = ref(false);
 const showFindPwdModal = ref(false);
@@ -20,11 +24,9 @@ const currentTab = ref<UserType>('user');
 const email = ref('');
 const username = ref('');
 const password = ref('');
-const status = ref('');
 const isLoading = ref(false);
 const errorMessage = ref('');
 
-// 탭 데이터
 const tabs = [
   { id: 'user', label: '사용자' },
   { id: 'staff', label: '임직원' },
@@ -36,18 +38,19 @@ const isEmailLogin = computed(() => {
   return currentTab.value === 'user' || currentTab.value === 'staff';
 });
 
-watch([email, username, password, currentTab], () => {
-  if (errorMessage.value) errorMessage.value = '';
-});
+const clearError = () => {
+  if (errorMessage.value) {
+    errorMessage.value = '';
+  }
+};
 
 const checkLoginElement = () => {
   if (isEmailLogin.value) {
-    //사용자와 임직원일 때
     if (!email.value) return (errorMessage.value = '이메일은 필수 입력입니다.');
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.value))
-      return (errorMessage.value = '이메일 양식에 맞지 않습니다.');
+      return (errorMessage.value = '이메일 형식이 맞지 않습니다.');
   } else {
     if (!username.value)
       return (errorMessage.value = '아이디는 필수 입력입니다.');
@@ -59,7 +62,11 @@ const checkLoginElement = () => {
   return null;
 };
 
-// 아이디/이메일 찾기 버튼 클릭 핸들러
+const selectTab = (tabId: UserType) => {
+  currentTab.value = tabId;
+  clearError();
+};
+
 const openFindModal = () => {
   if (isEmailLogin.value) {
     showFindEmailModal.value = true;
@@ -68,62 +75,75 @@ const openFindModal = () => {
   }
 };
 
-// 로그인 핸들러
 const handleLogin = async () => {
   isLoading.value = true;
   errorMessage.value = '';
 
   if (checkLoginElement() !== null) {
-    isLoading.value = false; // 유효성 검사 실패 시 로딩 끄기
+    isLoading.value = false;
     return;
   }
 
   try {
-    const payload = {
-      type: currentTab.value,
-      id: isEmailLogin.value ? email.value : username.value,
-      password: password.value,
+    const userTypeMap: Record<UserType, string> = {
+      user: 'USER',
+      staff: 'STAFF',
+      owner: 'OWNER',
+      admin: 'MANAGER',
     };
-    console.log('Login attempt:', payload);
-    // API 호출 시뮬레이션
-    await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    //status가 Dormant 인 경우
-    if (status.value === 'dormant') {
-      showDormantModal.value = true;
-      isLoading.value = false;
+    const payload = {
+      email: isEmailLogin.value ? email.value : username.value,
+      password: password.value,
+      userType: userTypeMap[currentTab.value],
+    };
+
+    const response = await httpRequest.post('/api/login', payload, { skipAuth: true });
+
+    const { accessToken } = response.data || {};
+    if (!accessToken) {
+      throw new Error('accessToken not found');
+    }
+
+    accountStore.setLoggedIn(true, response.data);
+    accountStore.setAccessToken(accessToken);
+
+    const nextPath = route.query.next;
+    if (typeof nextPath === 'string' && nextPath) {
+      router.push(nextPath);
       return;
     }
 
-    // [수정됨] 탭별 이동 경로 설정
     const targetPath = (() => {
-      switch (currentTab.value) {
-        case 'owner':
+      switch (response.data?.role) {
+        case 'ROLE_OWNER':
           return '/business/dashboard';
-        case 'admin':
+        case 'ROLE_ADMIN':
           return '/admin/dashboard';
-        case 'user':
-        case 'staff':
-          return '/staff/list'; //임시적
+        case 'ROLE_STAFF':
+          return '/staff/list';
+        case 'ROLE_USER':
         default:
           return '/';
       }
     })();
 
-    alert(`${tabs.find((t) => t.id === currentTab.value)?.label} 로그인 성공!`);
-
-    // 설정된 경로로 이동
     router.push(targetPath);
   } catch (error) {
-    errorMessage.value = '로그인 정보를 확인해주세요.';
-    // 실패 시 입력창 초기화는 UX에 따라 선택사항 (보통 비밀번호만 지움)
+    const statusCode = error?.response?.status;
     password.value = '';
+    if (statusCode === 401) {
+      errorMessage.value = '아이디 또는 비밀번호가 올바르지 않습니다.';
+    } else if (statusCode === 400) {
+      errorMessage.value = '로그인 정보가 올바르지 않습니다.';
+    } else {
+      errorMessage.value = '로그인 중 오류가 발생했습니다.';
+    }
   } finally {
     isLoading.value = false;
   }
 };
 
-// 휴면 해지 완료 후 처리
 const handleDormantUnlocked = () => {
   password.value = '';
   errorMessage.value = '';
@@ -153,7 +173,9 @@ const handleDormantUnlocked = () => {
           class="w-20 h-20 mb-4 object-contain"
         />
         <h1 class="text-2xl font-bold text-[#1E3A5F] mb-2">로그인</h1>
-        <p class="text-sm text-[#6C757D]">런치고에 오신 것을 환영합니다</p>
+        <p class="text-sm text-[#6C757D]">
+          런치고에 오신 것을 환영합니다.
+        </p>
       </div>
       <div class="login-card">
         <div class="tabs-nav">
@@ -163,7 +185,7 @@ const handleDormantUnlocked = () => {
             type="button"
             class="tab-btn"
             :class="{ active: currentTab === tab.id }"
-            @click="currentTab = tab.id"
+            @click="selectTab(tab.id)"
           >
             {{ tab.label }}
             <div class="active-bar" v-if="currentTab === tab.id"></div>
@@ -180,7 +202,8 @@ const handleDormantUnlocked = () => {
               v-model="email"
               type="email"
               class="input-field"
-              placeholder="이메일을 입력하세요."
+              placeholder="이메일을 입력하세요"
+              @input="clearError"
               required
             />
             <input
@@ -190,6 +213,7 @@ const handleDormantUnlocked = () => {
               type="text"
               class="input-field"
               placeholder="아이디를 입력하세요"
+              @input="clearError"
               required
             />
           </div>
@@ -202,6 +226,7 @@ const handleDormantUnlocked = () => {
               class="input-field"
               placeholder="비밀번호를 입력하세요"
               maxlength="20"
+              @input="clearError"
               required
             />
           </div>
@@ -263,12 +288,10 @@ const handleDormantUnlocked = () => {
 </template>
 
 <style scoped>
-/* 스타일은 기존과 동일하므로 생략하지 않고 그대로 둡니다 */
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
 .font-pretendard {
   font-family: 'Pretendard', sans-serif;
 }
-/* Card Component */
 .login-card {
   background: #ffffff;
   border-radius: 12px;
@@ -276,7 +299,6 @@ const handleDormantUnlocked = () => {
   border: 1px solid #e9ecef;
   overflow: hidden;
 }
-/* Tabs Nav */
 .tabs-nav {
   display: flex;
   border-bottom: 1px solid #e9ecef;
@@ -311,11 +333,9 @@ const handleDormantUnlocked = () => {
   background-color: #ff6b4a;
   border-radius: 3px 3px 0 0;
 }
-/* Form Padding */
 .login-form {
   padding: 24px;
 }
-/* Inputs */
 .input-group {
   margin-bottom: 20px;
 }
@@ -347,7 +367,6 @@ const handleDormantUnlocked = () => {
   border-color: #ff6b4a;
   box-shadow: 0 0 0 3px rgba(255, 107, 74, 0.12);
 }
-/* Error Msg */
 .error-msg {
   color: #f44336;
   font-size: 12px;
@@ -357,7 +376,6 @@ const handleDormantUnlocked = () => {
   padding: 8px;
   border-radius: 4px;
 }
-/* Button */
 .btn-primary {
   width: 100%;
   height: 52px;
@@ -387,7 +405,6 @@ const handleDormantUnlocked = () => {
   cursor: not-allowed;
   box-shadow: none;
 }
-/* 찾기 링크 컨테이너 */
 .find-links-container {
   display: flex;
   justify-content: center;
@@ -410,7 +427,6 @@ const handleDormantUnlocked = () => {
   color: #e9ecef;
   font-size: 12px;
 }
-/* Spinner */
 .spinner {
   width: 20px;
   height: 20px;

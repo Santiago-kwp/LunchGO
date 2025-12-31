@@ -42,4 +42,9 @@ public interface OwnerRepository extends JpaRepository<Owner, Long> {
     @Modifying(clearAutomatically = true)
     @Query("UPDATE Owner o SET o.phone = :phone, o.image = :image WHERE o.ownerId = :ownerId")
     int updateOwner(@Param("ownerId") Long ownerId, @Param("phone") String phone, @Param("image") String image);
+
+    /**
+     * Spring Security
+     * */
+    Optional<Owner> findByLoginId(String loginId);
 }

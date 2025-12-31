@@ -1,29 +1,53 @@
-<script setup>
-import { ref } from 'vue';
+﻿<script setup>
+import { ref, computed } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
+import httpRequest from '@/router/httpRequest';
+import { useAccountStore } from '@/stores/account';
 
 const router = useRouter();
+const accountStore = useAccountStore();
 
-// --- 상태 관리 --- (pinia 추후 연결)
-const isLoggedIn = ref(true); //일단 로그인 화면
-const userName = ref('김런치');
-const userProfileImage = ref(
-  'https://api.dicebear.com/9.x/avataaars/svg?seed=Felix'
+const getStoredMember = () => {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem('member');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+};
+
+const member = computed(() => accountStore.member || getStoredMember());
+const isLoggedIn = computed(() =>
+  Boolean(accountStore.accessToken || localStorage.getItem('accessToken'))
+);
+const userName = computed(
+  () =>
+    member.value?.name
+);
+const userProfileImage = computed(
+  () =>
+    member.value?.image ||
+    'https://api.dicebear.com/9.x/avataaars/svg?seed=Felix'
 );
 const isMenuOpen = ref(false);
 
-// --- 핸들러 ---
 const toggleMenu = () => {
   isMenuOpen.value = !isMenuOpen.value;
 };
 
 const handleLogout = async () => {
-  alert('로그아웃 되었습니다.');
-
-  //로그아웃 로직 구현
-  isLoggedIn.value = false;
-  isMenuOpen.value = false;
-  router.push('/');
+  try {
+    await httpRequest.post('/api/logout', {});
+    alert('로그아웃 되었습니다.');
+  } catch (error) {
+    console.warn('로그아웃 요청 실패:', error);
+  } finally {
+    accountStore.clearAccount();
+    isMenuOpen.value = false;
+    router.push('/');
+  }
 };
 </script>
 
@@ -50,10 +74,6 @@ const handleLogout = async () => {
 
       <div class="flex items-center gap-4">
         <template v-if="isLoggedIn">
-          <span class="text-sm font-medium text-[#495057]">
-            <span class="text-[#1e3a5f] font-bold">{{ userName }}</span
-            >님 안녕하세요!
-          </span>
 
           <div class="relative">
             <button
@@ -112,17 +132,17 @@ const handleLogout = async () => {
 
 <style scoped>
 /* Vue Transition Classes 
-  name="dropdown"으로 설정했으므로 접두사가 dropdown- 입니다.
+  name="dropdown"로 설정했으므로 모두 dropdown- 입니다.
 */
 
-/* 애니메이션 동작 시간 및 가속도 설정 (나타날 때 & 사라질 때) */
+/* 애니메이션 동작 시간 및 가속도 설정 (Transition & 클래스명) */
 .dropdown-enter-active,
 .dropdown-leave-active {
   transition: all 0.2s ease-out;
 }
 
-/* 시작 상태 (Enter From) & 끝 상태 (Leave To) 
-  투명하고 살짝 위로 올라가 있음 
+/* 시작 상태 (Enter From) & 종료 상태 (Leave To) 
+  투명하고 위쪽으로 올라가 있음 
 */
 .dropdown-enter-from,
 .dropdown-leave-to {
@@ -130,7 +150,7 @@ const handleLogout = async () => {
   transform: translateY(-10px);
 }
 
-/* 완료 상태 (Enter To) & 시작 상태 (Leave From)
+/* 종료 상태 (Enter To) & 시작 상태 (Leave From)
   완전 불투명하고 제자리에 있음 
 */
 .dropdown-enter-to,
