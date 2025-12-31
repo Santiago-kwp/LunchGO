@@ -33,8 +33,13 @@ import RestaurantCardList from "@/components/ui/RestaurantCardList.vue";
 import { useCafeteriaRecommendation } from "@/composables/useCafeteriaRecommendation";
 import TrendingRecommendationSection from "@/components/ui/TrendingRecommendationSection.vue";
 import { useTrendingRestaurants } from "@/composables/useTrendingRestaurants";
+import { useAccountStore } from "@/stores/account";
 import axios from "axios";
 
+const accountStore = useAccountStore();
+const isLoggedIn = computed(() =>
+  Boolean(accountStore.accessToken || localStorage.getItem("accessToken"))
+);
 const DEFAULT_USER_ID = 2;
 
 // State management (React's useState -> Vue's ref)
@@ -1262,23 +1267,31 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="px-4 py-5">
-        <CafeteriaRecommendationSection
-          :recommendations="cafeteriaRecommendations"
-          :favoriteRestaurantIds="favoriteRestaurantIds"
-          :onToggleFavorite="toggleRestaurantFavorite"
-          :onOpenSearch="() => (isSearchOpen = true)"
-          :onClearRecommendations="clearCafeteriaRecommendations"
-          :isModalOpen="isCafeteriaModalOpen"
-          :isProcessing="isCafeteriaOcrLoading"
-          :ocrResult="cafeteriaOcrResult"
-          :days="cafeteriaDaysDraft"
-          :errorMessage="cafeteriaOcrError"
-          :initialImageUrl="cafeteriaImageUrl"
-          :onModalClose="() => (isCafeteriaModalOpen = false)"
-          :onFileChange="handleCafeteriaFileChange"
-          :onRunOcr="() => handleCafeteriaOcr(resolveCafeteriaBaseDate())"
-          :onConfirm="handleCafeteriaConfirmAndClose"
-        />
+        <div v-if="isLoggedIn">
+          <CafeteriaRecommendationSection
+            :recommendations="cafeteriaRecommendations"
+            :favoriteRestaurantIds="favoriteRestaurantIds"
+            :onToggleFavorite="toggleRestaurantFavorite"
+            :onOpenSearch="() => (isSearchOpen = true)"
+            :onClearRecommendations="clearCafeteriaRecommendations"
+            :isModalOpen="isCafeteriaModalOpen"
+            :isProcessing="isCafeteriaOcrLoading"
+            :ocrResult="cafeteriaOcrResult"
+            :days="cafeteriaDaysDraft"
+            :errorMessage="cafeteriaOcrError"
+            :initialImageUrl="cafeteriaImageUrl"
+            :onModalClose="() => (isCafeteriaModalOpen = false)"
+            :onFileChange="handleCafeteriaFileChange"
+            :onRunOcr="() => handleCafeteriaOcr(resolveCafeteriaBaseDate())"
+            :onConfirm="handleCafeteriaConfirmAndClose"
+          />
+        </div>
+        <div
+          v-else
+          class="mb-6 rounded-2xl border border-[#e9ecef] bg-white p-4 text-sm text-[#6c757d]"
+        >
+          로그인하면 구내식당 대체 추천을 받을 수 있어요.
+        </div>
 
         <div
           v-if="!cafeteriaRecommendations.length"
@@ -1474,8 +1487,8 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <!-- TODO: 로그인 사용자만 노출 (백엔드 연동 후 v-if 적용) -->
-          <div>
+          <!-- 로그인 사용자만 노출 -->
+          <div v-if="isLoggedIn">
             <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">추천옵션</h4>
             <div class="flex flex-wrap gap-2">
               <button
@@ -1516,6 +1529,9 @@ onBeforeUnmount(() => {
                 </button>
               </div>
             </div>
+          </div>
+          <div v-else class="mt-2 text-xs text-[#6c757d]">
+            로그인 후 추천 옵션을 사용할 수 있습니다.
           </div>
         </div>
 

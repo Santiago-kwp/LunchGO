@@ -1,7 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import axios from 'axios';
 import HomeView from '../views/HomeView.vue';
 
 import { useRestaurantStore } from '@/stores/restaurant';
+import { useAccountStore } from '@/stores/account';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -152,11 +154,13 @@ const router = createRouter({
       path: '/mypage',
       name: 'mypage',
       component: () => import('../views/mypage/UserMyPage.vue'),
+      meta: { requiredAuth: true, roles: ['ROLE_USER']},
     },
     {
       path: '/business/mypage',
       name: 'business-mypage',
       component: () => import('../views/mypage/OwnerMyPage.vue'),
+      meta: { requiredAuth: true , roles: ['ROLE_OWNER']},
     },
     {
       path: '/partner',
@@ -257,13 +261,13 @@ const router = createRouter({
       name: 'signup-owner',
       component: () => import('../views/signup/OwnerSignupPage.vue'),
     },
-    //방문 선택 확인 페이지
+    //방문 선택 승인 페이지
     {
       path: '/business/notifications',
       name: 'business-notifications',
       component: () => import('../views/business/notifications/BusinessNotificationsPage.vue'),
     },
-    //예약 상세보기
+    //예약 상세 보기
     {
       path: '/business/reservations/:id',
       name: 'reservation-detail',
@@ -281,6 +285,7 @@ const router = createRouter({
       path: '/staff/list',
       name : 'staff-list',
       component: () => import('@/views/staff/StaffListPage.vue'),
+      meta: {requiredAuth: true, roles: ['ROLE_OWNER']}
     },
     // Wildcard route for 404 - make sure this is the last route
     {
@@ -291,8 +296,75 @@ const router = createRouter({
   ],
 });
 
+router.beforeEach(async (to, from, next) => {
+  const accountStore = useAccountStore();
+  const requiresAuth = to.matched.some((r) => r.meta?.requiredAuth);
+  const requiredRoles = to.matched.flatMap((r) => r.meta?.roles || []);
+
+  if (!requiresAuth) return next(); //비회원인 경우
+
+  const accessToken = localStorage.getItem('accessToken');
+  const memberRaw = localStorage.getItem('member');
+  let member = null;
+
+  if (memberRaw) {
+    try {
+      member = JSON.parse(memberRaw);
+    } catch (error) {
+      member = null;
+    }
+  }
+
+  const isLoggedIn = Boolean(accessToken);
+  const currentRole = member?.role;
+
+  if (!isLoggedIn) {
+    window.alert("로그인이 필요합니다.");
+    return next({
+      name: 'login',
+      query: { next: to.fullPath },
+    });
+  }
+
+  if (requiredRoles.length > 0) {
+    const hasRole = requiredRoles.includes(currentRole);
+    if (!hasRole) {
+      window.alert("권한이 없습니다");
+      return next({ name: 'home' });
+    }
+  }
+
+  try {
+    const res = await axios.get('/api/auth/check', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (res.status === 200 && res.data === true) {
+      const storedMember = localStorage.getItem('member');
+      if (storedMember) {
+        accountStore.setLoggedIn(true, JSON.parse(storedMember));
+        accountStore.setAccessToken(accessToken);
+      }
+
+      return next();
+    }
+
+    window.alert('로그인 세션이 만료되었습니다.');
+    accountStore.clearAccount();
+    return next('/login');
+
+  } catch (error) {
+    console.warn(error);
+    accountStore.clearAccount();
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('member');
+    window.alert('로그인 세션이 만료되었습니다.');
+    return next('/login');
+  }
+});
+
 router.beforeEach((to, from) => {
-  // Pinia 스토어는 Vue 앱이 실행된 후에 사용 가능하므로, 가드 내에서 직접 호출합니다.
+  
   const store = useRestaurantStore();
 
   const workflowRoutes = [
@@ -305,16 +377,15 @@ router.beforeEach((to, from) => {
   const isFromWorkflow = workflowRoutes.includes(from.name);
   const isToWorkflow = workflowRoutes.includes(to.name);
 
-  // Case 1: 워크플로우를 완전히 벗어나는 경우, 데이터를 초기화합니다.
+  
   if (isFromWorkflow && !isToWorkflow) {
     store.clearRestaurant();
     return;
   }
 
-  // Case 2: '식당 등록' 페이지로 진입하는 경우
+  
   if (to.name === 'business-restaurant-info-add') {
-    // 스토어가 비어있거나, '수정' 중이던 데이터(ID가 있는 데이터)가 남아있는 경우,
-    // 새로운 '등록'을 위해 상태를 깨끗하게 초기화합니다.
+    
     if (!store.restaurantInfo || store.restaurantInfo.restaurantId) {
       store.initializeNewRestaurant();
     }
@@ -322,3 +393,5 @@ router.beforeEach((to, from) => {
 });
 
 export default router;
+
+

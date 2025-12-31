@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.boot.autoconfigure.graphql.GraphQlProperties;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -39,12 +40,13 @@ public class BaseMemberService implements MemberService {
     private final MemberMapper memberMapper;
     private final StaffRepository staffRepository;
     private final ObjectStorageService objectStorageService;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public void save(UserJoinRequest userReq) {
         userRepository.save(User.builder()
                 .email(userReq.getEmail())
-                .password(userReq.getPassword()) //암호화 필수
+                .password(passwordEncoder.encode(userReq.getPassword())) //암호화
                 .name(userReq.getName())
                 .companyName(userReq.getCompanyName())
                 .companyAddress(userReq.getCompanyAddress())
@@ -68,7 +70,7 @@ public class BaseMemberService implements MemberService {
     public void save(OwnerJoinRequest ownerReq) {
         ownerRepository.save(Owner.builder()
                 .loginId(ownerReq.getLoginId())
-                .password(ownerReq.getPassword())
+                .password(passwordEncoder.encode(ownerReq.getPassword()))
                 .name(ownerReq.getName())
                 .startAt(ownerReq.getStartAt())
                 .businessNum(ownerReq.getBusinessNum())
@@ -121,13 +123,13 @@ public class BaseMemberService implements MemberService {
     @Transactional
     public void updatePwd(FindPwdRequest findPwdReq) { //비밀번호 암호화 필수
         if(StringUtils.hasLength(findPwdReq.getEmail())) { //사용자인 경우
-            if(userRepository.updatePassword(findPwdReq.getEmail(), findPwdReq.getPassword()) == 0){
+            if(userRepository.updatePassword(findPwdReq.getEmail(), passwordEncoder.encode(findPwdReq.getPassword())) == 0){
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다.");
             }
             return;
         }
         if(StringUtils.hasLength(findPwdReq.getLoginId())) { //사업자인 경우
-            if(ownerRepository.updatePassword(findPwdReq.getLoginId(), findPwdReq.getPassword()) == 0){
+            if(ownerRepository.updatePassword(findPwdReq.getLoginId(), passwordEncoder.encode(findPwdReq.getPassword())) == 0){
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "사업자를 찾을 수 없습니다.");
             }
             return;

@@ -42,4 +42,9 @@ public interface MemberService {
     void delete(StaffInfo staffInfo);
 
     List<StaffInfo> getStaffs(Long ownerId);
+
+    /**
+     * Spring Security
+     * */
+
 }

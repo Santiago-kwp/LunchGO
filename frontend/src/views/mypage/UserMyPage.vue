@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, watch, computed, onUnmounted, onMounted } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import {
@@ -14,9 +14,30 @@ import ReservationHistory from '@/components/ui/ReservationHistory.vue';
 import UsageHistory from '@/components/ui/UsageHistory.vue';
 import CheckEmailModal from '@/components/ui/CheckEmailModal.vue';
 import UserFavorites from '@/components/ui/UserFavorites.vue';
-import axios from 'axios';
+import httpRequest from '@/router/httpRequest';
+import { useAccountStore } from '@/stores/account';
 
 const router = useRouter();
+const accountStore = useAccountStore();
+
+const getStoredMember = () => {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem('member');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+};
+
+const member = computed(() => accountStore.member || getStoredMember());
+const memberId = computed(() => {
+  const rawId = member.value?.id ?? member.value?.userId ?? member.value?.memberId;
+  if (rawId === null || rawId === undefined) return null;
+  const parsed = Number(rawId);
+  return Number.isNaN(parsed) ? null : parsed;
+});
 
 // 이메일 인증 모달 표시 여부
 const showEmailModal = ref(false);
@@ -30,28 +51,27 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const activeNav = ref('info');
 
 const showSuccess = ref(false);
-const specialInterests =ref<(number | null)[]>([null]); //특이사항 id 저장
-const currentUserId = ref<number | null>(null);
+const specialInterests = ref<(number | null)[]>([null]); //특이사항 id 저장
 
 // Form fields state
-const email = ref('popsicle0404@test.com');
+const email = ref('');
 const isEmailVerified = ref(false);
-const name = ref('테스터');
+const name = ref('');
 const nickname = ref('');
 const birthDate = ref('');
 const gender = ref('공개하지 않음');
 
 // 주소 관련 상태
-const companyAddress = ref('서울시 강남구 테헤란로 123'); // 기존 통합 주소
+const companyAddress = ref(''); // 기존 통합 주소
 const companyFrontAddress = ref(''); // 도로명 주소
 const companyBackAddress = ref(''); // 상세 주소
 const isAddressEditable = ref(false); // 주소 수정 모드 여부
 
-const companyName = ref('xx회사');
+const companyName = ref('');
 const hideCompanyName = ref(false);
 
 // 전화번호 관련 상태
-const phoneNumber = ref('010-1234-5678');
+const phoneNumber = ref('');
 const isPhoneEditable = ref(false); // 전화번호 수정 가능 여부
 const showPhoneVerification = ref(false); // 인증번호 입력란 표시 여부
 const isVerificationRequested = ref(false); // 인증 요청을 한 번이라도 했는지 여부
@@ -197,33 +217,36 @@ const getAvailableOptions = (currentIndex: number) => {
 const addInterestField = () => {
   // 모든 옵션을 다 썼으면 추가 못하게 막기 (선택사항)
   if (specialInterests.value.length >= preferenceOptions.length) {
-    return alert("더 이상 선택할 수 있는 옵션이 없습니다.");
+    return alert('더 이상 선택할 수 있는 옵션이 없습니다.');
   }
   specialInterests.value.push(null); // 빈 선택지 추가
 };
 
 //사용자 정보 가져오기
 const fetchUserInfo = async() => {
-  try{
-    const userId = 1; //pinia에서 가져오기
-    currentUserId.value = userId;
+  const userId = memberId.value;
+  if (!userId) {
+    alert('로그인 정보를 찾을 수 없습니다. 다시 로그인해주세요.');
+    return;
+  }
 
-    const response = await axios.get(`/api/info/user/${userId}`);
+  try{
+    const response = await httpRequest.get(`/api/info/user/${userId}`);
     const data = response.data;
 
-    email.value = data.email;
-    name.value = data.name;
+    email.value = data.email || '';
+    name.value = data.name || '';
     nickname.value = data.nickname || '';
     birthDate.value = data.birth || '';
     gender.value = data.gender || '공개하지 않음';
-    phoneNumber.value = data.phone;
+    phoneNumber.value = data.phone || '';
 
-    companyName.value = data.companyName;
-    companyAddress.value = data.companyAddress;
+    companyName.value = data.companyName || '';
+    companyAddress.value = data.companyAddress || '';
 
-    isEmailVerified.value = data.emailAuthentication;
+    isEmailVerified.value = Boolean(data.emailAuthentication);
 
-    if(data.image){
+    if (data.image) {
       profileImage.value = data.image;
     }
 
@@ -234,14 +257,14 @@ const fetchUserInfo = async() => {
     } else {
       specialInterests.value = [null]; // 비어있으면 빈 칸 하나 생성
     }
-  }catch(error){
-     const status = error.response.status;
+  } catch (error) {
+    const status = error?.response?.status;
 
-      if(status === 404){
-        alert("[404 Not Found] 해당 사용자가 존재하지 않습니다.");
-      }else{
-        alert(`오류가 발생했습니다. (Code: ${status})`);
-      }
+    if (status === 404) {
+      alert('[404 Not Found] 해당 사용자가 존재하지 않습니다.');
+    } else {
+      alert(`오류가 발생했습니다. (Code: ${status ?? 'unknown'})`);
+    }
   }
 }
 
@@ -304,7 +327,7 @@ const handleVerifyCode = async () => {
   if (!verificationCode.value) return alert('인증번호를 입력해주세요.');
 
   try {
-    const response = await axios.post('/api/sms/verify', {
+    const response = await httpRequest.post('/api/sms/verify', {
       phone: phoneNumber.value,
       verifyCode: verificationCode.value
     });
@@ -327,16 +350,16 @@ const handleVerifyCode = async () => {
       //타이머 정지
       if (timerInterval.value) clearInterval(timerInterval.value);
 
-    } else{
-      alert("인증번호가 일치하지 않습니다. 다시 확인해주세요.");
+    } else {
+      alert('인증번호가 일치하지 않습니다. 다시 확인해주세요.');
 
       isPhoneVerified.value = false;
     }
   } catch (error) {
     // 에러 처리
-    const status = error.response.status;
-    if (status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
-    else alert(`오류가 발생했습니다. (Code: ${status})`);
+    const status = error?.response?.status;
+    if (status === 400) alert('[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.');
+    else alert(`오류가 발생했습니다. (Code: ${status ?? 'unknown'})`);
     
     isPhoneVerified.value = false;
   }
@@ -382,16 +405,16 @@ const handlePhoneBtn = async () => {
 
   alert(`인증번호를 발송했습니다: ${phoneNumber.value}`);
   try {
-    await axios.post('/api/sms/send', {phone: phoneNumber.value});
+    await httpRequest.post('/api/sms/send', {phone: phoneNumber.value});
 
     showPhoneVerification.value = true;
     isVerificationRequested.value = true;
     startTimer(); 
-  }catch(error){
-    const status = error.response.status;
+  } catch (error) {
+    const status = error?.response?.status;
 
-    if(status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
-    else alert(`메시지 전송에 오류가 발생했습니다. (Code: ${status})`);
+    if (status === 400) alert('[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.');
+    else alert(`메시지 전송에 오류가 발생했습니다. (Code: ${status ?? 'unknown'})`);
   }  
 }
 };
@@ -414,6 +437,12 @@ const handleSave = async () => {
     isAddressEditable.value = false;
   }
 
+  const userId = memberId.value;
+  if (!userId) {
+    alert('로그인 정보를 찾을 수 없습니다. 다시 로그인해주세요.');
+    return;
+  }
+
     try{
       const formData = new FormData();
 
@@ -423,25 +452,24 @@ const handleSave = async () => {
       
       const infoData = {
         nickname: nickname.value,
-        birth: birthDate.value ? birthDate.value:null,
+        birth: birthDate.value ? birthDate.value : null,
         gender: gender.value,
         phone: phoneNumber.value,
         companyName: companyName.value,
         companyAddress: companyAddress.value,
-        image: selectedImageFile.value ? null: profileImage.value,
+        image: selectedImageFile.value ? null : profileImage.value,
         emailAuthentication: isEmailVerified.value,
         specialities: specialityIds
       }
 
-      const jsonBlob = new Blob([JSON.stringify(infoData)], {type: "application/json"});
-      formData.append("info",jsonBlob);
+      const jsonBlob = new Blob([JSON.stringify(infoData)], {type: 'application/json'});
+      formData.append('info', jsonBlob);
 
       if(selectedImageFile.value){
         formData.append('image', selectedImageFile.value);
       }
 
-      const userId = currentUserId.value; //pinia 수정 필요
-      await axios.put(`/api/info/user/${userId}`,formData, {
+      await httpRequest.put(`/api/info/user/${userId}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -457,13 +485,13 @@ const handleSave = async () => {
 
     setTimeout(() => (showSuccess.value = false), 3000);
 
-    }catch(error){
-      const status = error.response.status;
+    } catch (error) {
+      const status = error?.response?.status;
 
-      if(status === 404){
-        alert("[404 Not Found] 해당 사용자가 존재하지 않습니다.");
-      }else{
-        alert(`오류가 발생했습니다. (Code: ${status})`);
+      if (status === 404) {
+        alert('[404 Not Found] 해당 사용자가 존재하지 않습니다.');
+      } else {
+        alert(`오류가 발생했습니다. (Code: ${status ?? 'unknown'})`);
       }
     }
 };
