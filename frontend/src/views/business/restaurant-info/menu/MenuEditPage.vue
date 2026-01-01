@@ -2,10 +2,10 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { Upload, X } from 'lucide-vue-next';
 import { useRouter, useRoute } from 'vue-router';
-import axios from 'axios';
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 import { useRestaurantStore } from '@/stores/restaurant';
+import httpRequest from "@/router/httpRequest.js";
 
 // 1. 라우터, 라우트, 스토어
 const router = useRouter();
@@ -79,7 +79,7 @@ const isTagSelected = (tag) => {
 // 6. 라이프사이클 훅
 const fetchIngredientTags = async () => {
   try {
-    const response = await axios.get('/api/tags/search', {
+    const response = await httpRequest.get('/api/tags/search', {
       params: { categories: 'INGREDIENT' },
     });
     // API는 { "INGREDIENT": [...] } 와 같은 객체를 반환하므로 배열을 추출합니다.

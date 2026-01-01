@@ -1,13 +1,9 @@
 package com.example.LunchGo.restaurant.service;
 
-import com.example.LunchGo.restaurant.domain.MenuCategory;
 import com.example.LunchGo.restaurant.dto.MenuDTO;
 import com.example.LunchGo.restaurant.dto.MenuTagDTO;
-import com.example.LunchGo.restaurant.dto.MenuTagMappingDTO;
 import com.example.LunchGo.restaurant.entity.Menu;
 import com.example.LunchGo.restaurant.repository.MenuRepository;
-import com.example.LunchGo.tag.entity.SearchTag;
-import com.example.LunchGo.tag.repository.SearchTagRepository;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
@@ -22,7 +18,7 @@ import java.util.stream.Collectors;
 public class MenuService {
 
     private final MenuRepository menuRepository;
-    private final SearchTagRepository searchTagRepository;
+    private final MenuTagService menuTagService; // 식당메뉴-태그 매핑 관련 서비스 로직 처리
     private final ModelMapper modelMapper;
 
     /**
@@ -40,17 +36,14 @@ public class MenuService {
                     .restaurantId(restaurantId)
                     .name(menuDto.getName())
                     .price(menuDto.getPrice())
-                    .category(menuDto.getCategory()) // .findCategory() 호출 제거
+                    .category(menuDto.getCategory())
                     .description(menuDto.getDescription() != null ? menuDto.getDescription() : "")
                     .build();
             Menu savedMenu = menuRepository.save(menu);
 
+            // MenuTagService에 위임
             if (menuDto.getTags() != null && !menuDto.getTags().isEmpty()) {
-                for (MenuTagDTO menuTagDto : menuDto.getTags()) {
-                    if (menuTagDto.getTagId() != null) {
-                        menuRepository.saveMenuTagMapping(savedMenu.getMenuId(), menuTagDto.getTagId());
-                    }
-                }
+                menuTagService.updateTagsForMenu(savedMenu.getMenuId(), menuDto.getTags());
             }
         }
     }
@@ -71,7 +64,8 @@ public class MenuService {
                 .description(menuDto.getDescription() != null ? menuDto.getDescription() : "")
                 .build();
         Menu savedMenu = menuRepository.save(menu);
-        updateMenuTags(savedMenu.getMenuId(), menuDto.getTags());
+        // MenuTagService에 위임
+        menuTagService.updateTagsForMenu(savedMenu.getMenuId(), menuDto.getTags());
 
         MenuDTO response = modelMapper.map(savedMenu, MenuDTO.class);
         response.setTags(menuDto.getTags() != null ? menuDto.getTags() : Collections.emptyList());
@@ -105,7 +99,8 @@ public class MenuService {
         }
 
         Menu savedMenu = menuRepository.save(menu);
-        updateMenuTags(savedMenu.getMenuId(), menuDto.getTags());
+        // MenuTagService에 위임
+        menuTagService.updateTagsForMenu(savedMenu.getMenuId(), menuDto.getTags());
 
         MenuDTO response = modelMapper.map(savedMenu, MenuDTO.class);
         response.setTags(menuDto.getTags() != null ? menuDto.getTags() : Collections.emptyList());
@@ -124,7 +119,8 @@ public class MenuService {
         if (updated == 0) {
             throw new NoSuchElementException("Menu not found with id: " + menuId);
         }
-        menuRepository.deleteMenuTagMappingsByMenuId(menuId);
+        // 태그 매핑도 함께 삭제
+        menuTagService.updateTagsForMenu(menuId, Collections.emptyList());
     }
 
     /**
@@ -138,71 +134,46 @@ public class MenuService {
             updatedMenuDtos = new ArrayList<>(); // null이면 빈 리스트로 처리하여 모든 메뉴를 삭제
         }
 
-        // 1. DB에서 기존 메뉴 목록 조회
         Map<Long, Menu> existingMenuMap = menuRepository.findAllByRestaurantIdAndIsDeletedFalse(restaurantId)
                 .stream()
                 .collect(Collectors.toMap(Menu::getMenuId, menu -> menu));
 
-        // 2. 요청 DTO에서 메뉴 ID 집합 생성
         Set<Long> updatedMenuIds = updatedMenuDtos.stream()
                 .map(MenuDTO::getMenuId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        // 3. 신규 및 수정 메뉴 처리
         for (MenuDTO dto : updatedMenuDtos) {
             Long menuId = dto.getMenuId();
-
-            // 휴리스틱: 1,000,000보다 큰 ID는 클라이언트에서 생성된 임시 ID로 간주
-            // 실제 DB ID는 보통 이보다 훨씬 작음
             boolean isNew = (menuId == null || menuId > 1000000L);
 
             if (isNew) {
-                // 신규 메뉴 -> INSERT
                 Menu newMenu = modelMapper.map(dto, Menu.class);
                 newMenu.setRestaurantId(restaurantId);
-                newMenu.setMenuId(null); // DB에 저장하기 전, ID를 null로 설정하여 auto-increment 적용
-
+                newMenu.setMenuId(null);
                 Menu savedMenu = menuRepository.save(newMenu);
-                updateMenuTags(savedMenu.getMenuId(), dto.getTags());
+                // MenuTagService에 위임
+                menuTagService.updateTagsForMenu(savedMenu.getMenuId(), dto.getTags());
             } else {
-                // 기존 메뉴 -> UPDATE
                 Menu existingMenu = existingMenuMap.get(menuId);
                 if (existingMenu != null) {
                     modelMapper.map(dto, existingMenu);
-                    menuRepository.save(existingMenu); // 변경된 메뉴를 명시적으로 저장
-                    updateMenuTags(existingMenu.getMenuId(), dto.getTags());
+                    menuRepository.save(existingMenu);
+                    // MenuTagService에 위임
+                    menuTagService.updateTagsForMenu(existingMenu.getMenuId(), dto.getTags());
                 }
             }
         }
 
-        // 4. 삭제된 메뉴 처리 (차집합 활용)
         Set<Long> existingMenuIds = new HashSet<>(existingMenuMap.keySet());
-        existingMenuIds.removeAll(updatedMenuIds); // existingMenuIds에 삭제할 ID만 남게 됨
+        existingMenuIds.removeAll(updatedMenuIds);
 
         for (Long menuIdToDelete : existingMenuIds) {
             menuRepository.softDeleteMenu(restaurantId, menuIdToDelete);
-            menuRepository.deleteMenuTagMappingsByMenuId(menuIdToDelete);
+            // MenuTagService를 통해 태그 매핑 삭제
+            menuTagService.updateTagsForMenu(menuIdToDelete, Collections.emptyList());
         }
     }
-
-    /**
-     * 특정 메뉴의 태그를 업데이트합니다. (기존 태그 모두 삭제 후 새로 추가)
-     *
-     * @param menuId  태그를 업데이트할 메뉴 ID
-     * @param tagDtos 새로운 태그 DTO 리스트
-     */
-    private void updateMenuTags(Long menuId, List<MenuTagDTO> tagDtos) {
-        menuRepository.deleteMenuTagMappingsByMenuId(menuId);
-        if (tagDtos != null && !tagDtos.isEmpty()) {
-            for (MenuTagDTO tagDto : tagDtos) {
-                if (tagDto.getTagId() != null) {
-                    menuRepository.saveMenuTagMapping(menuId, tagDto.getTagId());
-                }
-            }
-        }
-    }
-
 
     /**
      * 특정 식당의 메뉴 리스트를 조회합니다. (N+1 문제 해결 버전)
@@ -218,27 +189,12 @@ public class MenuService {
         }
 
         List<Long> menuIds = menus.stream().map(Menu::getMenuId).collect(Collectors.toList());
-        List<MenuTagMappingDTO> mappings = menuRepository.findTagsForMenus(menuIds);
-
-        List<Long> tagIds = mappings.stream().map(MenuTagMappingDTO::getTagId).distinct().collect(Collectors.toList());
-        Map<Long, SearchTag> tagMap = searchTagRepository.findAllById(tagIds).stream()
-                .collect(Collectors.toMap(SearchTag::getTagId, tag -> tag));
-
-        Map<Long, List<Long>> menuIdToTagIdsMap = mappings.stream()
-                .collect(Collectors.groupingBy(MenuTagMappingDTO::getMenuId,
-                        Collectors.mapping(MenuTagMappingDTO::getTagId, Collectors.toList())));
+        // MenuTagService에서 태그 정보 조회
+        Map<Long, List<MenuTagDTO>> tagsForMenus = menuTagService.getTagsForMenus(menuIds);
 
         return menus.stream().map(menu -> {
             MenuDTO menuDto = modelMapper.map(menu, MenuDTO.class);
-            List<Long> relatedTagIds = menuIdToTagIdsMap.getOrDefault(menu.getMenuId(), Collections.emptyList());
-            List<MenuTagDTO> menuTagDtos = relatedTagIds.stream()
-                    .map(tagId -> {
-                        SearchTag tag = tagMap.get(tagId);
-                        return tag != null ? modelMapper.map(tag, MenuTagDTO.class) : null;
-                    })
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-            menuDto.setTags(menuTagDtos);
+            menuDto.setTags(tagsForMenus.getOrDefault(menu.getMenuId(), Collections.emptyList()));
             return menuDto;
         }).collect(Collectors.toList());
     }
@@ -255,18 +211,8 @@ public class MenuService {
         Menu menu = menuRepository.findByMenuIdAndRestaurantIdAndIsDeletedFalse(menuId, restaurantId)
                 .orElseThrow(() -> new NoSuchElementException("Menu not found with id: " + menuId));
 
-        List<MenuTagMappingDTO> mappings = menuRepository.findTagsForMenus(List.of(menuId));
-        List<Long> tagIds = mappings.stream().map(MenuTagMappingDTO::getTagId).distinct().collect(Collectors.toList());
-        Map<Long, SearchTag> tagMap = tagIds.isEmpty()
-                ? Collections.emptyMap()
-                : searchTagRepository.findAllById(tagIds).stream()
-                        .collect(Collectors.toMap(SearchTag::getTagId, tag -> tag));
-
-        List<MenuTagDTO> menuTagDtos = mappings.stream()
-                .map(mapping -> tagMap.get(mapping.getTagId()))
-                .filter(Objects::nonNull)
-                .map(tag -> modelMapper.map(tag, MenuTagDTO.class))
-                .collect(Collectors.toList());
+        // MenuTagService에서 태그 정보 조회
+        List<MenuTagDTO> menuTagDtos = menuTagService.getTagsForMenu(menuId);
 
         MenuDTO menuDto = modelMapper.map(menu, MenuDTO.class);
         menuDto.setTags(menuTagDtos);

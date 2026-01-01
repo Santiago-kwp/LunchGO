@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import axios from 'axios'; // axios 임포트
+import httpRequest from "@/router/httpRequest.js"; // axios 임포트
 
 // 새 식당 정보의 기본 구조
 const defaultRestaurant = () => ({
@@ -27,7 +27,6 @@ export const useRestaurantStore = defineStore('restaurant', () => {
   const menus = ref([]);
 
   // Actions
-
   /**
    * 새 식당 등록을 위해 스토어를 초기화합니다.
    */
@@ -56,7 +55,7 @@ export const useRestaurantStore = defineStore('restaurant', () => {
    */
   async function fetchRestaurantDetail(restaurantId) {
     try {
-      const response = await axios.get(`/api/business/restaurants/${restaurantId}`);
+      const response = await httpRequest.get(`/api/business/restaurants/${restaurantId}`);
       loadRestaurant(response.data);
     } catch (error) {
       console.error('Failed to fetch restaurant details:', error);
@@ -117,7 +116,7 @@ export const useRestaurantStore = defineStore('restaurant', () => {
 
   async function createMenuForRestaurant(restaurantId, menu) {
     try {
-      const response = await axios.post(
+      const response = await httpRequest.post(
         `/api/business/restaurants/${restaurantId}/menus`,
         menu
       );
@@ -131,7 +130,7 @@ export const useRestaurantStore = defineStore('restaurant', () => {
 
   async function updateMenuForRestaurant(restaurantId, menuId, menu) {
     try {
-      const response = await axios.put(
+      const response = await httpRequest.put(
         `/api/business/restaurants/${restaurantId}/menus/${menuId}`,
         menu
       );
@@ -145,7 +144,7 @@ export const useRestaurantStore = defineStore('restaurant', () => {
 
   async function deleteMenuForRestaurant(restaurantId, menuId) {
     try {
-      await axios.delete(
+      await httpRequest.delete(
         `/api/business/restaurants/${restaurantId}/menus/${menuId}`
       );
       deleteMenu(menuId);

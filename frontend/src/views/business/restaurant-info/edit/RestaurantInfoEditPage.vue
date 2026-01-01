@@ -7,6 +7,7 @@ import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 import Pagination from '@/components/ui/Pagination.vue';
 import {useRestaurantStore} from '@/stores/restaurant';
+import httpRequest from "@/router/httpRequest.js";
 
 const router = useRouter();
 const route = useRoute();
@@ -235,7 +236,7 @@ const isTagSelected = (tag) => {
 // API: GET /api/tags/search
 const fetchTags = async () => {
   try {
-    const response = await axios.get('/api/tags/search');
+    const response = await httpRequest.get('/api/tags/search');
     return response.data; // axios는 응답 데이터를 response.data로 제공합니다.
   } catch (error) {
     console.error('Failed to fetch tags:', error);
@@ -358,13 +359,13 @@ const saveRestaurant = async () => {
 
     if (isEditMode.value) {
       // 수정 모드일 경우: PUT 요청
-      response = await axios.put(`${apiUrl}/${route.params.id}`, dataToSubmit);
+      response = await httpRequest.put(`${apiUrl}/${route.params.id}`, dataToSubmit);
       alert('식당 정보가 성공적으로 수정되었습니다.');
       // 수정 후 상세 페이지로 이동
       router.push(`/business/restaurant-info/${route.params.id}`);
     } else {
       // 등록 모드일 경우: POST 요청
-      response = await axios.post(apiUrl, dataToSubmit);
+      response = await httpRequest.post(apiUrl, dataToSubmit);
       const newRestaurantId = response.data; // 백엔드에서 생성된 ID를 응답으로 받음
       alert('식당 정보가 성공적으로 등록되었습니다.');
       // 등록 후 새로운 식당의 상세 페이지로 이동
