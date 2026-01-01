@@ -1,8 +1,10 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { ArrowLeft } from "lucide-vue-next";
 import { useBookmarkShare } from "@/composables/useBookmarkShare";
+import httpRequest from "@/router/httpRequest";
+import { useAccountStore } from "@/stores/account";
 
 // 분리한 자식 컴포넌트 임포트
 import ReservationHistory from "@/components/ui/ReservationHistory.vue"; // 예정된 예약 목록
@@ -10,24 +12,47 @@ import UsageHistory from "@/components/ui/UsageHistory.vue"; // 지난 예약(�
 
 const route = useRoute();
 const { getMyBookmarks } = useBookmarkShare();
+const accountStore = useAccountStore();
 
 // 탭 상태 관리 ('upcoming' | 'past')
 const activeTab = ref("upcoming");
-const currentUserId = ref(1); // pinia 연결 전 임시 사용자
 const favorites = ref([]);
+const upcomingReservations = ref([]);
+const pastReservations = ref([]);
+
+const getStoredMember = () => {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem("member");
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+};
+
+const member = computed(() => accountStore.member || getStoredMember());
+const memberId = computed(() => {
+  const rawId = member.value?.id ?? member.value?.userId ?? member.value?.memberId;
+  if (rawId === null || rawId === undefined) return null;
+  const parsed = Number(rawId);
+  return Number.isNaN(parsed) ? null : parsed;
+});
 
 // URL 쿼리에 따라 초기 탭 설정 (예: ?tab=past)
 onMounted(() => {
-  //식당 정보 불러와야함
   if (route.query.tab === "past") {
     activeTab.value = "past";
   }
   loadFavorites();
+  loadReservations("upcoming");
+  loadReservations("past");
 });
 
 const loadFavorites = async () => {
+  if (!memberId.value) return;
   try {
-    const response = await getMyBookmarks(currentUserId.value);
+    const response = await getMyBookmarks(memberId.value);
     const data = Array.isArray(response.data) ? response.data : [];
     favorites.value = data.map((item) => item.restaurantId);
   } catch (error) {
@@ -35,137 +60,99 @@ const loadFavorites = async () => {
     favorites.value = [];
   }
 };
-//취소 버튼
-const goCancel = (id) => {
-  router.push({ name: "reservation-cancel", params: { id: String(id) } });
+
+const statusMap = {
+  TEMPORARY: "pending_payment",
+  CONFIRMED: "confirmed",
+  PREPAID_CONFIRMED: "confirmed",
+  COMPLETED: "completed",
+  REFUND_PENDING: "refund_pending",
+  REFUNDED: "refunded",
+  CANCELLED: "refunded",
+  NOSHOW: "refunded",
+  NO_SHOW: "refunded",
 };
 
+const formatDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}.${month}.${day}`;
+};
 
-// 통합 예약 데이터
-const allReservations = ref([
-  // 1. 예정된 예약 (ReservationHistory로 감)
-  {
-    id: 1,
-    confirmationNumber: "123123123123",
-    restaurant: {
-      id: 1,
-      name: "식당명",
-      address: "서울시 강남구 테헤란로 132",
-    },
-    booking: { date: "2025년 12월 15일 (금)", time: "18:00", partySize: 4 },
-    reservationStatus: "confirmed", // 예약확정
-    status: "upcoming", // [중요] upcoming 탭으로 분류
-  },
-  {
-    id: 2,
-    confirmationNumber: "12312312312123",
-    restaurant: {
-      id: 1,
-      name: "식당명",
-      address: "서울시 강남구 테헤란로 132",
-    },
-    booking: { date: "2025년 12월 15일 (금)", time: "18:00", partySize: 4 },
-    reservationStatus: "pending_payment", // 결제대기
-    status: "upcoming", // [중요] upcoming 탭으로 분류
-  },
+const formatTime = (value) => {
+  if (!value) return "";
+  return String(value).slice(0, 5);
+};
 
-  // 2. 지난 예약 + 환불 관련 (UsageHistory로 감)
-  {
-    id: 3,
-    confirmationNumber: "LG2024111500001",
-    restaurant: {
-      id: 1,
-      name: "식당명",
-      address: "서울시 강남구 테헤란로 132",
-    },
-    booking: { date: "2024년 11월 15일 (금)", time: "11:00", partySize: 4 },
-    visitCount: 2,
-    daysSinceLastVisit: 70,
-    payment: { amount: 85000 },
-    reservationStatus: "completed", // 이용완료 -> 리뷰 작성 가능
-    status: "past",
-    review: {
-      id: 1,
-      rating: 5,
-      content: "회식하기 정말 좋았어요...",
-      tags: ["인테리어가 세련돼요", "재료가 신선해요"],
-      createdAt: "2024.11.16",
-    },
-  },
-  {
-    id: 4,
-    confirmationNumber: "LG2024111500002",
-    restaurant: {
-      id: 1,
-      name: "식당명",
-      address: "서울시 강남구 테헤란로 132",
-    },
-    booking: { date: "2024년 11월 15일 (금)", time: "11:00", partySize: 4 },
-    visitCount: 1,
-    daysSinceLastVisit: null,
-    payment: { amount: 85000 },
-    reservationStatus: "refund_pending", // 환불대기 -> 리뷰 UI 숨김
-    status: "past",
-    review: null,
-  },
-  {
-    id: 5,
-    confirmationNumber: "LG2024111500003",
-    restaurant: {
-      id: 1,
-      name: "식당명",
-      address: "서울시 강남구 테헤란로 132",
-    },
-    booking: { date: "2024년 11월 10일 (금)", time: "11:00", partySize: 2 },
-    visitCount: 3,
-    daysSinceLastVisit: 30,
-    payment: { amount: 125000 },
-    reservationStatus: "refunded", // 환불완료 -> 리뷰 UI 숨김
-    status: "past",
-    review: null, // 환불 완료 시 리뷰 데이터가 없어야 정상
-  },
-  {
-    id: 6,
-    confirmationNumber: "LG2024111500001",
-    restaurant: {
-      id: 1,
-      name: "김치찌개",
-      address: "서울시 강남구 테헤란로 132",
-    },
-    booking: { date: "2024년 11월 15일 (금)", time: "11:00", partySize: 4 },
-    visitCount: 2,
-    daysSinceLastVisit: 70,
-    payment: { amount: 85000 },
-    reservationStatus: "completed", // 이용완료 -> 리뷰 작성 가능
-    status: "past",
-    review: null,
-  },
-  {
-    id: 7,
-    confirmationNumber: "LG2024111600004",
-    restaurant: {
-      id: 2,
-      name: "바다향기 횟집",
-      address: "서울시 강남구 테헤란로 140",
-    },
-    booking: { date: "2024년 11월 16일 (토)", time: "19:30", partySize: 3 },
-    visitCount: 1,
-    daysSinceLastVisit: 10,
-    payment: { amount: 95000 },
-    reservationStatus: "completed", // 이용완료 -> 리뷰 작성 가능
-    status: "past",
-    review: null,
-  },
-]);
+const mapReservation = (item) => {
+  const reservationStatus = statusMap[item.reservationStatus] || "confirmed";
+  const fallbackVisitCount = reservationStatus === "completed" ? 1 : 0;
 
-// 필터링: status가 'upcoming'인 것만 추출
-const upcomingReservations = computed(() =>
-  allReservations.value.filter((r) => r.status === "upcoming")
-);
+  return {
+    id: item.id,
+    confirmationNumber: item.confirmationNumber,
+    restaurant: {
+      id: item.restaurant?.id,
+      name: item.restaurant?.name,
+      address: item.restaurant?.address,
+    },
+    booking: {
+      date: formatDate(item.booking?.date),
+      time: formatTime(item.booking?.time),
+      partySize: item.booking?.partySize,
+    },
+    visitCount: item.visitCount ?? fallbackVisitCount,
+    daysSinceLastVisit: item.daysSinceLastVisit ?? null,
+    payment: item.payment?.amount ? { amount: item.payment.amount } : null,
+    reservationStatus,
+    review: item.review
+      ? {
+          id: item.review.id,
+          rating: item.review.rating,
+          content: item.review.content || "",
+          tags: Array.isArray(item.review.tags) ? item.review.tags : [],
+          createdAt: formatDate(item.review.createdAt),
+        }
+      : null,
+  };
+};
 
-// 필터링: status가 'past'인 것만 추출 (이용완료, 환불대기, 환불완료 포함)
-const pastReservations = computed(() =>
-  allReservations.value.filter((r) => r.status === "past")
+const loadReservations = async (type) => {
+  if (!memberId.value) return;
+  try {
+    const response = await httpRequest.get("/api/reservations/history", {
+      userId: memberId.value,
+      type,
+    });
+    const data = Array.isArray(response.data) ? response.data : [];
+    const mapped = data.map(mapReservation);
+    if (type === "past") {
+      pastReservations.value = mapped;
+    } else {
+      upcomingReservations.value = mapped;
+    }
+  } catch (error) {
+    console.error("예약 내역 조회 실패:", error);
+    if (type === "past") {
+      pastReservations.value = [];
+    } else {
+      upcomingReservations.value = [];
+    }
+  }
+};
+
+watch(
+  () => memberId.value,
+  (next) => {
+    if (!next) return;
+    loadFavorites();
+    loadReservations("upcoming");
+    loadReservations("past");
+  }
 );
 </script>
 
@@ -225,7 +212,7 @@ const pastReservations = computed(() =>
         <UsageHistory
           v-show="activeTab === 'past'"
           :reservations="pastReservations"
-          :user-id="currentUserId"
+          :user-id="memberId"
           :favorites="favorites"
         />
       </div>

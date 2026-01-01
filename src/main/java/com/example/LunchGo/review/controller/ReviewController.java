@@ -51,6 +51,7 @@ public class ReviewController {
         return ResponseEntity.ok(response);
     }
 
+
     @GetMapping("/{reviewId}")
     public ResponseEntity<ReviewDetailResponse> detail(
         @PathVariable Long restaurantId,

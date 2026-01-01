@@ -56,6 +56,8 @@ public class SecurityConfig {
                                 "/api/restaurants/*/reviews/*",
                                 "/api/restaurants/trending"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/reviews/tags").hasAuthority("ROLE_USER")
+                        .requestMatchers(HttpMethod.GET, "/api/reviews/my").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.POST, "/api/payments/portone/webhook").permitAll()
 
                         .requestMatchers(HttpMethod.POST, "/api/restaurants/*/reviews").hasAuthority("ROLE_USER")
@@ -111,7 +113,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:8080"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-type", "X-Requested-With"));
         configuration.setExposedHeaders(List.of("Authorization", "Location"));
         configuration.setAllowCredentials(true);

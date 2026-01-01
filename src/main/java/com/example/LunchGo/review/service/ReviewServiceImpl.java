@@ -20,10 +20,14 @@ import com.example.LunchGo.review.dto.UpdateReviewRequest;
 import com.example.LunchGo.review.dto.UpdateReviewResponse;
 import com.example.LunchGo.review.dto.VisitInfo;
 import com.example.LunchGo.image.service.ObjectStorageService;
+import com.example.LunchGo.review.entity.Receipt;
+import com.example.LunchGo.review.entity.ReceiptItem;
 import com.example.LunchGo.review.entity.Review;
 import com.example.LunchGo.review.entity.ReviewImage;
 import com.example.LunchGo.review.entity.ReviewTagMap;
 import com.example.LunchGo.review.mapper.ReviewReadMapper;
+import com.example.LunchGo.review.repository.ReceiptItemRepository;
+import com.example.LunchGo.review.repository.ReceiptRepository;
 import com.example.LunchGo.review.repository.ReviewImageRepository;
 import com.example.LunchGo.review.repository.ReviewRepository;
 import com.example.LunchGo.review.repository.ReviewTagMapRepository;
@@ -46,6 +50,8 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewRepository reviewRepository;
     private final ReviewTagMapRepository reviewTagMapRepository;
     private final ReviewImageRepository reviewImageRepository;
+    private final ReceiptRepository receiptRepository;
+    private final ReceiptItemRepository receiptItemRepository;
     private final ReviewReadMapper reviewReadMapper;
     private final ObjectStorageService objectStorageService;
     private final ReviewTagRepository reviewTagRepository;
@@ -59,6 +65,7 @@ public class ReviewServiceImpl implements ReviewService {
             restaurantId,
             request.getUserId(),
             request.getReceiptId(),
+            request.getReservationId(),
             request.getRating(),
             request.getContent()
         );
@@ -176,6 +183,7 @@ public class ReviewServiceImpl implements ReviewService {
         ReviewEditResponse response = new ReviewEditResponse();
         response.setReviewId(reviewId);
         response.setRestaurantId(review.getRestaurantId());
+        response.setReservationId(review.getReservationId());
         response.setReceiptId(review.getReceiptId());
         response.setRating(review.getRating());
         response.setContent(review.getContent());
@@ -226,6 +234,8 @@ public class ReviewServiceImpl implements ReviewService {
             }
             reviewImageRepository.saveAll(images);
         }
+
+        updateReceiptItems(review.getReceiptId(), request.getReceiptItems());
 
         Review saved = reviewRepository.save(review);
         return new UpdateReviewResponse(saved.getReviewId(), saved.getUpdatedAt(), saved.getStatus());
@@ -302,6 +312,44 @@ public class ReviewServiceImpl implements ReviewService {
         if (request.getRating() == null || request.getRating() < 1 || request.getRating() > 5) {
             throw new IllegalArgumentException("rating must be between 1 and 5");
         }
+    }
+
+    private void updateReceiptItems(Long receiptId, List<UpdateReviewRequest.ReceiptItemRequest> items) {
+        if (receiptId == null || items == null) {
+            return;
+        }
+        Receipt receipt = receiptRepository.findById(receiptId).orElse(null);
+        if (receipt == null) {
+            return;
+        }
+
+        receiptItemRepository.deleteByReceiptId(receiptId);
+
+        List<ReceiptItem> entities = new ArrayList<>();
+        int totalAmount = 0;
+        for (UpdateReviewRequest.ReceiptItemRequest item : items) {
+            if (item == null) {
+                continue;
+            }
+            String name = item.getName() == null ? "" : item.getName().trim();
+            int qty = item.getQuantity() == null ? 0 : item.getQuantity();
+            int unitPrice = item.getPrice() == null ? 0 : item.getPrice();
+            if (qty < 1) {
+                qty = 1;
+            }
+            if (unitPrice < 0) {
+                unitPrice = 0;
+            }
+            int lineAmount = unitPrice * qty;
+            totalAmount += lineAmount;
+            entities.add(new ReceiptItem(receiptId, name, qty, unitPrice, lineAmount));
+        }
+
+        if (!entities.isEmpty()) {
+            receiptItemRepository.saveAll(entities);
+        }
+        receipt.updateConfirmedAmount(totalAmount);
+        receiptRepository.save(receipt);
     }
 
     private void applyReceiptImagePresign(VisitInfo visitInfo) {

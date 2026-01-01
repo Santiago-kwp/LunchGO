@@ -10,7 +10,7 @@ import {
   Edit,
   Trash2,
 } from "lucide-vue-next";
-import axios from "axios";
+import httpRequest from "@/router/httpRequest";
 import Button from "@/components/ui/Button.vue";
 import Card from "@/components/ui/Card.vue";
 import FavoriteHeart from "@/components/ui/FavoriteHeart.vue";
@@ -99,7 +99,7 @@ const handleEditReview = (reservation) => {
 // 리뷰 삭제 핸들러
 const handleDeleteReview = (reservation) => {
   if (!confirm("리뷰를 삭제하시겠습니까?")) return;
-  axios
+  httpRequest
     .delete(
       `/api/restaurants/${reservation.restaurant.id}/reviews/${reservation.review.id}`
     )

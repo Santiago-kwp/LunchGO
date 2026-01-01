@@ -9,6 +9,7 @@ import lombok.Setter;
 public class ReviewEditResponse {
     private Long reviewId;
     private Long restaurantId;
+    private Long reservationId;
     private Long receiptId;
     private Integer rating;
     private String content;

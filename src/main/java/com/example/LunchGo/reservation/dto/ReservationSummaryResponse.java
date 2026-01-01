@@ -2,6 +2,7 @@ package com.example.LunchGo.reservation.dto;
 
 import lombok.Builder;
 import lombok.Getter;
+import java.util.List;
 
 @Getter
 @Builder
@@ -10,6 +11,9 @@ public class ReservationSummaryResponse {
     private BookingInfo booking;
     private PaymentInfo payment;
     private String requestNote;
+    private Integer totalAmount;
+    private Integer visitCount;
+    private List<MenuItem> menuItems;
 
     @Getter
     @Builder
@@ -32,5 +36,14 @@ public class ReservationSummaryResponse {
     public static class PaymentInfo {
         private String type;
         private Integer amount;
+    }
+
+    @Getter
+    @Builder
+    public static class MenuItem {
+        private String name;
+        private Integer quantity;
+        private Integer unitPrice;
+        private Integer lineAmount;
     }
 }

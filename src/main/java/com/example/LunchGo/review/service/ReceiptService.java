@@ -27,8 +27,14 @@ public class ReceiptService {
             throw new IllegalArgumentException("receipt data is required");
         }
 
-        Receipt receipt = new Receipt(reservationId, receiptDTO.getTotalAmount(), receiptImageKey);
-        Receipt saved = receiptRepository.save(receipt);
+        Receipt saved = receiptRepository.findTopByReservationIdOrderByCreatedAtDesc(reservationId)
+            .map(existing -> {
+                existing.updateConfirmedAmount(receiptDTO.getTotalAmount());
+                existing.updateImageUrl(receiptImageKey);
+                receiptItemRepository.deleteByReceiptId(existing.getReceiptId());
+                return existing;
+            })
+            .orElseGet(() -> receiptRepository.save(new Receipt(reservationId, receiptDTO.getTotalAmount(), receiptImageKey)));
 
         List<ReceiptItem> items = new ArrayList<>();
         if (receiptDTO.getItems() != null) {

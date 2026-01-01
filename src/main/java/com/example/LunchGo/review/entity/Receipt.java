@@ -40,6 +40,14 @@ public class Receipt {
         this.imageUrl = imageUrl;
     }
 
+    public void updateConfirmedAmount(Integer confirmedAmount) {
+        this.confirmedAmount = confirmedAmount;
+    }
+
+    public void updateImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+    }
+
     @PrePersist
     public void onCreate() {
         if (createdAt == null) {

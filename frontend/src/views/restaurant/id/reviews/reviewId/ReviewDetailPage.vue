@@ -118,6 +118,10 @@ const setupDragScroll = (element) => {
 
 // 이전 단계로 이동
 const goToPreviousStep = () => {
+  if (route.query.from === "my-reservations") {
+    router.replace({ path: "/my-reservations", query: { tab: "past" } });
+    return;
+  }
   router.back();
 };
 

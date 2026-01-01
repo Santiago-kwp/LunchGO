@@ -10,6 +10,8 @@ import com.example.LunchGo.reservation.dto.ReservationSummaryResponse;
 import com.example.LunchGo.reservation.entity.Payment;
 import com.example.LunchGo.reservation.entity.Reservation;
 import com.example.LunchGo.reservation.entity.ReservationSlot;
+import com.example.LunchGo.reservation.mapper.ReservationSummaryMapper;
+import com.example.LunchGo.reservation.mapper.row.ReservationMenuItemRow;
 import com.example.LunchGo.reservation.repository.PaymentRepository;
 import com.example.LunchGo.reservation.repository.ReservationRepository;
 import com.example.LunchGo.reservation.repository.ReservationSlotRepository;
@@ -18,6 +20,8 @@ import com.example.LunchGo.restaurant.repository.RestaurantRepository;
 import com.example.LunchGo.restaurant.stats.RestaurantStatsEventService;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +48,7 @@ public class ReservationPaymentService {
     private final RestaurantRepository restaurantRepository;
     private final PortoneVerificationService portoneVerificationService;
     private final RestaurantStatsEventService statsEventService;
+    private final ReservationSummaryMapper reservationSummaryMapper;
 
     @Transactional
     public CreatePaymentResponse createPayment(Long reservationId, CreatePaymentRequest request) {
@@ -284,6 +289,38 @@ public class ReservationPaymentService {
         Payment payment = paymentRepository.findTopByReservationIdOrderByCreatedAtDesc(reservationId)
             .orElse(null);
 
+        List<ReservationMenuItemRow> menuRows = reservationSummaryMapper.selectReservationMenuItems(reservationId);
+        List<ReservationSummaryResponse.MenuItem> menuItems = new ArrayList<>();
+        Integer menuTotal = null;
+        if (menuRows != null && !menuRows.isEmpty()) {
+            int sum = 0;
+            for (ReservationMenuItemRow row : menuRows) {
+                Integer lineAmount = row.getLineAmount();
+                if (lineAmount != null) {
+                    sum += lineAmount;
+                }
+                menuItems.add(ReservationSummaryResponse.MenuItem.builder()
+                    .name(row.getName())
+                    .quantity(row.getQuantity())
+                    .unitPrice(row.getUnitPrice())
+                    .lineAmount(row.getLineAmount())
+                    .build());
+            }
+            menuTotal = sum;
+        }
+
+        Integer visitCount = reservationSummaryMapper.selectVisitCount(
+            restaurant.getRestaurantId(),
+            reservation.getUserId()
+        );
+
+        Integer totalAmount = menuTotal != null && menuTotal > 0
+            ? menuTotal
+            : reservation.getTotalAmount();
+        if (totalAmount == null) {
+            totalAmount = payment != null ? payment.getAmount() : 0;
+        }
+
         return ReservationSummaryResponse.builder()
             .restaurant(ReservationSummaryResponse.RestaurantInfo.builder()
                 .name(restaurant.getName())
@@ -300,6 +337,9 @@ public class ReservationPaymentService {
                 .amount(payment != null ? payment.getAmount() : 0)
                 .build())
             .requestNote(reservation.getRequestMessage())
+            .totalAmount(totalAmount)
+            .visitCount(visitCount)
+            .menuItems(menuItems.isEmpty() ? null : menuItems)
             .build();
     }
 

@@ -2,6 +2,8 @@ package com.example.LunchGo.reservation.controller;
 
 import com.example.LunchGo.reservation.dto.ReservationCreateRequest;
 import com.example.LunchGo.reservation.dto.ReservationCreateResponse;
+import com.example.LunchGo.reservation.dto.ReservationHistoryItem;
+import com.example.LunchGo.reservation.service.ReservationHistoryService;
 import com.example.LunchGo.reservation.service.ReservationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,6 +20,7 @@ import java.util.List;
 public class ReservationController {
 
     private final ReservationService reservationService;
+    private final ReservationHistoryService reservationHistoryService;
 
     @PostMapping
     public ResponseEntity<ReservationCreateResponse> create(@RequestBody ReservationCreateRequest request) {
@@ -39,5 +42,14 @@ public class ReservationController {
     ) {
         List<LocalTime> times = reservationService.slotTimes(restaurantId, slotDate);
         return ResponseEntity.ok(times);
+    }
+
+    @GetMapping("/history")
+    public ResponseEntity<List<ReservationHistoryItem>> history(
+            @RequestParam Long userId,
+            @RequestParam(defaultValue = "past") String type
+    ) {
+        List<ReservationHistoryItem> items = reservationHistoryService.getHistory(userId, type);
+        return ResponseEntity.ok(items);
     }
 }

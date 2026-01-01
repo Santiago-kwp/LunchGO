@@ -5,9 +5,11 @@ import { ArrowLeft, X, Upload, Plus, Star } from "lucide-vue-next";
 import Button from "@/components/ui/Button.vue";
 import Card from "@/components/ui/Card.vue";
 import httpRequest from "@/router/httpRequest";
+import { useAccountStore } from "@/stores/account";
 
 const route = useRoute();
 const router = useRouter();
+const accountStore = useAccountStore();
 const restaurantId = route.params.id || "1";
 const reviewId = route.params.reviewId; // 수정 모드일 때 리뷰 ID
 const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
@@ -18,6 +20,7 @@ const reservationId = computed(() => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 });
+const editReservationId = ref(null);
 
 // 작성 모드 vs 수정 모드 판단
 const isEditMode = computed(() => !!reviewId);
@@ -35,7 +38,24 @@ const isPhotoModalOpen = ref(false);
 // 리뷰 등록 완료 모달
 const isReviewCompleteModalOpen = ref(false);
 const submittedReviewId = ref(null); // 등록된 리뷰 ID (API 응답에서 받아옴)
-const DEFAULT_USER_ID = 2;
+const getStoredMember = () => {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem("member");
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+};
+
+const member = computed(() => accountStore.member || getStoredMember());
+const memberId = computed(() => {
+  const rawId = member.value?.id ?? member.value?.userId ?? member.value?.memberId;
+  if (rawId === null || rawId === undefined) return null;
+  const parsed = Number(rawId);
+  return Number.isNaN(parsed) ? null : parsed;
+});
 const rating = ref(0);
 const receiptId = ref(null);
 const selectedTagIds = ref([]);
@@ -49,15 +69,11 @@ const visitInfo = ref({
 
 // 영수증 정보
 const receipt = ref({
-  date: "2025년 11월 15일 (금)",
-  partySize: 8,
-  totalAmount: 111000,
+  date: "",
+  partySize: 0,
+  totalAmount: 0,
   uploaded: false, // 영수증 업로드 여부
-  items: [
-    { name: "메뉴명1", quantity: 1, price: 18000 },
-    { name: "메뉴명2", quantity: 2, price: 9000 },
-    { name: "메뉴명3", quantity: 3, price: 11000 },
-  ],
+  items: [],
 });
 const receiptDraftItems = ref(
   receipt.value.items.map((item) => ({ ...item }))
@@ -207,13 +223,47 @@ const existingReviews = {
 };
 
 // 수정 모드일 때 기존 리뷰 데이터 로드
+const applyReservationSummary = (data, shouldApplyReceipt) => {
+  visitInfo.value.restaurantName = data.restaurant?.name || "";
+  const count = Number(data.visitCount);
+  visitInfo.value.visitNumber = Number.isFinite(count) && count > 0 ? count : 1;
+
+  if (!shouldApplyReceipt) return;
+
+  receipt.value.date = formatOcrDate(data.booking?.date);
+  receipt.value.partySize = data.booking?.partySize || 0;
+  receipt.value.totalAmount = data.totalAmount ?? data.payment?.amount ?? 0;
+  const menuItems = Array.isArray(data.menuItems) ? data.menuItems : [];
+  const mappedItems = menuItems.map((item) => ({
+    name: item.name,
+    quantity: Number(item.quantity) || 0,
+    price: Number(item.unitPrice) || 0,
+  }));
+  receipt.value.items = mappedItems.map((item) => ({ ...item }));
+  receiptDraftItems.value = mappedItems.map((item) => ({ ...item }));
+  receipt.value.uploaded = false;
+};
+
+const fetchReservationSummary = async (summaryReservationId, shouldApplyReceipt) => {
+  if (!summaryReservationId) return;
+  try {
+    const response = await httpRequest.get(
+      `/api/reservations/${summaryReservationId}/summary`
+    );
+    const data = response.data || {};
+    applyReservationSummary(data, shouldApplyReceipt);
+  } catch (error) {
+    console.error("예약 정보 로드 실패:", error);
+  }
+};
+
 const loadExistingReview = async () => {
   if (isEditMode.value && reviewId) {
     try {
       const response = await httpRequest.get(
         `/api/restaurants/${restaurantId}/reviews/${reviewId}/edit`
       );
-      const data = response.data;
+      const data = response.data?.data ?? response.data;
 
       receiptId.value = data.receiptId || null;
       rating.value = data.rating ?? 0;
@@ -222,16 +272,25 @@ const loadExistingReview = async () => {
       const tags = data.tags || [];
       selectedTags.value = tags.map((tag) => tag.name);
       selectedTagIds.value = tags.map((tag) => tag.tagId);
-      tagIdByName.value = tags.reduce((acc, tag) => {
-        acc[tag.name] = tag.tagId;
-        return acc;
-      }, {});
+      tagIdByName.value = {
+        ...tagIdByName.value,
+        ...tags.reduce((acc, tag) => {
+          acc[tag.name] = tag.tagId;
+          return acc;
+        }, {}),
+      };
 
       reviewPhotos.value = (data.images || []).map((url, index) => ({
         id: `${Date.now()}-${index}`,
         url,
         file: null,
       }));
+
+      editReservationId.value = data.reservationId ?? null;
+      const summaryReservationId = editReservationId.value ?? reservationId.value;
+      if (summaryReservationId) {
+        await fetchReservationSummary(summaryReservationId, !data.receiptId);
+      }
 
       if (data.visitInfo) {
         receipt.value.date = formatOcrDate(data.visitInfo.date);
@@ -274,6 +333,30 @@ const loadExistingReview = async () => {
       }
     }
   }
+};
+
+const loadTagMap = async () => {
+  try {
+    const response = await httpRequest.get("/api/reviews/tags");
+    const payload = response.data?.data ?? response.data;
+    const tags = Array.isArray(payload) ? payload : [];
+    const map = tags.reduce((acc, tag) => {
+      if (tag?.name && tag?.tagId) {
+        acc[tag.name] = tag.tagId;
+      }
+      return acc;
+    }, {});
+    tagIdByName.value = map;
+    return map;
+  } catch (error) {
+    console.error("리뷰 태그 목록 조회 실패:", error);
+    return {};
+  }
+};
+
+const loadReservationSummary = async () => {
+  if (isEditMode.value || !reservationId.value) return;
+  await fetchReservationSummary(reservationId.value, true);
 };
 
 // 태그 선택/해제
@@ -408,6 +491,20 @@ const submitReview = async () => {
     return;
   }
 
+  let tagIdsForSubmit = selectedTags.value
+    .map((tag) => tagIdByName.value[tag])
+    .filter((id) => id);
+  if (selectedTags.value.length > 0 && tagIdsForSubmit.length === 0) {
+    const refreshedMap = await loadTagMap();
+    tagIdsForSubmit = selectedTags.value
+      .map((tag) => refreshedMap[tag])
+      .filter((id) => id);
+  }
+  if (selectedTags.value.length > 0 && tagIdsForSubmit.length === 0) {
+    alert("리뷰 태그 정보를 불러오지 못했습니다. 다시 시도해주세요.");
+    return;
+  }
+
   if (isEditMode.value) {
     try {
       const response = await httpRequest.put(
@@ -416,27 +513,36 @@ const submitReview = async () => {
           receiptId: receiptId.value,
           rating: rating.value,
           content: reviewText.value,
-          tagIds: selectedTagIds.value,
+          tagIds: tagIdsForSubmit,
           imageUrls: imageUrls,
+          receiptItems: receiptDraftItems.value.map((item) => ({
+            name: item.name,
+            quantity: Number(item.quantity) || 0,
+            price: Number(item.price) || 0,
+          })),
         }
       );
       const updatedId = response.data.reviewId || reviewId;
-      router.push(`/restaurant/${restaurantId}/reviews/${updatedId}`);
+      router.replace(`/restaurant/${restaurantId}/reviews/${updatedId}`);
     } catch (error) {
       console.error("리뷰 수정 실패:", error);
       alert("리뷰 수정에 실패했습니다.");
     }
   } else {
     try {
+      if (!memberId.value) {
+        alert("로그인이 필요합니다.");
+        return;
+      }
       const response = await httpRequest.post(
         `/api/restaurants/${restaurantId}/reviews`,
         {
-          userId: DEFAULT_USER_ID,
+          userId: memberId.value,
           reservationId: reservationId.value,
           receiptId: receiptId.value,
           rating: rating.value,
           content: reviewText.value,
-          tagIds: selectedTagIds.value,
+          tagIds: tagIdsForSubmit,
           imageUrls: imageUrls,
         }
       );
@@ -457,7 +563,10 @@ const closeReviewCompleteModal = () => {
 // 내 리뷰 보러가기
 const goToMyReview = () => {
   closeReviewCompleteModal();
-  router.push(`/restaurant/${restaurantId}/reviews/${submittedReviewId.value}`);
+  router.push({
+    path: `/restaurant/${restaurantId}/reviews/${submittedReviewId.value}`,
+    query: { from: "my-reservations" },
+  });
 };
 
 // 지난 예약 페이지로 가기
@@ -499,10 +608,16 @@ const handleReceiptUpload = async (event) => {
 
   const formData = new FormData();
   formData.append("file", file);
+  const targetReservationId = reservationId.value ?? editReservationId.value;
+  if (!targetReservationId) {
+    alert("예약 정보를 찾을 수 없습니다.");
+    isOcrProcessing.value = false;
+    return;
+  }
 
   try {
     const response = await httpRequest.post("/api/ocr/receipt", formData, {
-      params: { reservationId: reservationId.value },
+      params: { reservationId: targetReservationId },
       headers: { "Content-Type": "multipart/form-data" },
     });
 
@@ -613,9 +728,11 @@ const setupDragScroll = () => {
   });
 };
 
-onMounted(() => {
+onMounted(async () => {
   setupDragScroll();
-  loadExistingReview(); // 수정 모드일 때 기존 리뷰 데이터 로드
+  await loadTagMap();
+  await loadExistingReview(); // 수정 모드일 때 기존 리뷰 데이터 로드
+  loadReservationSummary();
 });
 </script>
 

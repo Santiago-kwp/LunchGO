@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import {
   ArrowLeft,
@@ -10,9 +10,13 @@ import {
   MapPin,
 } from 'lucide-vue-next';
 import Card from '@/components/ui/Card.vue';
+import Pagination from "@/components/ui/Pagination.vue";
+import httpRequest from "@/router/httpRequest";
+import { useAccountStore } from "@/stores/account";
 
 const route = useRoute();
 const router = useRouter();
+const accountStore = useAccountStore();
 
 const getReviewRestaurantId = (review) =>
   review?.restaurant?.id ?? review?.restaurantId;
@@ -27,66 +31,71 @@ const getReviewId = (review) => {
   return null;
 };
 
-// 내가 작성한 리뷰 목록 (Mock data - 실제로는 API에서 가져옴)
-const myReviews = ref([
-  {
-    id: 1,
-    reservationId: 3,
-    restaurant: {
-      id: 1,
-      name: '식당명',
-      address: '서울시 강남구 테헤란로 132',
-    },
-    visitCount: 2,
-    rating: 5,
-    date: '2024.11.16',
-    visitDate: '2024.11.15',
-    content:
-      '회식하기 정말 좋았어요. 음식도 맛있고 분위기도 최고였습니다! 특히 룸이 프라이빗해서 회사 동료들과 편하게 대화할 수 있었고, 음식 양도 정말 푸짐해서 배불리 먹었습니다. 다음에 또 방문하고 싶어요.',
-    tags: [
-      '인테리어가 세련돼요',
-      '재료가 신선해요',
-      '직원들이 적극적으로 도와줘요',
-    ],
-    images: [
-      '/korean-appetizer-main-dessert.jpg',
-      '/premium-course-meal-with-wine.jpg',
-    ],
+const myReviews = ref([]);
+const searchQuery = ref("");
+const minRating = ref("all");
+const pageSize = ref(5);
+const currentPage = ref(1);
+
+const getStoredMember = () => {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem("member");
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+};
+
+const member = computed(() => accountStore.member || getStoredMember());
+const memberId = computed(() => {
+  const rawId = member.value?.id ?? member.value?.userId ?? member.value?.memberId;
+  if (rawId === null || rawId === undefined) return null;
+  const parsed = Number(rawId);
+  return Number.isNaN(parsed) ? null : parsed;
+});
+
+const formatDate = (dateString) => {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}.${month}.${day}`;
+};
+
+const mapReview = (item) => ({
+  id: item.reviewId ?? item.id,
+  reservationId: item.reservationId ?? null,
+  restaurant: {
+    id: item.restaurant?.id ?? item.restaurantId,
+    name: item.restaurant?.name ?? item.restaurantName ?? "",
+    address: item.restaurant?.address ?? item.restaurantAddress ?? "",
   },
-  {
-    id: 2,
-    reservationId: 5,
-    restaurant: {
-      id: 1,
-      name: '식당명',
-      address: '서울시 강남구 테헤란로 132',
-    },
-    visitCount: 3,
-    rating: 4,
-    date: '2024.11.11',
-    visitDate: '2024.11.10',
-    content: '가격 대비 훌륭한 퀄리티입니다. 다음에 또 방문할게요.',
-    tags: ['가격 대비 만족스러워요', '청결 관리가 잘 돼요'],
-    images: ['/italian-pasta-dish.png'],
-  },
-  {
-    id: 3,
-    reservationId: 6,
-    restaurant: {
-      id: 2,
-      name: '맛있는집',
-      address: '서울시 강남구 역삼동 456',
-    },
-    visitCount: 1,
-    rating: 5,
-    date: '2024.10.20',
-    visitDate: '2024.10.19',
-    content:
-      '직원분들이 친절하시고 코스 구성이 알차서 만족스러웠습니다. 예약 시간에 맞춰 테이블이 완벽하게 세팅되어 있었고, 서비스도 훌륭했습니다.',
-    tags: ['메뉴 설명을 잘 해줘요', '시그니처 메뉴가 있어요'],
-    images: [],
-  },
-]);
+  visitCount: item.visitCount ?? 1,
+  rating: item.rating ?? 0,
+  date: formatDate(item.createdAt ?? item.date),
+  visitDate: formatDate(item.visitDate),
+  content: item.content ?? "",
+  tags: Array.isArray(item.tags) ? item.tags : [],
+  images: Array.isArray(item.images) ? item.images : [],
+});
+
+const loadMyReviews = async () => {
+  if (!memberId.value) return;
+  try {
+    const response = await httpRequest.get("/api/reviews/my", {
+      userId: memberId.value,
+    });
+    const data = Array.isArray(response.data) ? response.data : [];
+    myReviews.value = data.map(mapReview);
+    scrollToHighlightedReview();
+  } catch (error) {
+    console.error("내 리뷰 목록 조회 실패:", error);
+    myReviews.value = [];
+  }
+};
 
 // 리뷰 메뉴 드롭다운 상태
 const activeReviewMenu = ref(null);
@@ -117,9 +126,21 @@ const handleEditReview = (review) => {
 // 리뷰 삭제
 const handleDeleteReview = (review) => {
   if (confirm('리뷰를 삭제하시겠습니까?')) {
-    console.log('리뷰 삭제:', review.id);
-    // TODO: API 호출하여 리뷰 삭제
-    myReviews.value = myReviews.value.filter((r) => r.id !== review.id);
+    const restaurantId = getReviewRestaurantId(review);
+    const reviewId = getReviewId(review);
+    if (!restaurantId || !reviewId) {
+      alert('리뷰 상세 정보가 없습니다.');
+      return;
+    }
+    httpRequest
+      .delete(`/api/restaurants/${restaurantId}/reviews/${reviewId}`)
+      .then(() => {
+        myReviews.value = myReviews.value.filter((r) => r.id !== reviewId);
+      })
+      .catch((error) => {
+        console.error('리뷰 삭제 실패:', error);
+        alert('리뷰 삭제에 실패했습니다.');
+      });
   }
   activeReviewMenu.value = null;
 };
@@ -149,12 +170,48 @@ const truncateText = (content, reviewId) => {
   return content.substring(0, 70) + '...';
 };
 
+const filteredReviews = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase();
+  const min = minRating.value === "all" ? 0 : Number(minRating.value);
+
+  return myReviews.value.filter((review) => {
+    if (min > 0 && (review.rating ?? 0) < min) return false;
+    if (!query) return true;
+    const restaurantName = review.restaurant?.name || "";
+    const content = review.content || "";
+    return (
+      restaurantName.toLowerCase().includes(query) ||
+      content.toLowerCase().includes(query)
+    );
+  });
+});
+
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredReviews.value.length / pageSize.value))
+);
+
+const pagedReviews = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  return filteredReviews.value.slice(start, start + pageSize.value);
+});
+
+const goToPage = (page) => {
+  const next = Math.min(Math.max(page, 1), totalPages.value);
+  currentPage.value = next;
+};
+
 // URL에서 highlight 쿼리 파라미터 가져오기
 const highlightedReviewId = computed(() => route.query.highlight);
 
 // 하이라이트된 리뷰로 스크롤
 const scrollToHighlightedReview = () => {
   if (highlightedReviewId.value) {
+    const targetIndex = filteredReviews.value.findIndex(
+      (review) => String(review.id) === String(highlightedReviewId.value)
+    );
+    if (targetIndex >= 0) {
+      currentPage.value = Math.floor(targetIndex / pageSize.value) + 1;
+    }
     nextTick(() => {
       const element = document.getElementById(
         `review-${highlightedReviewId.value}`
@@ -174,8 +231,23 @@ const scrollToHighlightedReview = () => {
 };
 
 onMounted(() => {
-  scrollToHighlightedReview();
+  loadMyReviews();
 });
+
+watch(
+  () => memberId.value,
+  (next) => {
+    if (!next) return;
+    loadMyReviews();
+  }
+);
+
+watch(
+  () => [searchQuery.value, minRating.value, pageSize.value],
+  () => {
+    currentPage.value = 1;
+  }
+);
 </script>
 
 <template>
@@ -196,15 +268,46 @@ onMounted(() => {
         <p class="text-sm text-[#6c757d]">
           총
           <span class="font-semibold text-[#1e3a5f]">{{
-            myReviews.length
+            filteredReviews.length
           }}</span
           >개의 리뷰
         </p>
       </div>
 
+      <!-- 필터 & 검색 -->
+      <div class="px-4 py-3 bg-white border-b border-[#e9ecef] space-y-2">
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="식당명 또는 리뷰 내용 검색"
+          class="w-full h-10 px-3 border border-[#dee2e6] rounded-lg text-sm focus:outline-none focus:border-[#ff6b4a]"
+        />
+        <div class="flex items-center gap-2">
+          <select
+            v-model="minRating"
+            class="h-9 px-3 border border-[#dee2e6] rounded-lg text-xs bg-white"
+          >
+            <option value="all">전체 별점</option>
+            <option value="5">5점 이상</option>
+            <option value="4">4점 이상</option>
+            <option value="3">3점 이상</option>
+            <option value="2">2점 이상</option>
+            <option value="1">1점 이상</option>
+          </select>
+          <select
+            v-model="pageSize"
+            class="h-9 px-3 border border-[#dee2e6] rounded-lg text-xs bg-white"
+          >
+            <option :value="3">3개씩</option>
+            <option :value="5">5개씩</option>
+            <option :value="10">10개씩</option>
+          </select>
+        </div>
+      </div>
+
       <!-- 리뷰가 없는 경우 -->
       <div
-        v-if="myReviews.length === 0"
+        v-if="filteredReviews.length === 0"
         class="flex flex-col items-center justify-center py-16 px-4"
       >
         <div
@@ -225,7 +328,7 @@ onMounted(() => {
       <!-- 리뷰 목록 -->
       <div v-else class="px-4 pt-4 space-y-3">
         <Card
-          v-for="review in myReviews"
+          v-for="review in pagedReviews"
           :key="review.id"
           :id="`review-${review.id}`"
           :class="`p-4 border-[#e9ecef] rounded-2xl bg-white shadow-card hover:shadow-md transition-all ${
@@ -369,6 +472,15 @@ onMounted(() => {
             </RouterLink>
           </div>
         </Card>
+
+        <!-- 페이지네이션 -->
+        <div class="flex items-center justify-center py-4">
+          <Pagination
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            @change-page="goToPage"
+          />
+        </div>
       </div>
     </main>
   </div>

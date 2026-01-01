@@ -32,6 +32,9 @@ public class Review {
     @Column(name = "receipt_id")
     private Long receiptId;
 
+    @Column(name = "reservation_id")
+    private Long reservationId;
+
     @Column(name = "rating", nullable = false)
     private Integer rating;
 
@@ -56,10 +59,11 @@ public class Review {
     @Column(name = "blind_requested_at")
     private LocalDateTime blindRequestedAt;
 
-    public Review(Long restaurantId, Long userId, Long receiptId, Integer rating, String content) {
+    public Review(Long restaurantId, Long userId, Long receiptId, Long reservationId, Integer rating, String content) {
         this.restaurantId = restaurantId;
         this.userId = userId;
         this.receiptId = receiptId;
+        this.reservationId = reservationId;
         this.rating = rating;
         this.content = content;
     }
