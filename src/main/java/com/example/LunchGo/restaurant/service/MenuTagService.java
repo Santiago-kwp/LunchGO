@@ -17,7 +17,6 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional
 @RequiredArgsConstructor
 public class MenuTagService {
 
@@ -31,6 +30,7 @@ public class MenuTagService {
      * @param menuId  태그를 업데이트할 메뉴 ID
      * @param tagDtos 새로운 태그 DTO 리스트
      */
+    @Transactional
     public void updateTagsForMenu(Long menuId, List<MenuTagDTO> tagDtos) {
         menuRepository.deleteMenuTagMappingsByMenuId(menuId);
         if (tagDtos != null && !tagDtos.isEmpty()) {

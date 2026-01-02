@@ -13,7 +13,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional
 @RequiredArgsConstructor
 public class MenuService {
 
@@ -27,6 +26,7 @@ public class MenuService {
      * @param restaurantId 메뉴를 추가할 식당 ID
      * @param menuDtos     생성할 메뉴 정보 DTO 리스트
      */
+    @Transactional
     public void createMenus(Long restaurantId, List<MenuDTO> menuDtos) {
         if (menuDtos == null || menuDtos.isEmpty()) {
             return;
@@ -55,6 +55,7 @@ public class MenuService {
      * @param menuDto      생성할 메뉴 정보 DTO
      * @return 생성된 메뉴 DTO
      */
+    @Transactional
     public MenuDTO createMenu(Long restaurantId, MenuDTO menuDto) {
         Menu menu = Menu.builder()
                 .restaurantId(restaurantId)
@@ -81,6 +82,7 @@ public class MenuService {
      * @param menuDto      업데이트할 메뉴 정보 DTO
      * @return 업데이트된 메뉴 DTO
      */
+    @Transactional
     public MenuDTO updateMenu(Long restaurantId, Long menuId, MenuDTO menuDto) {
         Menu menu = menuRepository.findByMenuIdAndRestaurantIdAndIsDeletedFalse(menuId, restaurantId)
                 .orElseThrow(() -> new NoSuchElementException("Menu not found with id: " + menuId));
@@ -114,6 +116,7 @@ public class MenuService {
      * @param restaurantId 식당 ID
      * @param menuId       메뉴 ID
      */
+    @Transactional
     public void deleteMenu(Long restaurantId, Long menuId) {
         int updated = menuRepository.softDeleteMenu(restaurantId, menuId);
         if (updated == 0) {
@@ -129,6 +132,7 @@ public class MenuService {
      * @param restaurantId    업데이트할 식당 ID
      * @param updatedMenuDtos 업데이트할 메뉴 정보 DTO 리스트
      */
+    @Transactional
     public void updateMenus(Long restaurantId, List<MenuDTO> updatedMenuDtos) {
         if (updatedMenuDtos == null) {
             updatedMenuDtos = new ArrayList<>(); // null이면 빈 리스트로 처리하여 모든 메뉴를 삭제

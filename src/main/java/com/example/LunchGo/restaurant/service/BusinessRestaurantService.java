@@ -8,11 +8,10 @@ import com.example.LunchGo.restaurant.dto.RestaurantDetailResponse;
 import com.example.LunchGo.restaurant.dto.RestaurantCreateRequest;
 import com.example.LunchGo.restaurant.dto.RestaurantTagDTO;
 import com.example.LunchGo.restaurant.entity.Restaurant;
-import com.example.LunchGo.restaurant.repository.RegularHolidayRepository;
 import com.example.LunchGo.restaurant.repository.RestaurantRepository;
-import com.example.LunchGo.restaurant.stats.RestaurantStatsEventService;
 import com.example.LunchGo.restaurant.dto.RestaurantUpdateRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.security.access.AccessDeniedException; // AccessDeniedException import 추가
 import org.springframework.stereotype.Service;
@@ -22,13 +21,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BusinessRestaurantService {
 
     private final RestaurantRepository restaurantRepository;
-    private final RegularHolidayRepository regularHolidayRepository;
-    private final RestaurantStatsEventService statsEventService;
 
     private final MenuService menuService;
     private final RegularHolidayService regularHolidayService;
