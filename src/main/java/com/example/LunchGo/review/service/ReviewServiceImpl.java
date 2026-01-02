@@ -19,6 +19,7 @@ import com.example.LunchGo.review.dto.TagResponse;
 import com.example.LunchGo.review.dto.UpdateReviewRequest;
 import com.example.LunchGo.review.dto.UpdateReviewResponse;
 import com.example.LunchGo.review.dto.VisitInfo;
+import com.example.LunchGo.review.forbidden.ForbiddenWordService;
 import com.example.LunchGo.image.service.ObjectStorageService;
 import com.example.LunchGo.review.entity.Receipt;
 import com.example.LunchGo.review.entity.ReceiptItem;
@@ -55,6 +56,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewReadMapper reviewReadMapper;
     private final ObjectStorageService objectStorageService;
     private final ReviewTagRepository reviewTagRepository;
+    private final ForbiddenWordService forbiddenWordService;
 
     @Override
     @Transactional
@@ -138,6 +140,7 @@ public class ReviewServiceImpl implements ReviewService {
                 Long reviewId = item.getReviewId();
                 item.setTags(tagMap.getOrDefault(reviewId, Collections.emptyList()));
                 item.setImages(imageMap.getOrDefault(reviewId, Collections.emptyList()));
+                item.setContent(forbiddenWordService.maskForbiddenWords(item.getContent()));
             }
         }
 
@@ -161,6 +164,7 @@ public class ReviewServiceImpl implements ReviewService {
         detail.setTags(reviewReadMapper.selectReviewTags(reviewId));
         detail.setImages(reviewReadMapper.selectReviewImages(reviewId));
         detail.setComments(reviewReadMapper.selectReviewComments(reviewId));
+        detail.setContent(forbiddenWordService.maskForbiddenWords(detail.getContent()));
 
         VisitInfo visitInfo = reviewReadMapper.selectVisitInfo(reviewId);
         if (visitInfo != null) {
@@ -186,7 +190,7 @@ public class ReviewServiceImpl implements ReviewService {
         response.setReservationId(review.getReservationId());
         response.setReceiptId(review.getReceiptId());
         response.setRating(review.getRating());
-        response.setContent(review.getContent());
+        response.setContent(forbiddenWordService.maskForbiddenWords(review.getContent()));
         response.setTags(reviewReadMapper.selectReviewTags(reviewId));
         response.setImages(reviewReadMapper.selectReviewImages(reviewId));
 

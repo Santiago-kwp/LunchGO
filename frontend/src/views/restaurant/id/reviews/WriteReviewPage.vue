@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, nextTick } from "vue";
+import { ref, computed, onMounted, nextTick, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ArrowLeft, X, Upload, Plus, Star } from "lucide-vue-next";
 import Button from "@/components/ui/Button.vue";
@@ -136,6 +136,7 @@ const tagCategories = ref([
 // 리뷰 작성 데이터
 const reviewPhotos = ref([]);
 const reviewText = ref("");
+const submitError = ref("");
 
 // Mock 기존 리뷰 데이터 (API에서 가져올 데이터)
 const existingReviews = {
@@ -480,8 +481,15 @@ const setRating = (value) => {
   rating.value = value;
 };
 
+watch([reviewText, rating, selectedTags], () => {
+  if (submitError.value) {
+    submitError.value = "";
+  }
+});
+
 // 리뷰 등록 또는 수정
 const submitReview = async () => {
+  submitError.value = "";
   let imageUrls = [];
   try {
     imageUrls = await uploadReviewPhotos();
@@ -523,10 +531,14 @@ const submitReview = async () => {
         }
       );
       const updatedId = response.data.reviewId || reviewId;
+      submitError.value = "";
       router.replace(`/restaurant/${restaurantId}/reviews/${updatedId}`);
     } catch (error) {
       console.error("리뷰 수정 실패:", error);
-      alert("리뷰 수정에 실패했습니다.");
+      const message =
+        error?.response?.data?.message ||
+        "리뷰 수정에 실패했습니다. 잠시 후 다시 시도해주세요.";
+      submitError.value = message;
     }
   } else {
     try {
@@ -547,10 +559,14 @@ const submitReview = async () => {
         }
       );
       submittedReviewId.value = response.data.reviewId;
+      submitError.value = "";
       isReviewCompleteModalOpen.value = true;
     } catch (error) {
       console.error("리뷰 등록 실패:", error);
-      alert("리뷰 등록에 실패했습니다.");
+      const message =
+        error?.response?.data?.message ||
+        "리뷰 등록에 실패했습니다. 잠시 후 다시 시도해주세요.";
+      submitError.value = message;
     }
   }
 };
@@ -1229,25 +1245,30 @@ onMounted(async () => {
       v-if="currentStep === 2"
       class="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e9ecef] z-40"
     >
-      <div class="max-w-[500px] mx-auto px-4 py-3 flex gap-2">
-        <button
-          @click="goToPreviousStep"
-          class="flex-1 h-12 bg-white border border-[#dee2e6] text-[#495057] rounded-lg font-medium hover:bg-gray-50"
-        >
-          &lt; 이전
-        </button>
-        <button
-          @click="submitReview"
-          :disabled="rating < 1"
-          :class="[
-            'flex-1 h-12 rounded-lg font-medium transition-colors',
-            rating >= 1
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed',
-          ]"
-        >
-          {{ isEditMode ? "수정 완료" : "등록" }}
-        </button>
+      <div class="max-w-[500px] mx-auto px-4 py-3">
+        <p v-if="submitError" class="text-sm text-[#dc3545] mb-2">
+          {{ submitError }}
+        </p>
+        <div class="flex gap-2">
+          <button
+            @click="goToPreviousStep"
+            class="flex-1 h-12 bg-white border border-[#dee2e6] text-[#495057] rounded-lg font-medium hover:bg-gray-50"
+          >
+            &lt; 이전
+          </button>
+          <button
+            @click="submitReview"
+            :disabled="rating < 1"
+            :class="[
+              'flex-1 h-12 rounded-lg font-medium transition-colors',
+              rating >= 1
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed',
+            ]"
+          >
+            {{ isEditMode ? "수정 완료" : "등록" }}
+          </button>
+        </div>
       </div>
     </div>
   </div>

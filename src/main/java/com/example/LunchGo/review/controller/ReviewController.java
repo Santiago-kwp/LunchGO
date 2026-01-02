@@ -10,6 +10,7 @@ import com.example.LunchGo.review.dto.UpdateReviewRequest;
 import com.example.LunchGo.review.dto.UpdateReviewResponse;
 import com.example.LunchGo.review.service.ReviewService;
 import java.util.List;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -33,7 +34,7 @@ public class ReviewController {
     @PostMapping
     public ResponseEntity<CreateReviewResponse> create(
         @PathVariable Long restaurantId,
-        @RequestBody CreateReviewRequest request
+        @Valid @RequestBody CreateReviewRequest request
     ) {
         CreateReviewResponse response = reviewService.createReview(restaurantId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -80,7 +81,7 @@ public class ReviewController {
     public ResponseEntity<UpdateReviewResponse> update(
         @PathVariable Long restaurantId,
         @PathVariable Long reviewId,
-        @RequestBody UpdateReviewRequest request
+        @Valid @RequestBody UpdateReviewRequest request
     ) {
         UpdateReviewResponse response = reviewService.updateReview(restaurantId, reviewId, request);
         if (response == null) {

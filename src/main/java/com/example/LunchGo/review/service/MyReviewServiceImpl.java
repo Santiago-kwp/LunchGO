@@ -1,6 +1,7 @@
 package com.example.LunchGo.review.service;
 
 import com.example.LunchGo.review.dto.MyReviewItem;
+import com.example.LunchGo.review.forbidden.ForbiddenWordService;
 import com.example.LunchGo.review.mapper.MyReviewMapper;
 import com.example.LunchGo.review.mapper.row.MyReviewRow;
 import java.util.Arrays;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 public class MyReviewServiceImpl implements MyReviewService {
 
     private final MyReviewMapper myReviewMapper;
+    private final ForbiddenWordService forbiddenWordService;
 
     @Override
     public List<MyReviewItem> getMyReviews(Long userId) {
@@ -45,7 +47,7 @@ public class MyReviewServiceImpl implements MyReviewService {
             row.getRating(),
             row.getCreatedAt(),
             row.getVisitDate(),
-            row.getContent(),
+            forbiddenWordService.maskForbiddenWords(row.getContent()),
             splitList(row.getTags()),
             splitList(row.getImages())
         );

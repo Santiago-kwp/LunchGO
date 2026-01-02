@@ -30,6 +30,14 @@ const isReportModalOpen = ref(false);
 const selectedReview = ref(null);
 const reportTagId = ref("");
 const reportReason = ref("");
+const forbiddenWords = ref([]);
+const forbiddenSearchQuery = ref("");
+const forbiddenNewWord = ref("");
+const showForbiddenList = ref(false);
+const forbiddenCurrentPage = ref(1);
+const forbiddenItemsPerPage = 20;
+const editingWordId = ref(null);
+const editingWordValue = ref("");
 
 const adminReportTags = [
   { id: 21, name: "욕설/비속어 포함" },
@@ -137,6 +145,120 @@ const loadAdminReviews = async () => {
     allReviews.value = [];
   }
 };
+
+const loadForbiddenWords = async () => {
+  try {
+    const response = await httpRequest.get("/api/admin/forbidden-words");
+    const data = response.data?.data ?? response.data;
+    const items = Array.isArray(data) ? data : [];
+    forbiddenWords.value = items.map((item) => ({
+      wordId: item.wordId,
+      word: item.word ?? "",
+      enabled: item.enabled ?? true,
+    }));
+  } catch (error) {
+    console.error("금칙어 목록을 불러오지 못했습니다:", error);
+    forbiddenWords.value = [];
+  }
+};
+
+const filteredForbiddenWords = computed(() => {
+  const query = forbiddenSearchQuery.value.trim().toLowerCase();
+  if (!query) return forbiddenWords.value;
+  return forbiddenWords.value.filter((item) =>
+    (item.word || "").toLowerCase().includes(query)
+  );
+});
+
+const paginatedForbiddenWords = computed(() => {
+  const start = (forbiddenCurrentPage.value - 1) * forbiddenItemsPerPage;
+  const end = start + forbiddenItemsPerPage;
+  return filteredForbiddenWords.value.slice(start, end);
+});
+
+const forbiddenTotalPages = computed(() => {
+  return Math.max(
+    1,
+    Math.ceil(filteredForbiddenWords.value.length / forbiddenItemsPerPage)
+  );
+});
+
+const handleForbiddenPageChange = (page) => {
+  forbiddenCurrentPage.value = page;
+};
+
+const handleCreateForbiddenWord = async () => {
+  const word = forbiddenNewWord.value.trim();
+  if (!word) {
+    alert("금칙어를 입력해주세요.");
+    return;
+  }
+  try {
+    const response = await httpRequest.post("/api/admin/forbidden-words", {
+      word,
+    });
+    const data = response.data?.data ?? response.data;
+    if (data?.wordId) {
+      forbiddenWords.value.unshift({
+        wordId: data.wordId,
+        word: data.word ?? word,
+        enabled: data.enabled ?? true,
+      });
+      forbiddenCurrentPage.value = 1;
+      forbiddenNewWord.value = "";
+    }
+  } catch (error) {
+    console.error("금칙어 추가 실패:", error);
+    alert(error?.response?.data?.message || "금칙어 추가에 실패했습니다.");
+  }
+};
+
+const startEditForbiddenWord = (item) => {
+  editingWordId.value = item.wordId;
+  editingWordValue.value = item.word;
+};
+
+const cancelEditForbiddenWord = () => {
+  editingWordId.value = null;
+  editingWordValue.value = "";
+};
+
+const saveEditForbiddenWord = async (item) => {
+  const word = editingWordValue.value.trim();
+  if (!word) {
+    alert("금칙어를 입력해주세요.");
+    return;
+  }
+  try {
+    const response = await httpRequest.put(
+      `/api/admin/forbidden-words/${item.wordId}`,
+      { word }
+    );
+    const data = response.data?.data ?? response.data;
+    item.word = data?.word ?? word;
+    cancelEditForbiddenWord();
+  } catch (error) {
+    console.error("금칙어 수정 실패:", error);
+    alert(error?.response?.data?.message || "금칙어 수정에 실패했습니다.");
+  }
+};
+
+const deleteForbiddenWord = async (item) => {
+  if (!confirm(`금칙어를 삭제하시겠습니까?\n${item.word}`)) return;
+  try {
+    await httpRequest.delete(`/api/admin/forbidden-words/${item.wordId}`);
+    forbiddenWords.value = forbiddenWords.value.filter(
+      (word) => word.wordId !== item.wordId
+    );
+  } catch (error) {
+    console.error("금칙어 삭제 실패:", error);
+    alert(error?.response?.data?.message || "금칙어 삭제에 실패했습니다.");
+  }
+};
+
+watch([forbiddenSearchQuery, showForbiddenList], () => {
+  forbiddenCurrentPage.value = 1;
+});
 
 // 필터링된 리뷰 목록
 const filteredReviews = computed(() => {
@@ -282,6 +404,7 @@ watch([searchQuery, selectedStatus, startDate, endDate], () => {
 
 onMounted(() => {
   loadAdminReviews();
+  loadForbiddenWords();
 });
 
 // 필터 값 업데이트 핸들러
@@ -572,6 +695,147 @@ const submitReportProcess = async (decision) => {
             @update:filter-value="handleFilterUpdate"
             @reset-filters="resetFilters"
           />
+
+          <!-- 금칙어 관리 -->
+          <div class="bg-white rounded-xl border border-[#e9ecef] p-6 space-y-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-lg font-semibold text-[#1e3a5f]">금칙어 관리</h3>
+                <p class="text-sm text-[#6c757d]">
+                  총 {{ forbiddenWords.length.toLocaleString() }}건
+                </p>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+              <div class="flex-1">
+                <input
+                  v-model="forbiddenSearchQuery"
+                  type="text"
+                  placeholder="금칙어 검색"
+                  class="w-full px-4 py-2 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff6b4a] focus:border-transparent"
+                />
+              </div>
+              <div class="flex flex-1 gap-2">
+                <input
+                  v-model="forbiddenNewWord"
+                  type="text"
+                  placeholder="새 금칙어 입력"
+                  class="flex-1 px-4 py-2 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff6b4a] focus:border-transparent"
+                />
+                <Button variant="default" @click="handleCreateForbiddenWord">
+                  추가
+                </Button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <p class="text-xs text-[#6c757d]">
+                검색 결과 {{ filteredForbiddenWords.length.toLocaleString() }}건
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                @click="showForbiddenList = !showForbiddenList"
+              >
+                {{ showForbiddenList ? "리스트 숨기기" : "리스트 보기" }}
+              </Button>
+            </div>
+
+            <div
+              v-if="showForbiddenList || forbiddenSearchQuery.trim()"
+              class="border border-[#e9ecef] rounded-lg overflow-hidden"
+            >
+              <table class="w-full">
+                <thead class="bg-[#f8f9fa] border-b border-[#e9ecef]">
+                  <tr>
+                    <th
+                      class="px-6 py-3 text-left text-xs font-semibold text-[#1e3a5f] uppercase tracking-wider"
+                    >
+                      금칙어
+                    </th>
+                    <th
+                      class="px-6 py-3 text-right text-xs font-semibold text-[#1e3a5f] uppercase tracking-wider"
+                    >
+                      관리
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[#e9ecef]">
+                  <tr
+                    v-for="item in paginatedForbiddenWords"
+                    :key="item.wordId"
+                    class="hover:bg-[#f8f9fa] transition-colors"
+                  >
+                    <td class="px-6 py-3 text-sm text-[#1e3a5f]">
+                      <div v-if="editingWordId === item.wordId" class="flex">
+                        <input
+                          v-model="editingWordValue"
+                          type="text"
+                          class="w-full px-3 py-2 border border-[#dee2e6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff6b4a] focus:border-transparent"
+                        />
+                      </div>
+                      <span v-else>{{ item.word }}</span>
+                    </td>
+                    <td class="px-6 py-3 text-right">
+                      <div class="flex justify-end gap-2">
+                        <template v-if="editingWordId === item.wordId">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            @click="saveEditForbiddenWord(item)"
+                          >
+                            저장
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            @click="cancelEditForbiddenWord"
+                          >
+                            취소
+                          </Button>
+                        </template>
+                        <template v-else>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            @click="startEditForbiddenWord(item)"
+                          >
+                            수정
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            @click="deleteForbiddenWord(item)"
+                          >
+                            삭제
+                          </Button>
+                        </template>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div
+                v-if="paginatedForbiddenWords.length === 0"
+                class="text-center py-8 text-[#6c757d] text-sm"
+              >
+                금칙어가 없습니다.
+              </div>
+
+              <div
+                v-if="forbiddenTotalPages > 1"
+                class="px-6 py-4 border-t border-[#e9ecef] flex justify-center"
+              >
+                <Pagination
+                  :current-page="forbiddenCurrentPage"
+                  :total-pages="forbiddenTotalPages"
+                  @change-page="handleForbiddenPageChange"
+                />
+              </div>
+            </div>
+          </div>
 
           <!-- 리뷰 목록 테이블 -->
           <div

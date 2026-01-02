@@ -39,6 +39,7 @@ dependencies {
 
 	//이메일 의존성 추가
 	implementation 'org.springframework.boot:spring-boot-starter-mail'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
 
 	// Thymeleaf (HTML 템플릿 엔진)
 	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
@@ -56,6 +57,7 @@ dependencies {
 	testImplementation 'org.springframework.security:spring-security-test'
 
 	implementation 'commons-codec:commons-codec:1.16.0'
+	implementation 'org.ahocorasick:ahocorasick:0.6.3'
 
 	// JWT 라이브러리
 	implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
