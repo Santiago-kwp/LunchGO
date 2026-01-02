@@ -98,6 +98,8 @@ public class AccountHelperImpl implements AccountHelper {
                 .id(userDetails.getId())
                 .email(userDetails.getEmail())
                 .role(userDetails.getRole())
+                .name(userDetails.getName())
+                .image(userDetails.getImage())
                 .accessToken(tokenDTO.getAccessToken())
                 .build();
     }

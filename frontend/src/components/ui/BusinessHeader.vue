@@ -22,7 +22,7 @@ const getStoredMember = () => {
 const member = computed(() => accountStore.member || getStoredMember());
 const userName = computed(() => {
   if(member.value?.role === 'ROLE_OWNER' || member.value?.role === 'ROLE_STAFF'){
-    return member.value.email;
+    return member.value.name;
   }
   return '사용자';
 });
