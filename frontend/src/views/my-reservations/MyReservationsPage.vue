@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-vue-next";
 import { useBookmarkShare } from "@/composables/useBookmarkShare";
 import httpRequest from "@/router/httpRequest";
 import { useAccountStore } from "@/stores/account";
+import Pagination from "@/components/ui/Pagination.vue";
 
 // 분리한 자식 컴포넌트 임포트
 import ReservationHistory from "@/components/ui/ReservationHistory.vue"; // 예정된 예약 목록
@@ -19,6 +20,10 @@ const activeTab = ref("upcoming");
 const favorites = ref([]);
 const upcomingReservations = ref([]);
 const pastReservations = ref([]);
+const pastSearchQuery = ref("");
+const pastStatusFilter = ref("all");
+const pastPageSize = ref(5);
+const pastCurrentPage = ref(1);
 
 const getStoredMember = () => {
   if (typeof window === "undefined") return null;
@@ -121,6 +126,38 @@ const mapReservation = (item) => {
   };
 };
 
+const filteredPastReservations = computed(() => {
+  const query = pastSearchQuery.value.trim().toLowerCase();
+  const status = pastStatusFilter.value;
+
+  return pastReservations.value.filter((reservation) => {
+    if (status !== "all" && reservation.reservationStatus !== status) {
+      return false;
+    }
+    if (!query) return true;
+    const name = reservation.restaurant?.name || "";
+    const address = reservation.restaurant?.address || "";
+    return (
+      name.toLowerCase().includes(query) ||
+      address.toLowerCase().includes(query)
+    );
+  });
+});
+
+const pastTotalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredPastReservations.value.length / pastPageSize.value))
+);
+
+const pagedPastReservations = computed(() => {
+  const start = (pastCurrentPage.value - 1) * pastPageSize.value;
+  return filteredPastReservations.value.slice(start, start + pastPageSize.value);
+});
+
+const goToPastPage = (page) => {
+  const next = Math.min(Math.max(page, 1), pastTotalPages.value);
+  pastCurrentPage.value = next;
+};
+
 const loadReservations = async (type) => {
   if (!memberId.value) return;
   try {
@@ -144,6 +181,13 @@ const loadReservations = async (type) => {
     }
   }
 };
+
+watch(
+  () => [pastSearchQuery.value, pastStatusFilter.value, pastPageSize.value],
+  () => {
+    pastCurrentPage.value = 1;
+  }
+);
 
 watch(
   () => memberId.value,
@@ -209,12 +253,59 @@ watch(
           :reservations="upcomingReservations"
         />
 
-        <UsageHistory
-          v-show="activeTab === 'past'"
-          :reservations="pastReservations"
-          :user-id="memberId"
-          :favorites="favorites"
-        />
+        <div v-show="activeTab === 'past'">
+          <div class="py-3 border-b border-[#e9ecef]">
+            <p class="text-sm text-[#6c757d]">
+              총
+              <span class="font-semibold text-[#1e3a5f]">{{
+                filteredPastReservations.length
+              }}</span
+              >건의 지난 예약
+            </p>
+          </div>
+
+          <div class="py-3 border-b border-[#e9ecef] space-y-2">
+            <input
+              v-model="pastSearchQuery"
+              type="text"
+              placeholder="식당명 또는 주소 검색"
+              class="w-full h-10 px-3 border border-[#dee2e6] rounded-lg text-sm focus:outline-none focus:border-[#ff6b4a]"
+            />
+            <div class="flex items-center gap-2">
+              <select
+                v-model="pastStatusFilter"
+                class="h-9 px-3 border border-[#dee2e6] rounded-lg text-xs bg-white"
+              >
+                <option value="all">전체 상태</option>
+                <option value="completed">이용완료</option>
+                <option value="refund_pending">환불대기</option>
+                <option value="refunded">환불완료</option>
+              </select>
+              <select
+                v-model="pastPageSize"
+                class="h-9 px-3 border border-[#dee2e6] rounded-lg text-xs bg-white"
+              >
+                <option :value="3">3개씩</option>
+                <option :value="5">5개씩</option>
+                <option :value="10">10개씩</option>
+              </select>
+            </div>
+          </div>
+
+          <UsageHistory
+            :reservations="pagedPastReservations"
+            :user-id="memberId"
+            :favorites="favorites"
+          />
+
+          <div class="flex items-center justify-center py-4">
+            <Pagination
+              :current-page="pastCurrentPage"
+              :total-pages="pastTotalPages"
+              @change-page="goToPastPage"
+            />
+          </div>
+        </div>
       </div>
     </main>
   </div>

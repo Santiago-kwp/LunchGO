@@ -3,6 +3,7 @@ package com.example.LunchGo.reservation.controller;
 import com.example.LunchGo.reservation.dto.ReservationCreateRequest;
 import com.example.LunchGo.reservation.dto.ReservationCreateResponse;
 import com.example.LunchGo.reservation.dto.ReservationHistoryItem;
+import com.example.LunchGo.reservation.service.ReservationCompletionService;
 import com.example.LunchGo.reservation.service.ReservationHistoryService;
 import com.example.LunchGo.reservation.service.ReservationService;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ public class ReservationController {
 
     private final ReservationService reservationService;
     private final ReservationHistoryService reservationHistoryService;
+    private final ReservationCompletionService reservationCompletionService;
 
     @PostMapping
     public ResponseEntity<ReservationCreateResponse> create(@RequestBody ReservationCreateRequest request) {
@@ -51,5 +53,11 @@ public class ReservationController {
     ) {
         List<ReservationHistoryItem> items = reservationHistoryService.getHistory(userId, type);
         return ResponseEntity.ok(items);
+    }
+
+    @PatchMapping("/{reservationId}/complete")
+    public ResponseEntity<Void> complete(@PathVariable Long reservationId) {
+        reservationCompletionService.complete(reservationId);
+        return ResponseEntity.noContent().build();
     }
 }
