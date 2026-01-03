@@ -7,6 +7,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +30,7 @@ public class BusinessRestaurantImageController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("hasAuthority('ROLE_OWNER')")
     @PostMapping
     public ResponseEntity<RestaurantImageResponse> createImage(
         @PathVariable Long restaurantId,
@@ -41,6 +43,7 @@ public class BusinessRestaurantImageController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @PreAuthorize("hasAuthority('ROLE_OWNER')")
     @PutMapping("/{restaurantImageId}")
     public ResponseEntity<RestaurantImageResponse> updateImage(
         @PathVariable Long restaurantId,
@@ -54,6 +57,7 @@ public class BusinessRestaurantImageController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("hasAuthority('ROLE_OWNER')")
     @DeleteMapping("/{restaurantImageId}")
     public ResponseEntity<Void> deleteImage(
         @PathVariable Long restaurantId,

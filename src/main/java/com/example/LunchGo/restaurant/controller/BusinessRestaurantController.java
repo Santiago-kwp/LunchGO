@@ -8,6 +8,7 @@ import com.example.LunchGo.restaurant.service.BusinessRestaurantService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,6 +22,7 @@ public class BusinessRestaurantController {
 
     private final BusinessRestaurantService businessRestaurantService;
 
+    @PreAuthorize("hasAuthority('ROLE_OWNER')")
     @GetMapping("/owner/restaurant")
     public ResponseEntity<?> getRestaurantIdByOwner(
             @AuthenticationPrincipal CustomUserDetails userDetails
@@ -34,6 +36,7 @@ public class BusinessRestaurantController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasAuthority('ROLE_OWNER')")
     @GetMapping("/restaurants/{id}")
     public ResponseEntity<RestaurantDetailResponse> getRestaurantDetail(
             @PathVariable("id") Long id,
@@ -53,6 +56,7 @@ public class BusinessRestaurantController {
                 : ResponseEntity.status(HttpStatus.FORBIDDEN).build();
     }
 
+    @PreAuthorize("hasAuthority('ROLE_OWNER')")
     @PostMapping("/restaurants")
     public ResponseEntity<Long> createRestaurant(
             @RequestBody RestaurantCreateRequest request,
@@ -65,6 +69,7 @@ public class BusinessRestaurantController {
         return ResponseEntity.status(HttpStatus.CREATED).body(newRestaurantId);
     }
 
+    @PreAuthorize("hasAuthority('ROLE_OWNER')")
     @PutMapping("/restaurants/{id}")
     public ResponseEntity<RestaurantDetailResponse> updateRestaurant(
             @PathVariable("id") Long id,

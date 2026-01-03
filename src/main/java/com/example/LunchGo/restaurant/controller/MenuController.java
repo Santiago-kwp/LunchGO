@@ -5,6 +5,7 @@ import com.example.LunchGo.restaurant.service.MenuService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -74,6 +75,7 @@ public class MenuController {
      * @param menuDto      등록할 메뉴 정보
      * @return 생성된 메뉴 DTO
      */
+    @PreAuthorize("hasAuthority('ROLE_OWNER')")
     @PostMapping("/business/restaurants/{restaurantId}/menus")
     public ResponseEntity<MenuDTO> createMenu(
             @PathVariable Long restaurantId,
@@ -91,6 +93,7 @@ public class MenuController {
      * @param menuDto      수정할 메뉴 정보
      * @return 수정된 메뉴 DTO
      */
+    @PreAuthorize("hasAuthority('ROLE_OWNER')")
     @PutMapping("/business/restaurants/{restaurantId}/menus/{menuId}")
     public ResponseEntity<MenuDTO> updateMenu(
             @PathVariable Long restaurantId,
@@ -108,6 +111,7 @@ public class MenuController {
      * @param menuId       메뉴 ID
      * @return 삭제 결과 ResponseEntity
      */
+    @PreAuthorize("hasAuthority('ROLE_OWNER')")
     @DeleteMapping("/business/restaurants/{restaurantId}/menus/{menuId}")
     public ResponseEntity<Void> deleteMenu(
             @PathVariable Long restaurantId,
