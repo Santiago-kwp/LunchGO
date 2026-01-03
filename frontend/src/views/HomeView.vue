@@ -119,7 +119,6 @@ const searchPartySize = ref(4);
 const searchTags = ref([]);
 const avoidIngredients = ref([]);
 const searchDistance = ref("");
-const budget = ref(500000);
 const categories = ref([]);
 const restaurantTags = ref([]);
 const ingredients = ref([]);
@@ -372,20 +371,6 @@ const calendarMonth = ref(new Date());
 const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
 const selectedMapRestaurant = ref(null);
 const favoriteRestaurantIds = ref([]);
-
-const perPersonBudget = computed(() => {
-  if (budget.value <= 0 || !searchPartySize.value) {
-    return 0;
-  }
-  return Math.floor(budget.value / searchPartySize.value);
-});
-
-const perPersonBudgetDisplay = computed(() => {
-  if (!perPersonBudget.value) {
-    return "0원";
-  }
-  return `${perPersonBudget.value.toLocaleString()}원`;
-});
 
 const formattedSearchDate = computed(() => {
   if (!searchDate.value) {
@@ -1190,7 +1175,6 @@ const resetSearch = () => {
   searchTags.value = [];
   avoidIngredients.value = [];
   searchDistance.value = "";
-  budget.value = 500000;
   isCalendarOpen.value = false;
   calendarMonth.value = new Date();
 };
@@ -1855,45 +1839,6 @@ onBeforeUnmount(() => {
               >
                 <Plus class="w-4 h-4 text-[#495057]" />
               </button>
-            </div>
-          </div>
-
-          <!-- Budget Slider -->
-          <div>
-            <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">
-              총 회식 가격
-            </h4>
-            <div class="space-y-3">
-              <div class="text-center">
-                <span class="text-2xl font-semibold text-[#1e3a5f]">
-                  {{
-                    budget >= 500000
-                      ? "50만원 이상"
-                      : `${(budget / 10000).toFixed(0)}만원`
-                  }}
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="500000"
-                step="10000"
-                v-model.number="budget"
-                class="w-full h-2 bg-[#e9ecef] rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#ff6b4a] [&::-webkit-slider-thumb]:cursor-pointer"
-              />
-              <div class="flex justify-between text-xs text-[#6c757d]">
-                <span>0원</span>
-                <span>50만원 이상</span>
-              </div>
-              <div
-                v-if="perPersonBudget"
-                class="mt-2 p-3 bg-[#f8f9fa] border border-[#e9ecef] rounded-lg text-center text-sm text-[#495057]"
-              >
-                <p>1인당 예상 금액</p>
-                <p class="text-xl font-semibold text-[#1e3a5f]">
-                  {{ perPersonBudgetDisplay }}
-                </p>
-              </div>
             </div>
           </div>
 
