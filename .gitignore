@@ -24,6 +24,11 @@ frontend/.env
 frontend/.env.*
 !frontend/.env.production.sample
 .env
+.apm-local.env
+
+## Scouter APM artifacts
+scouter-all-*.tar.gz
+scouter/agent.java/scouter.agent.jar
 
 
 ### STS ###

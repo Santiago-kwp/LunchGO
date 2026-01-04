@@ -56,5 +56,7 @@ jobs:
             ssh -i /home/ncp-user/lunchgo.pem root@10.0.2.6 "
               docker rm -f lunchgo-backend || true
               docker pull pgw10243/lunchgo-backend:dev
-              docker run --env-file /opt/lunchgo/.env -p 8080:8080 --name lunchgo-backend -d pgw10243/lunchgo-backend:dev
+              docker run --env-file /opt/lunchgo/.env \
+                -e SCOUTER_OBJ_NAME=lunchgo-prod-$(hostname) \
+                -p 8080:8080 --name lunchgo-backend -d pgw10243/lunchgo-backend:dev
             "
