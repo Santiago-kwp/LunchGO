@@ -16,6 +16,10 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, Long> {
     @Query("SELECT r.restaurantId FROM Restaurant r WHERE r.ownerId = :ownerId")
     Optional<Long> findRestaurantIdByOwnerId(@Param("ownerId") Long ownerId);
 
+    // 식당이 설정한 예약석 수의 최대 한도를 반환
+    @Query("SELECT r.reservationLimit FROM Restaurant r WHERE r.restaurantId = :restaurantId")
+    Optional<Integer> findReservationLimitByRestaurantId(Long restaurantId);
+
     @Query("SELECT r FROM Restaurant r LEFT JOIN FETCH r.restaurantImages WHERE r.restaurantId = :restaurantId")
     Optional<Restaurant> findByIdWithImages(@Param("restaurantId") Long restaurantId);
 

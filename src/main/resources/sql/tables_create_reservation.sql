@@ -67,6 +67,9 @@ CREATE TABLE `reservations` (
                                         ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='예약(슬롯 기반, 중복 컬럼 없음)';
 
+# 한 식당에 대해 동일 날짜, 시간대에 동일한 사용자가 중복 예약하는 것을 방지하기 위한 멱등성 처리 필요
+ALTER TABLE reservations
+    ADD CONSTRAINT uk_reservations_user_slot UNIQUE (user_id, slot_id);
 
 
 # drop table reservation_menu_items;
