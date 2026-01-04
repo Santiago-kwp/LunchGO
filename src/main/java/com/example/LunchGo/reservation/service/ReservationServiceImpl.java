@@ -23,8 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReservationServiceImpl implements ReservationService {
 
     private static final DateTimeFormatter CODE_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
+
     private final ReservationMapper reservationMapper;
-    private static final int DEFAULT_MAX_CAPACITY = 20;
+    private final ReservationSlotService reservationSlotService;
 
 
     @Override
@@ -32,28 +33,14 @@ public class ReservationServiceImpl implements ReservationService {
     public ReservationCreateResponse create(ReservationCreateRequest request) {
         validate(request);
 
-        ReservationSlot slot = reservationMapper.selectSlot(
+        // 이 메소드가 끝난 후에도 @Transactional 범위 내에 있으므로 락은 계속 유지(트랜잭션 전파)
+        // 지정한 날짜+시간대의 예약슬롯을 불러오는 서비스 로직(없으면 신규 생성)
+        ReservationSlot slot = reservationSlotService.getValidatedSlot(
                 request.getRestaurantId(),
                 request.getSlotDate(),
-                request.getSlotTime()
+                request.getSlotTime(),
+                request.getPartySize()
         );
-
-        if (slot == null) {
-            reservationMapper.upsertSlot(
-                    request.getRestaurantId(),
-                    request.getSlotDate(),
-                    request.getSlotTime(),
-                    DEFAULT_MAX_CAPACITY
-            );
-            slot = reservationMapper.selectSlot(
-                    request.getRestaurantId(),
-                    request.getSlotDate(),
-                    request.getSlotTime()
-            );
-            if (slot == null) {
-                throw new IllegalStateException("slot create failed");
-            }
-        }
 
         Reservation reservation = new Reservation();
         reservation.setReservationCode("PENDING");
