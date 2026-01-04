@@ -4,7 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { ArrowLeft, CalendarIcon, Users } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
-import axios from 'axios';
+import httpRequest from "@/router/httpRequest.js";
 
 const route = useRoute();
 const router = useRouter();
@@ -79,7 +79,7 @@ const createReservation = async () => {
     requestMessage: requestNote.value?.trim() || null,
   };
 
-  const res = await axios.post('/api/reservations', payload);
+  const res = await httpRequest.post('/api/reservations', payload);
   return res.data;
 };
 

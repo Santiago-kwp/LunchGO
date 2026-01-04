@@ -17,6 +17,12 @@ public interface ReservationMapper {
             @Param("slotTime") LocalTime slotTime
     );
 
+    // 비관적 락을 적용하여 특정 예약 슬롯 조회
+    ReservationSlot selectSlotForUpdate(
+            @Param("restaurantId") Long restaurantId,
+            @Param("slotDate") LocalDate slotDate,
+            @Param("slotTime") LocalTime slotTime);
+
     int insertReservation(Reservation reservation);
 
     int updateReservationCode(
@@ -38,4 +44,5 @@ public interface ReservationMapper {
             @Param("maxCapacity") Integer maxCapacity
     );
 
+    int sumPartySizeBySlotId(@Param("slotId") Long slotId);
 }
