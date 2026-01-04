@@ -45,7 +45,7 @@ public class ReservationSlotService {
         log.info("{} {} 예약 슬롯을 불러옵니다.", date, time);
 
         // 3. 잔여석 계산
-        // 실시간 집계 방식 활용: 테이블에 잔여석 정보를 별도로 저장하지 않음, 예약 취소 시 별도의 잔여석 처리 없이 예약상태만 변경하면 끝
+        // 잔여석 정보는 별도의 DB 속성값으로 저장하지 않고 계산 -> 예약 취소 시 별도의 잔여석 처리 없이 예약상태만 변경하면 끝
         // (추후 테이블에 잔여석 정보를 저장할 속성을 추가한다면, 예약 취소 시에도 잔여석 처리 로직을 추가해야 함)
         // 예약석을 점유하는 예약상태, 즉 TEMPORARY(임시예약), CONFIRMED(예약비 결제완료), PREPAID_CONFIRMED(선결제/선주문 결제완료)인 경우에만 예약한 인원수를 합산
         int currentTotal = reservationMapper.sumPartySizeBySlotId(slot.getSlotId());
