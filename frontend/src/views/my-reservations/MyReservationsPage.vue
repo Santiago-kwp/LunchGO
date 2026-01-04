@@ -1,15 +1,9 @@
 <script setup>
-<<<<<<< Updated upstream
 import { ref, computed, onMounted, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
-=======
-import { ref, computed, onMounted } from "vue";
-import { RouterLink, useRoute, useRouter } from "vue-router";
->>>>>>> Stashed changes
 import { ArrowLeft } from "lucide-vue-next";
 import httpRequest from "@/router/httpRequest";
 import { useBookmarkShare } from "@/composables/useBookmarkShare";
-import httpRequest from "@/router/httpRequest";
 import { useAccountStore } from "@/stores/account";
 import Pagination from "@/components/ui/Pagination.vue";
 
@@ -18,7 +12,6 @@ import ReservationHistory from "@/components/ui/ReservationHistory.vue"; // 예�
 import UsageHistory from "@/components/ui/UsageHistory.vue"; // 지난 예약(이용완료/환불) 목록
 
 const route = useRoute();
-const router = useRouter();
 const { getMyBookmarks } = useBookmarkShare();
 const accountStore = useAccountStore();
 
@@ -60,7 +53,6 @@ onMounted(() => {
   if (route.query.tab === "past") {
     activeTab.value = "past";
   }
-<<<<<<< Updated upstream
   loadFavorites();
   loadReservations("upcoming");
   loadReservations("past");
@@ -70,18 +62,6 @@ const loadFavorites = async () => {
   if (!memberId.value) return;
   try {
     const response = await getMyBookmarks(memberId.value);
-=======
-  loadReservations();
-});
-
-const loadFavorites = async () => {
-  if (!userId.value) {
-    favorites.value = [];
-    return;
-  }
-  try {
-    const response = await getMyBookmarks(userId.value);
->>>>>>> Stashed changes
     const data = Array.isArray(response.data) ? response.data : [];
     favorites.value = data.map((item) => item.restaurantId);
   } catch (error) {
@@ -90,7 +70,6 @@ const loadFavorites = async () => {
   }
 };
 
-<<<<<<< Updated upstream
 const statusMap = {
   TEMPORARY: "pending_payment",
   CONFIRMED: "confirmed",
@@ -222,113 +201,6 @@ watch(
     loadReservations("upcoming");
     loadReservations("past");
   }
-=======
-//취소 버튼
-const goCancel = (id) => {
-  router.push({ name: "reservation-cancel", params: { id: String(id) } });
-};
-
-const normalizeStatus = (status) => String(status || "").toUpperCase();
-
-const isPastReservation = (date, time) => {
-  if (!date || !time) return false;
-  const parsed = new Date(`${date}T${time}:00`);
-  if (Number.isNaN(parsed.getTime())) return false;
-  return parsed < new Date();
-};
-
-const mapReservationStatus = (status, date, time) => {
-  const normalized = normalizeStatus(status);
-  if (normalized === "TEMPORARY") return "pending_payment";
-  if (normalized === "CONFIRMED" || normalized === "PREPAID_CONFIRMED") {
-    return isPastReservation(date, time) ? "completed" : "confirmed";
-  }
-  if (normalized === "COMPLETED") return "completed";
-  if (normalized === "CANCELLED") return "cancelled";
-  if (normalized === "EXPIRED") return "expired";
-  if (normalized === "NOSHOW" || normalized === "NO_SHOW") return "no_show";
-  return "confirmed";
-};
-
-const UPCOMING_STATUSES = new Set(["CONFIRMED", "PREPAID_CONFIRMED"]);
-const PAST_STATUSES = new Set([
-  "COMPLETED",
-  "REFUND_PENDING",
-  "REFUNDED",
-  "CANCELLED",
-  "EXPIRED",
-  "NO_SHOW",
-]);
-
-const mapReservationRow = (row) => {
-  const normalized = normalizeStatus(row.status);
-  const past = PAST_STATUSES.has(normalized);
-  return {
-    id: row.reservationId,
-    confirmationNumber: row.confirmationNumber,
-    restaurant: {
-      id: row.restaurantId,
-      name: row.restaurantName,
-      address: "-",
-    },
-    booking: {
-      date: row.date,
-      time: row.time,
-      partySize: row.partySize,
-    },
-    reservationStatus: mapReservationStatus(row.status, row.date, row.time),
-    status: past ? "past" : "upcoming",
-    normalizedStatus: normalized,
-    payment: null,
-    review: null,
-    visitCount: null,
-    daysSinceLastVisit: null,
-  };
-};
-
-const loadReservations = async () => {
-  const accessToken = localStorage.getItem("accessToken");
-  if (!accessToken) {
-    loadError.value = "로그인이 필요합니다.";
-    router.push("/login");
-    return;
-  }
-  try {
-    loadError.value = "";
-    const response = await httpRequest.get("/api/reservations/my");
-    if (Array.isArray(response.data)) {
-      const mapped = response.data.map((row) => mapReservationRow(row));
-      const allowedStatuses = new Set([
-        ...UPCOMING_STATUSES,
-        ...PAST_STATUSES,
-      ]);
-      allReservations.value = mapped.filter((row) =>
-        allowedStatuses.has(row.normalizedStatus)
-      );
-    }
-  } catch (error) {
-    console.error("예약 조회 실패:", error);
-    if (error?.response?.status === 401) {
-      loadError.value = "로그인이 필요합니다.";
-      router.push("/login");
-      return;
-    }
-    loadError.value = "예약 내역을 불러오지 못했습니다.";
-  }
-};
-
-// 통합 예약 데이터
-const allReservations = ref([]);
-
-// 필터링: status가 'upcoming'인 것만 추출
-const upcomingReservations = computed(() =>
-  allReservations.value.filter((r) => UPCOMING_STATUSES.has(r.normalizedStatus))
-);
-
-// 필터링: status가 'past'인 것만 추출 (이용완료, 환불대기, 환불완료 포함)
-const pastReservations = computed(() =>
-  allReservations.value.filter((r) => PAST_STATUSES.has(r.normalizedStatus))
->>>>>>> Stashed changes
 );
 </script>
 
@@ -385,7 +257,6 @@ const pastReservations = computed(() =>
             :reservations="upcomingReservations"
         />
 
-<<<<<<< Updated upstream
         <div v-show="activeTab === 'past'">
           <div class="py-3 border-b border-[#e9ecef]">
             <p class="text-sm text-[#6c757d]">
@@ -439,13 +310,6 @@ const pastReservations = computed(() =>
             />
           </div>
         </div>
-=======
-        <UsageHistory
-          v-show="activeTab === 'past'"
-          :reservations="pastReservations"
-          :favorites="favorites"
-        />
->>>>>>> Stashed changes
       </div>
     </main>
   </div>

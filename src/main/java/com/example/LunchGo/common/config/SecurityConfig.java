@@ -51,7 +51,6 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(authorizeRequests -> authorizeRequests
                         //각자 권한 걸어주면 됨니다
-<<<<<<< Updated upstream
                         .requestMatchers("/api/join/**", "/api/auth/**", "/api/sms/**", "/api/login").permitAll()
                         .requestMatchers("/api/refresh").permitAll()
                         .requestMatchers(HttpMethod.GET,
@@ -109,9 +108,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/admin/forbidden-words/*").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/admin/forbidden-words/*").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/admin/reviews/*/blind-requests").hasAuthority("ROLE_ADMIN")
-=======
-                        .requestMatchers("/api/join/**", "/api/auth/**", "/api/sms/**", "/api/login", "/api/refresh").permitAll()
->>>>>>> Stashed changes
                         .anyRequest().authenticated()
                 )
 

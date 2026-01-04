@@ -80,6 +80,7 @@ const mapReservationRow = (row: any) => {
     (UPCOMING_STATUSES.has(normalized) && isPastReservation(row.date, row.time));
   return {
     id: row.reservationId,
+    reservationId: row.reservationId,
     confirmationNumber: row.confirmationNumber,
     restaurantName: row.restaurantName,
     restaurant: {

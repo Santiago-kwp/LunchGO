@@ -5,26 +5,21 @@ import com.example.LunchGo.reservation.dto.CancelReservationRequest;
 import com.example.LunchGo.reservation.dto.CancelReservationResponse;
 import com.example.LunchGo.reservation.dto.ReservationCreateRequest;
 import com.example.LunchGo.reservation.dto.ReservationCreateResponse;
-<<<<<<< Updated upstream
 import com.example.LunchGo.reservation.dto.ReservationHistoryItem;
-import com.example.LunchGo.reservation.service.ReservationCompletionService;
-import com.example.LunchGo.reservation.service.ReservationHistoryService;
-=======
 import com.example.LunchGo.reservation.dto.UserReservationDetailResponse;
 import com.example.LunchGo.reservation.dto.UserReservationResponse;
->>>>>>> Stashed changes
+import com.example.LunchGo.reservation.service.ReservationCompletionService;
+import com.example.LunchGo.reservation.service.ReservationHistoryService;
 import com.example.LunchGo.reservation.service.ReservationService;
 import com.example.LunchGo.reservation.service.UserReservationQueryService;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-<<<<<<< Updated upstream
-
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -32,9 +27,11 @@ import java.util.List;
 public class ReservationController {
 
     private final ReservationService reservationService;
+    private final UserReservationQueryService userReservationQueryService;
     private final ReservationHistoryService reservationHistoryService;
     private final ReservationCompletionService reservationCompletionService;
 
+    // 예약 생성
     @PostMapping
     public ResponseEntity<ReservationCreateResponse> create(@RequestBody ReservationCreateRequest request) {
         try {
@@ -48,31 +45,6 @@ public class ReservationController {
         }
     }
 
-    @GetMapping("/slots")
-    public ResponseEntity<List<LocalTime>> slotTimes(
-            @RequestParam Long restaurantId,
-            @RequestParam LocalDate slotDate
-=======
-
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.util.List;
-
-@RestController
-@RequiredArgsConstructor
-@RequestMapping("/api/reservations")
-public class ReservationController {
-
-    private final ReservationService reservationService;                 // (기존) 예약 생성/슬롯
-    private final UserReservationQueryService userReservationQueryService; // (추가) 사용자 조회
-
-    // 예약 생성
-    @PostMapping
-    public ResponseEntity<ReservationCreateResponse> create(@RequestBody ReservationCreateRequest request) {
-        ReservationCreateResponse response = reservationService.create(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
-
     // 슬롯 시간 조회
     @GetMapping("/slots")
     public ResponseEntity<List<LocalTime>> slotTimes(
@@ -84,12 +56,11 @@ public class ReservationController {
 
     /**
      * 사용자 예약 내역 (본인 것만)
-     * 예) GET /api/reservations/my
+     * GET /api/reservations/my
      */
     @GetMapping("/my")
     public ResponseEntity<List<UserReservationResponse>> myReservations(
             @AuthenticationPrincipal CustomUserDetails userDetails
->>>>>>> Stashed changes
     ) {
         if (userDetails == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -99,7 +70,7 @@ public class ReservationController {
 
     /**
      * 사용자 예약 상세 (본인 것만)
-     * 예) GET /api/reservations/10?userId=3
+     * GET /api/reservations/{reservationId}?userId=3
      */
     @GetMapping("/{reservationId}")
     public ResponseEntity<UserReservationDetailResponse> myReservationDetail(
@@ -110,18 +81,21 @@ public class ReservationController {
     }
 
     /**
-     * 사용자 예약 취소 (ReservationCancelView.vue가 호출)
-     * POST /api/reservations/{id}/cancel
-     * 응답은 { ok: true } 형태로 내려준다.
+     * 사용자 예약 취소
+     * POST /api/reservations/{reservationId}/cancel
      */
     @PostMapping("/{reservationId}/cancel")
     public ResponseEntity<CancelReservationResponse> cancel(
             @PathVariable Long reservationId,
             @RequestBody CancelReservationRequest request
     ) {
-        throw new UnsupportedOperationException("Not implemented");
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
     }
 
+    /**
+     * 지난 예약 / 예정 예약 히스토리
+     * GET /api/reservations/history?userId=1&type=past
+     */
     @GetMapping("/history")
     public ResponseEntity<List<ReservationHistoryItem>> history(
             @RequestParam Long userId,
@@ -131,6 +105,10 @@ public class ReservationController {
         return ResponseEntity.ok(items);
     }
 
+    /**
+     * 이용완료 처리
+     * PATCH /api/reservations/{reservationId}/complete
+     */
     @PatchMapping("/{reservationId}/complete")
     public ResponseEntity<Void> complete(@PathVariable Long reservationId) {
         reservationCompletionService.complete(reservationId);

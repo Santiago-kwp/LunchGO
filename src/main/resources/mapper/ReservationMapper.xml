@@ -87,7 +87,7 @@
                  JOIN restaurant_reservation_slots s ON s.slot_id = r.slot_id
                  JOIN restaurants res ON res.restaurant_id = s.restaurant_id
         WHERE r.user_id = #{userId}
-          AND r.status IN ('CONFIRMED', 'PREPAID_CONFIRMED', 'COMPLETED', 'REFUND_PENDING', 'REFUNDED', 'CANCELLED', 'EXPIRED', 'NO_SHOW')
+          AND r.status IN ('TEMPORARY', 'CONFIRMED', 'PREPAID_CONFIRMED', 'COMPLETED', 'REFUND_PENDING', 'REFUNDED', 'CANCELLED', 'EXPIRED', 'NO_SHOW')
         ORDER BY r.created_at DESC
     </select>
 

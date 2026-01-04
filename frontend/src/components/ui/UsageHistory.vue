@@ -123,7 +123,7 @@ const handleDeleteReview = (reservation) => {
     <Card
       v-else
       v-for="reservation in props.reservations"
-      :key="reservation.id"
+      :key="reservation.reservationId || reservation.id"
       class="overflow-hidden border-[#e9ecef] rounded-2xl bg-white shadow-sm"
     >
       <div class="p-4">
