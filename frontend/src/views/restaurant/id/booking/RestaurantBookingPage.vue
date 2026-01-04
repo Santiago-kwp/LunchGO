@@ -4,7 +4,6 @@ import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { ArrowLeft, CalendarIcon, Users } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
-import axios from 'axios';
 import httpRequest from "@/router/httpRequest.js";
 
 const route = useRoute();
