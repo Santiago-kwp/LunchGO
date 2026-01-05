@@ -34,6 +34,7 @@ import { useCafeteriaRecommendation } from "@/composables/useCafeteriaRecommenda
 import TrendingRecommendationSection from "@/components/ui/TrendingRecommendationSection.vue";
 import { useTrendingRestaurants } from "@/composables/useTrendingRestaurants";
 import { useBudgetRecommendation, extractPriceValue } from "@/composables/useBudgetRecommendation";
+import { useTagMappingRecommendation } from "@/composables/useTagMappingRecommendation";
 import { useAccountStore } from "@/stores/account";
 import axios from "axios";
 import httpRequest from "@/router/httpRequest.js";
@@ -159,6 +160,14 @@ const {
 } = useTrendingRestaurants();
 const { budgetRecommendations, fetchBudgetRecommendations, clearBudgetRecommendations } =
   useBudgetRecommendation();
+const {
+  isTagMappingLoading,
+  tagMappingRecommendations,
+  tagMappingError,
+  tagMappingMessageCode,
+  fetchTagMappingRecommendations,
+  clearTagMappingRecommendations,
+} = useTagMappingRecommendation();
 const isGeocodeExportMode = ref(false);
 const isGeocodeExporting = ref(false);
 const geocodeExportProgress = ref({ done: 0, total: 0 });
@@ -171,16 +180,49 @@ const selectedDistanceKm = computed(() => {
   return null;
 });
 
+const RECOMMEND_CAFETERIA = "\uAD6C\uB0B4\uC2DD\uB2F9 \uB300\uCCB4 \uCD94\uCC9C";
+const RECOMMEND_BUDGET = "\uC608\uC0B0 \uB9DE\uCDA4";
+const RECOMMEND_TASTE = "\uCDE8\uD5A5 \uB9DE\uCDA4";
+const RECOMMEND_TRENDING = "\uC778\uAE30\uC21C";
+const TAG_MESSAGE_LOGIN = "\uB85C\uADF8\uC778\uC774 \uD544\uC694\uD569\uB2C8\uB2E4";
+const TAG_MESSAGE_SPECIALITY = "\uD2B9\uC774\uC0AC\uD56D \uD0DC\uADF8\uB97C \uBA3C\uC800 \uCD94\uAC00\uD574\uC8FC\uC138\uC694";
+const TAG_MESSAGE_LOADING = "\uCD94\uCC9C \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4";
+const TAG_MESSAGE_ERROR = "\uCD94\uCC9C \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4";
+
+  "\uD2B9\uC774\uC0AC\uD56D \uD0DC\uADF8\uB97C \uBA3C\uC800 \uCD94\uAC00\uD574\uC8FC\uC138\uC694";
+
 const restaurants = restaurantData;
 const baseRestaurants = computed(() => {
-  if (selectedRecommendation.value === "예산 맞춤") {
+  if (selectedRecommendation.value === RECOMMEND_BUDGET) {
     return budgetRecommendations.value;
+  }
+  if (selectedRecommendation.value === RECOMMEND_TASTE) {
+    return tagMappingRecommendations.value;
   }
   return restaurants;
 });
+const tagMappingNotice = computed(() => {
+  if (selectedRecommendation.value !== RECOMMEND_TASTE) {
+    return "";
+  }
+  if (isTagMappingLoading.value) {
+    return TAG_MESSAGE_LOADING;
+  }
+  if (tagMappingMessageCode.value === "LOGIN_REQUIRED") {
+    return TAG_MESSAGE_LOGIN;
+  }
+  if (tagMappingMessageCode.value === "SPECIALITY_REQUIRED") {
+    return TAG_MESSAGE_SPECIALITY;
+  }
+  if (tagMappingError.value) {
+    return TAG_MESSAGE_ERROR;
+  }
+  return "";
+});
+
 const restaurantsPerPage = 10;
 const currentPage = ref(1);
-const isTrendingSort = computed(() => selectedRecommendation.value === "인기순");
+const isTrendingSort = computed(() => selectedRecommendation.value === RECOMMEND_TRENDING);
 const restaurantIndexById = new Map(
   restaurants.map((restaurant) => [String(restaurant.id), restaurant])
 );
@@ -207,7 +249,9 @@ const getRestaurantReviewCount = (restaurant) => {
   return summary?.reviews ?? restaurant.reviews ?? 0;
 };
 const processedRestaurants = computed(() => {
-  let result = baseRestaurants.value.slice();
+  let result = (selectedRecommendation.value === RECOMMEND_TASTE
+    ? tagMappingRecommendations.value
+    : baseRestaurants.value).slice();
 
   const distanceLimit = selectedDistanceKm.value;
   if (distanceLimit) {
@@ -256,8 +300,10 @@ const processedRestaurants = computed(() => {
     },
   };
 
-  const sorter = sorters[selectedSort.value] || sorters.추천순;
-  result.sort(sorter);
+  if (selectedRecommendation.value !== RECOMMEND_TASTE) {
+    const sorter = sorters[selectedSort.value] || sorters[Object.keys(sorters)[0]];
+    result.sort(sorter);
+  }
 
   const overrides = restaurantImageOverrides.value;
   return result.map((restaurant) => ({
@@ -903,9 +949,12 @@ onMounted(() => {
       selectedRecommendation.value =
         parsed.selectedRecommendation ?? selectedRecommendation.value;
       currentPage.value = parsed.currentPage ?? currentPage.value;
-      if (selectedRecommendation.value === "예산 맞춤") {
+      if (selectedRecommendation.value === RECOMMEND_BUDGET) {
         selectedRecommendation.value = null;
         clearBudgetRecommendations();
+      }
+      if (selectedRecommendation.value === RECOMMEND_TASTE) {
+        fetchTagMappingRecommendations();
       }
       nextTick(() => {
         if (Number.isFinite(parsed.scrollY)) {
@@ -970,12 +1019,12 @@ const priceRangeMap = Object.freeze({
   "2만원~3만원": { min: 20000, max: 30000 },
   "3만원 이상": { min: 30000, max: Number.POSITIVE_INFINITY },
 });
-const recommendationOptions = [ 
-  "구내식당 대체 추천",
-  "예산 맞춤",
-  "취향 맞춤",
-  "인기순",
-  "날씨 추천",
+const recommendationOptions = [
+  RECOMMEND_CAFETERIA,
+  RECOMMEND_BUDGET,
+  RECOMMEND_TASTE,
+  RECOMMEND_TRENDING,
+  "\uAC80\uC0C9 \uCD94\uCC9C",
 ];
 const distances = ["1km 이내", "2km 이내", "3km 이내"];
 const sortOptions = ["추천순", "거리순", "평점순", "낮은 가격순"];
@@ -1080,22 +1129,28 @@ const toggleRestaurantFavorite = (restaurantId) => {
 };
 
 const resetFilters = () => {
-  filterForm.sort = "추천순";
+  filterForm.sort = sortOptions[0];
   filterForm.priceRange = null;
   filterForm.recommendation = null;
   filterBudget.value = 60000;
   filterPartySize.value = 4;
   clearBudgetRecommendations();
+  clearTagMappingRecommendations();
 };
 
 const applyFilters = () => {
-  selectedSort.value = filterForm.sort || "추천순";
+  selectedSort.value = filterForm.sort || sortOptions[0];
   selectedPriceRange.value = filterForm.priceRange || null;
   selectedRecommendation.value = filterForm.recommendation || null;
-  if (selectedRecommendation.value === "예산 맞춤") {
+  if (selectedRecommendation.value === RECOMMEND_BUDGET) {
     fetchBudgetRecommendations(filterPerPersonBudget.value);
   } else {
     clearBudgetRecommendations();
+  }
+  if (selectedRecommendation.value === RECOMMEND_TASTE) {
+    fetchTagMappingRecommendations();
+  } else {
+    clearTagMappingRecommendations();
   }
   currentPage.value = 1;
   isFilterOpen.value = false;
@@ -1104,10 +1159,11 @@ const applyFilters = () => {
 
 const closeFilterModal = () => {
   resetFilters();
-  selectedSort.value = "추천순";
+  selectedSort.value = sortOptions[0];
   selectedPriceRange.value = null;
   selectedRecommendation.value = null;
   clearTrendingRestaurants();
+  clearTagMappingRecommendations();
   currentPage.value = 1;
   isFilterOpen.value = false;
   persistHomeListState();
@@ -1122,7 +1178,7 @@ const clearTrendingRecommendation = () => {
 };
 
 const toggleRecommendationOption = (option) => {
-  if (option === "구내식당 대체 추천") {
+  if (option === RECOMMEND_CAFETERIA) {
     filterForm.recommendation = option;
     const baseDate = resolveCafeteriaBaseDate();
     checkCafeteriaMenuStatus(baseDate);
@@ -1399,6 +1455,13 @@ onBeforeUnmount(() => {
         </div>
 
         <div v-if="!cafeteriaRecommendations.length" class="space-y-6">
+          <div
+            v-if="tagMappingNotice"
+            class="rounded-2xl border border-[#e9ecef] bg-white px-4 py-3 text-sm text-[#6c757d]"
+          >
+            {{ tagMappingNotice }}
+          </div>
+
           <TrendingRecommendationSection
             :isActive="isTrendingSort"
             :isLoading="isTrendingLoading"

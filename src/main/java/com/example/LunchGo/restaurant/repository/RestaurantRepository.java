@@ -27,6 +27,50 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, Long> {
     void saveRestaurantTagMapping(@Param("restaurantId") Long restaurantId, @Param("tagId") Long tagId);
 
     @Query(
+            value = "WITH user_specialities AS (" +
+                    "SELECT sm.speciality_id " +
+                    "FROM speciality_mappings sm " +
+                    "WHERE sm.user_id = :userId" +
+                    ") , liked_tags AS (" +
+                    "SELECT DISTINCT tm.tag_id " +
+                    "FROM user_specialities us " +
+                    "JOIN tag_maps tm ON tm.specialty_id = us.speciality_id " +
+                    "WHERE tm.weight = 1" +
+                    ") , disliked_tags AS (" +
+                    "SELECT DISTINCT tm.tag_id " +
+                    "FROM user_specialities us " +
+                    "JOIN tag_maps tm ON tm.specialty_id = us.speciality_id " +
+                    "WHERE tm.weight = 0" +
+                    ") , liked_count AS (" +
+                    "SELECT COUNT(*) AS cnt FROM liked_tags" +
+                    ") , disliked_count AS (" +
+                    "SELECT COUNT(*) AS cnt FROM disliked_tags" +
+                    ") " +
+                    "SELECT r.restaurant_id AS restaurantId, " +
+                    "COALESCE(1.0 * COUNT(DISTINCT lt.tag_id) / " +
+                    "NULLIF(lc.cnt + COUNT(DISTINCT rtm.tag_id) - COUNT(DISTINCT lt.tag_id), 0), 0) AS likeScore, " +
+                    "COALESCE(1.0 * COUNT(DISTINCT dt.tag_id) / NULLIF(dc.cnt, 0), 0) AS dislikePenalty, " +
+                    "COALESCE(1.0 * COUNT(DISTINCT lt.tag_id) / " +
+                    "NULLIF(lc.cnt + COUNT(DISTINCT rtm.tag_id) - COUNT(DISTINCT lt.tag_id), 0), 0) " +
+                    "- 0.4 * COALESCE(1.0 * COUNT(DISTINCT dt.tag_id) / NULLIF(dc.cnt, 0), 0) AS finalScore " +
+                    "FROM restaurants r " +
+                    "LEFT JOIN restaurant_tag_maps rtm ON r.restaurant_id = rtm.restaurant_id " +
+                    "LEFT JOIN liked_tags lt ON lt.tag_id = rtm.tag_id " +
+                    "LEFT JOIN disliked_tags dt ON dt.tag_id = rtm.tag_id " +
+                    "CROSS JOIN liked_count lc " +
+                    "CROSS JOIN disliked_count dc " +
+                    "WHERE r.status = 'OPEN' " +
+                    "AND (lc.cnt + dc.cnt) > 0 " +
+                    "GROUP BY r.restaurant_id, lc.cnt, dc.cnt " +
+                    "ORDER BY finalScore DESC",
+            nativeQuery = true
+    )
+    List<RestaurantSimilarityProjection> findRestaurantsByUserTagSimilarity(
+            @Param("userId") Long userId
+    );
+
+
+    @Query(
             value = "SELECT " +
                     "r.restaurant_id AS restaurantId, " +
                     "r.name AS name, " +
