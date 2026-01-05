@@ -53,6 +53,8 @@ public class SecurityConfig {
                         //각자 권한 걸어주면 됨니다
                         .requestMatchers("/api/join/**", "/api/auth/**", "/api/sms/**", "/api/login").permitAll()
                         .requestMatchers("/api/refresh").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
                         .requestMatchers(HttpMethod.GET,
                                 "/api/restaurants/*/reviews",
                                 "/api/restaurants/*/reviews/*",
@@ -101,6 +103,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/owners/restaurants/*/reviews/*/comments/*").hasAuthority("ROLE_OWNER")
                         .requestMatchers(HttpMethod.POST, "/api/owners/restaurants/*/reviews/*/blind-requests").hasAuthority("ROLE_OWNER")
                         .requestMatchers(HttpMethod.GET, "/api/business/restaurants/*").hasAuthority("ROLE_OWNER")
+                        .requestMatchers(HttpMethod.POST, "/api/business/staff/*").hasAuthority("ROLE_OWNER")
+                        .requestMatchers(HttpMethod.POST, "/api/business/promotion/*").hasAuthority("ROLE_OWNER")
 
                         .requestMatchers(HttpMethod.GET, "/api/admin/reviews").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/admin/forbidden-words").hasAuthority("ROLE_ADMIN")

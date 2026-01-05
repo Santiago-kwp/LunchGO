@@ -239,7 +239,7 @@ public class BaseMemberService implements MemberService {
 
     @Override
     public List<StaffInfo> getStaffs(Long ownerId) { //임직원 id일 수도 있음
-        Long resolvedOwnerId = null;
+        Long resolvedOwnerId = ownerId;
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getPrincipal() instanceof CustomUserDetails userDetails) {

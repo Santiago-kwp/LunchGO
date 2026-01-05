@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, onUnmounted, onMounted } from 'vue';
 import axios from 'axios';
+import { marked } from 'marked';
 import { RouterLink , useRouter} from 'vue-router';
 import {
   ArrowLeft,
@@ -12,6 +13,7 @@ import {
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import Input from '@/components/ui/Input.vue';
+import PRIVACY_POLICY_TEXT from '@/content/privacyPolicy.md?raw';
 
 const router = useRouter();
 
@@ -350,6 +352,7 @@ const handleVerifyCode = async() => {
 const isTermsModalOpen = ref(false);
 const modalTitle = ref('');
 const modalContent = ref('');
+const modalContentHtml = computed(() => marked.parse(modalContent.value, { breaks: true }));
 
 // 이용약관 모달 열기 -> 내용 수정 필수!!
 const openModal = (type) => {
@@ -360,7 +363,7 @@ const openModal = (type) => {
       '제1조 (목적)\n이 약관은 런치고 서비스의 이용조건 및 절차...';
   } else if (type === 'privacy') {
     modalTitle.value = '개인정보 처리방침';
-    modalContent.value = '런치고는 고객님의 개인정보를 소중히 다루며...';
+    modalContent.value = PRIVACY_POLICY_TEXT;
   }
 };
 
@@ -817,7 +820,7 @@ const handleSignup = async () => {
           <div
             class="p-5 overflow-y-auto text-sm text-[#495057] leading-relaxed whitespace-pre-line bg-[#f8f9fa]"
           >
-            {{ modalContent }}
+            <div v-html="modalContentHtml"></div>
           </div>
 
           <div class="p-4 bg-white border-t border-[#f1f3f5]">
