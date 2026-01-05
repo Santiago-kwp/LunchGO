@@ -12,6 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VITE_API_BASE_URL: http://${{ secrets.SERVER_IP }}
+      VITE_PORTONE_STORE_ID: ${{ secrets.VITE_PORTONE_STORE_ID }}
+      VITE_PORTONE_CHANNEL_KEY: ${{ secrets.VITE_PORTONE_CHANNEL_KEY }}
+      VITE_PORTONE_OPEN_TYPE: ${{ secrets.VITE_PORTONE_OPEN_TYPE }}
       AWS_ACCESS_KEY_ID: ${{ secrets.NCP_ACCESS_KEY }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.NCP_SECRET_KEY }}
       AWS_S3_FORCE_PATH_STYLE: "true"
