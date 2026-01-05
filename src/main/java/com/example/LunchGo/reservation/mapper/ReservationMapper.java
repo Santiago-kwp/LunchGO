@@ -45,4 +45,12 @@ public interface ReservationMapper {
     );
 
     int sumPartySizeBySlotId(@Param("slotId") Long slotId);
+
+    java.util.List<com.example.LunchGo.reservation.mapper.row.BusinessReservationListRow>
+    selectBusinessReservationList(
+            @org.apache.ibatis.annotations.Param("restaurantId") java.lang.Long restaurantId
+    );
+
+    java.util.List<com.example.LunchGo.reservation.mapper.row.AdminReservationListRow>
+    selectAdminReservationList();
 }

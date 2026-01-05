@@ -10,59 +10,56 @@ const instance = axios.create({
 });
 
 // response interceptor
-instance.interceptors.response.use((res) => {
-    return res;
-}, async (err) => {
+instance.interceptors.response.use(
+  (res) => res,
+  async (err) => {
     const accountStore = useAccountStore();
 
-    if (!err.response) {
-        return Promise.reject(err);
-    }
+    if (err.response?.status === 401) {
+      const config = err.config || {};
 
-    switch (err.response.status) {
-        case 401: {
-            const isLoginRequest =
-                err.config?.skipAuth ||
-                err.config?.url?.includes('/api/login') ||
-                err.config?.url?.endsWith('/login');
-            if (isLoginRequest) {
-                return Promise.reject(err);
-            }
+      const isAuthBypass =
+        config.skipAuth ||
+        config.url?.includes('/api/login') ||
+        config.url?.includes('/api/refresh');
 
-            const config = err.config || {};
-            const currentToken = accountStore.accessToken || localStorage.getItem('accessToken');
+      if (isAuthBypass) return Promise.reject(err);
 
-            if (!currentToken) {
-                return Promise.reject(err);
-            }
+      if (config._retry) return Promise.reject(err);
+      config._retry = true;
 
-            if (config.retried) {
-                window.alert('로그인 세션이 만료되었습니다.');
-                accountStore.clearAccount();
-                localStorage.removeItem('accessToken');
-                localStorage.removeItem('member');
-                window.location.replace('/');
-                return Promise.reject(err);
-            }
+      try {
+        const refreshRes = await axios.post('/api/refresh', null, {
+          withCredentials: true,
+        });
 
-            const res = await axios.post('/api/refresh', {}, {withCredentials: true});
-
-            const {accessToken} = res.data || {};
-            if (!accessToken) throw new Error('토큰 리프레시 에러');
-
-            accountStore.setAccessToken(accessToken);
-            localStorage.setItem('accessToken', accessToken);
-
-            config.headers = config.headers || {};
-            config.headers.Authorization = `Bearer ${accessToken}`;
-            config.retried = true;
-
-            return instance(config);
+        const accessToken = refreshRes.data?.accessToken ?? refreshRes.data;
+        if (!accessToken || typeof accessToken !== 'string') {
+          throw new Error('invalid refresh token response');
         }
-        default:
-            return Promise.reject(err);
+
+        accountStore.setAccessToken(accessToken);
+        localStorage.setItem('accessToken', accessToken);
+
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Bearer ${accessToken}`;
+
+        return instance(config);
+      } catch (refreshError) {
+        const status = refreshError?.response?.status;
+        if (status === 401 || status === 403) {
+          accountStore.clearAccount?.();
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('member');
+          window.location.replace('/login');
+        }
+        return Promise.reject(refreshError);
+      }
     }
-});
+
+    return Promise.reject(err);
+  }
+);
 
 const generateConfig = (options = {}) => {
     const { skipAuth, ...rest } = options;

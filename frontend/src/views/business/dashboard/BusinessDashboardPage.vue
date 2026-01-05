@@ -1,11 +1,14 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { Filter } from 'lucide-vue-next'; // Bell, User는 Header로 이동
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 import StaffSideBar from '@/components/ui/StaffSideBar.vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
+import httpRequest from '@/router/httpRequest';
 const router = useRouter();
+const route = useRoute();
+const restaurantId = computed(() => Number(route.query.restaurantId || 0));
 
 
 // 권한 확인 로직 (실제 앱에서는 Pinia Store나 localStorage에서 가져옵니다)
@@ -72,112 +75,82 @@ const submitCancel = () => {
   window.alert('취소 되었습니다.');
 };
 
-const selectedDate = ref(new Date().toISOString().split('T')[0]);
+const selectedDate = ref(new Date());
+const selectedDateStr = computed(() => {
+  const d = selectedDate.value;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+});
 
-const reservations = ref([
-  {
-    id: 1,
-    name: '홍길동',
-    phone: '010-1234-5678',
-    date: '2025-12-25',
-    time: '12:00',
-    guests: 4,
-    amount: 72000,
-    status: 'confirmed',
-    menus: ['확정', '대기'],
-    orderType: '상세보기 / 확정 / 취소',
-  },
-  {
-    id: 2,
-    name: '김철수',
-    phone: '010-2345-6789',
-    date: '2025-12-25',
-    time: '13:00',
-    guests: 6,
-    amount: 108000,
-    status: 'confirmed',
-    menus: ['확정'],
-    orderType: '상세보기 / 확정 / 취소',
-  },
-  {
-    id: 3,
-    name: '이영희',
-    phone: '010-3456-7890',
-    date: '2025-12-25',
-    time: '12:30',
-    guests: 8,
-    amount: 144000,
-    status: 'pending',
-    menus: ['대기'],
-    orderType: '상세보기 / 확정 / 취소',
-  },
-  {
-    id: 4,
-    name: '박민수',
-    phone: '010-4567-8901',
-    date: '2025-12-25',
-    time: '14:00',
-    guests: 5,
-    amount: 90000,
-    status: 'confirmed',
-    menus: ['확정'],
-    orderType: '상세보기 / 확정 / 취소',
-  },
-  {
-    id: 5,
-    name: '정수진',
-    phone: '010-5678-9012',
-    date: '2025-12-25',
-    time: '11:30',
-    guests: 4,
-    amount: 72000,
-    status: 'pending',
-    menus: ['대기'],
-    orderType: '상세보기 / 확정 / 취소',
-  },
-  {
-    id: 6,
-    name: '최동훈',
-    phone: '010-6789-0123',
-    date: '2025-12-25',
-    time: '13:30',
-    guests: 7,
-    amount: 126000,
-    status: 'confirmed',
-    menus: ['확정'],
-    orderType: '상세보기 / 확정 / 취소',
-  },
-  {
-    id: 7,
-    name: '윤서연',
-    phone: '010-7890-1234',
-    date: '2025-12-25',
-    time: '12:00',
-    guests: 4,
-    amount: 72000,
-    status: 'cancelled',
-    cancelReason: '고객 요청',
-    menus: ['취소'],
-    orderType: '상세보기 / 확정 / 취소',
-  },
-]);
+const reservations = ref([]);
+
+const mapStatus = (status) => {
+  if (status === '대기') return 'pending';
+  if (status === '확정') return 'confirmed';
+  if (status === '취소') return 'cancelled';
+  if (status === '환불') return 'refunded';
+  return 'confirmed';
+};
+
+const splitDateTime = (datetime) => {
+  if (!datetime) return { date: '', time: '' };
+  const parts = String(datetime).split(' ');
+  return { date: parts[0] || '', time: parts[1] || '' };
+};
+
+const loadReservations = async () => {
+  if (!restaurantId.value) return;
+  try {
+    const response = await httpRequest.get('/api/business/reservations', {
+      restaurantId: restaurantId.value,
+    });
+    if (Array.isArray(response.data)) {
+      reservations.value = response.data.map((row) => {
+        const { date, time } = splitDateTime(row.datetime);
+        return {
+          id: row.id,
+          name: row.name,
+          phone: row.phone,
+          date,
+          time,
+          guests: row.guests,
+          amount: row.amount || 0,
+          status: mapStatus(row.status),
+        };
+      });
+    }
+  } catch (error) {
+    console.error('예약 조회 실패:', error);
+  }
+};
+
+onMounted(() => {
+  loadReservations();
+});
+
+const reservationsForDate = computed(() =>
+  reservations.value.filter((r) => r.date === selectedDateStr.value)
+);
 
 //필터 적용된 예약 리스트
 const filteredReservations = computed(() => {
-  if (statusFilter.value === 'all') return reservations.value;
-  return reservations.value.filter((r) => r.status === statusFilter.value);
+  const base = reservationsForDate.value;
+  if (statusFilter.value === 'all') return base;
+  return base.filter((r) => r.status === statusFilter.value);
 });
 
 // 예약 상태가 바뀌면 자동 갱신 
 const stats = computed(() => ({
-  total: reservations.value.length,
-  confirmed: reservations.value.filter((r) => r.status === 'confirmed').length,
-  pending: reservations.value.filter((r) => r.status === 'pending').length,
-  cancelled: reservations.value.filter((r) => r.status === 'cancelled').length,
+  total: reservationsForDate.value.length,
+  confirmed: reservationsForDate.value.filter((r) => r.status === 'confirmed').length,
+  pending: reservationsForDate.value.filter((r) => r.status === 'pending').length,
+  cancelled: reservationsForDate.value.filter((r) => r.status === 'cancelled').length,
 }));
 
 const salesStats = computed(() => {
-  const confirmedList = reservations.value.filter((r) => r.status === 'confirmed');
+  const confirmedList = reservationsForDate.value.filter((r) => r.status === 'confirmed');
   return {
     totalSales: confirmedList.reduce((sum, r) => sum + r.amount, 0),
     totalReservations: confirmedList.length,
@@ -209,7 +182,7 @@ const salesStats = computed(() => {
           <div class="flex items-center justify-between">
             <h2 class="text-3xl font-bold text-[#1e3a5f]">오늘의 예약 현황</h2>
             <div class="flex items-center gap-2">
-              <span class="text-sm text-[#6c757d]">{{ selectedDate }}</span>
+            <span class="text-sm text-[#6c757d]">{{ selectedDateStr }}</span>
             </div>
           </div>
 

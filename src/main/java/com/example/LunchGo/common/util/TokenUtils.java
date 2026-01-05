@@ -137,16 +137,32 @@ public class TokenUtils {
 
     public boolean validateToken(String token){
         try {
-            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
+            Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
+            Date expiration = claims.getExpiration();
+            if (expiration != null && expiration.before(new Date())) {
+                log.warn("만료된 JWT 토큰입니다. exp={}", expiration);
+                return false;
+            }
+            String subject = claims.getSubject();
+            if (subject == null) {
+                log.warn("JWT sub 누락");
+                return false;
+            }
+            try {
+                Long.parseLong(subject);
+            } catch (NumberFormatException e) {
+                log.warn("JWT sub 파싱 실패(숫자 아님): sub={}", subject);
+                return false;
+            }
             return true;
-        }catch(SecurityException | MalformedJwtException e){
-            log.info("잘못된 JWT 서명입니다.");
+        } catch (SecurityException | MalformedJwtException e) {
+            log.warn("잘못된 JWT 서명/포맷입니다. cause={}", e.getMessage());
         } catch (ExpiredJwtException e) {
-            log.info("만료된 JWT 토큰입니다.");
+            log.warn("만료된 JWT 토큰입니다. exp={}", e.getClaims().getExpiration());
         } catch (UnsupportedJwtException e) {
-            log.info("지원되지 않는 JWT 토큰입니다.");
+            log.warn("지원되지 않는 JWT 토큰입니다. cause={}", e.getMessage());
         } catch (IllegalArgumentException e) {
-            log.info("JWT 토큰이 잘못되었습니다.");
+            log.warn("JWT 토큰이 잘못되었습니다. cause={}", e.getMessage());
         }
         return false;
     }
@@ -165,9 +181,17 @@ public class TokenUtils {
                         .map(SimpleGrantedAuthority::new)
                         .collect(Collectors.toList());
 
+        Long memberId;
+        try {
+            memberId = Long.parseLong(claims.getSubject());
+        } catch (NumberFormatException e) {
+            log.warn("JWT subject 파싱 실패: sub={}", claims.getSubject());
+            throw e;
+        }
+
         //CustomUserDetails 객체 만들고 Authentication 리턴
         CustomUserDetails principal = new CustomUserDetails(
-                Long.parseLong(claims.getSubject()),
+                memberId,
                 claims.get(AUTHORITIES_KEY).toString() //ROLE_
         );
 

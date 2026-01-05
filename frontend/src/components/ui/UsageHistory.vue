@@ -38,7 +38,7 @@ const props = defineProps({
 const activeReviewMenu = ref(null);
 
 const isFavorite = (restaurantId) =>
-  props.favorites.includes(restaurantId);
+  props.favorites?.includes(restaurantId);
 
 // 리뷰 메뉴 토글
 const toggleReviewMenu = (reservationId) => {
@@ -116,14 +116,14 @@ const handleDeleteReview = (reservation) => {
 
 <template>
   <div class="space-y-3">
-    <div v-if="reservations.length === 0" class="text-center py-12">
+    <div v-if="props.reservations.length === 0" class="text-center py-12">
       <p class="text-[#6c757d] text-sm">지난 예약 내역이 없습니다.</p>
     </div>
 
     <Card
       v-else
-      v-for="reservation in reservations"
-      :key="reservation.id"
+      v-for="reservation in props.reservations"
+      :key="reservation.reservationId || reservation.id"
       class="overflow-hidden border-[#e9ecef] rounded-2xl bg-white shadow-sm"
     >
       <div class="p-4">

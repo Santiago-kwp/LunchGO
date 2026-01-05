@@ -105,6 +105,11 @@ const handleLogin = async () => {
       throw new Error('accessToken not found');
     }
 
+    localStorage.setItem('accessToken', accessToken);
+    if (response.data?.member) {
+      localStorage.setItem('member', JSON.stringify(response.data.member));
+    }
+
     accountStore.setLoggedIn(true, response.data);
     accountStore.setAccessToken(accessToken);
 

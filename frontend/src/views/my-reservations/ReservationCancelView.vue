@@ -49,6 +49,7 @@ const fetchReservationSummary = async () => {
   try {
     const response = await httpRequest.get(`/api/reservations/${reservationId.value}/summary`);
     const data = response?.data || {};
+
     reservationSummary.value = {
       restaurantName: data.restaurant?.name || "",
       address: data.restaurant?.address || "",

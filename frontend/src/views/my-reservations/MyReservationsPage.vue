@@ -2,8 +2,8 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { ArrowLeft } from "lucide-vue-next";
-import { useBookmarkShare } from "@/composables/useBookmarkShare";
 import httpRequest from "@/router/httpRequest";
+import { useBookmarkShare } from "@/composables/useBookmarkShare";
 import { useAccountStore } from "@/stores/account";
 import Pagination from "@/components/ui/Pagination.vue";
 
@@ -14,6 +14,10 @@ import UsageHistory from "@/components/ui/UsageHistory.vue"; // 지난 예약(�
 const route = useRoute();
 const { getMyBookmarks } = useBookmarkShare();
 const accountStore = useAccountStore();
+
+const devUserId = import.meta.env.DEV ? 1 : 0;
+const userId = computed(() => Number(route.query.userId || devUserId || 0));
+const loadError = ref("");
 
 // 탭 상태 관리 ('upcoming' | 'past')
 const activeTab = ref("upcoming");
@@ -215,8 +219,8 @@ watch(
       <div class="bg-white border-b border-[#e9ecef] sticky top-14 z-40">
         <div class="flex">
           <button
-            @click="activeTab = 'upcoming'"
-            :class="[
+              @click="activeTab = 'upcoming'"
+              :class="[
               'flex-1 py-3 text-sm font-medium transition-colors relative',
               activeTab === 'upcoming'
                 ? 'text-[#1e3a5f] font-semibold'
@@ -225,13 +229,13 @@ watch(
           >
             예약 내역
             <div
-              v-if="activeTab === 'upcoming'"
-              class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1e3a5f]"
+                v-if="activeTab === 'upcoming'"
+                class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1e3a5f]"
             ></div>
           </button>
           <button
-            @click="activeTab = 'past'"
-            :class="[
+              @click="activeTab = 'past'"
+              :class="[
               'flex-1 py-3 text-sm font-medium transition-colors relative',
               activeTab === 'past'
                 ? 'text-[#1e3a5f] font-semibold'
@@ -240,8 +244,8 @@ watch(
           >
             지난 예약
             <div
-              v-if="activeTab === 'past'"
-              class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1e3a5f]"
+                v-if="activeTab === 'past'"
+                class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1e3a5f]"
             ></div>
           </button>
         </div>
@@ -249,8 +253,8 @@ watch(
 
       <div class="px-4 pt-5">
         <ReservationHistory
-          v-show="activeTab === 'upcoming'"
-          :reservations="upcomingReservations"
+            v-show="activeTab === 'upcoming'"
+            :reservations="upcomingReservations"
         />
 
         <div v-show="activeTab === 'past'">

@@ -1,10 +1,11 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import AdminSideBar from "@/components/ui/AdminSideBar.vue";
 import AdminHeader from "@/components/ui/AdminHeader.vue";
 import Pagination from "@/components/ui/Pagination.vue";
 import AdminSearchFilter from "@/components/ui/AdminSearchFilter.vue";
 import { Line } from "vue-chartjs";
+import httpRequest from "@/router/httpRequest";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -259,22 +260,22 @@ const getTypeLabel = (type) => (type === "prepaid" ? "선결제" : "예약금");
 const maskName = (name) =>
   name.length <= 1 ? name : name[0] + "*".repeat(name.length - 1);
 
-const allReservations = ref([
-  ...Array.from({ length: 45 }, (_, i) => ({
-    id: `R20241217${(i + 1).toString().padStart(2, "0")}`,
-    restaurantName:
-      ["한신포차", "본죽&비빔밥", "스시로", "아웃백", "청년다방"][i % 5] +
-      " " +
-      ["강남점", "서초점", "판교점"][i % 3],
-    customerName: ["김", "이", "박", "정", "최"][i % 5] + "민수",
-    reservationDateTime: `2024-12-${18 + (i % 5)} 18:30`,
-    partySize: 2 + (i % 5),
-    type: i % 2 === 0 ? "prepaid" : "deposit",
-    status: ["temp", "confirmed", "completed", "refund_pending", "refunded"][
-      i % 5
-    ],
-  })),
-]);
+const allReservations = ref([]);
+
+const loadReservations = async () => {
+  try {
+    const response = await httpRequest.get("/api/admin/reservations");
+    if (Array.isArray(response.data)) {
+      allReservations.value = response.data;
+    }
+  } catch (error) {
+    console.error("예약 조회 실패:", error);
+  }
+};
+
+onMounted(() => {
+  loadReservations();
+});
 
 const filteredReservations = computed(() => {
   let filtered = allReservations.value;

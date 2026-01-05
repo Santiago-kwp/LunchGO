@@ -15,6 +15,7 @@ import com.example.LunchGo.reservation.mapper.row.ReservationMenuItemRow;
 import com.example.LunchGo.reservation.repository.PaymentRepository;
 import com.example.LunchGo.reservation.repository.ReservationRepository;
 import com.example.LunchGo.reservation.repository.ReservationSlotRepository;
+import com.example.LunchGo.reservation.service.PortoneVerificationService;
 import com.example.LunchGo.restaurant.entity.Restaurant;
 import com.example.LunchGo.restaurant.repository.RestaurantRepository;
 import com.example.LunchGo.restaurant.stats.RestaurantStatsEventService;

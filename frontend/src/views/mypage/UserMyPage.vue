@@ -40,6 +40,105 @@ const memberId = computed(() => {
   return Number.isNaN(parsed) ? null : parsed;
 });
 
+const UPCOMING_STATUSES = new Set(['TEMPORARY', 'CONFIRMED', 'PREPAID_CONFIRMED']);
+const PAST_STATUSES = new Set([
+  'COMPLETED',
+  'REFUND_PENDING',
+  'REFUNDED',
+  'CANCELLED',
+  'EXPIRED',
+  'NO_SHOW',
+]);
+
+const normalizeStatus = (status: unknown) => String(status || '').toUpperCase();
+
+const isPastReservation = (date?: string, time?: string) => {
+  if (!date || !time) return false;
+  const normalizedTime = time.length === 5 ? `${time}:00` : time;
+  const parsed = new Date(`${date}T${normalizedTime}`);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return parsed < new Date();
+};
+
+const mapReservationStatus = (status?: string, date?: string, time?: string) => {
+  const normalized = normalizeStatus(status);
+  if (normalized === 'TEMPORARY') return 'pending_payment';
+  if (normalized === 'CONFIRMED' || normalized === 'PREPAID_CONFIRMED') {
+    return isPastReservation(date, time) ? 'completed' : 'confirmed';
+  }
+  if (normalized === 'COMPLETED') return 'completed';
+  if (normalized === 'CANCELLED') return 'cancelled';
+  if (normalized === 'EXPIRED') return 'expired';
+  if (normalized === 'NOSHOW' || normalized === 'NO_SHOW') return 'no_show';
+  return 'confirmed';
+};
+
+const mapReservationRow = (row: any) => {
+  const normalized = normalizeStatus(row.status);
+  const past =
+    PAST_STATUSES.has(normalized) ||
+    (UPCOMING_STATUSES.has(normalized) && isPastReservation(row.date, row.time));
+  return {
+    id: row.reservationId,
+    reservationId: row.reservationId,
+    confirmationNumber: row.confirmationNumber,
+    restaurantName: row.restaurantName,
+    restaurant: {
+      id: row.restaurantId,
+      name: row.restaurantName,
+      address: '-',
+    },
+    booking: {
+      date: row.date,
+      time: row.time,
+      partySize: row.partySize,
+    },
+    date: row.date,
+    time: row.time,
+    partySize: row.partySize,
+    reservationStatus: mapReservationStatus(row.status, row.date, row.time),
+    status: past ? 'past' : 'upcoming',
+    normalizedStatus: normalized,
+    requestNote: row.requestNote,
+    payment: null,
+    review: null,
+    visitCount: null,
+    daysSinceLastVisit: null,
+  };
+};
+
+const allReservations = ref<any[]>([]);
+
+const upcomingReservations = computed(() =>
+  allReservations.value.filter((r) => r.status === 'upcoming')
+);
+
+const pastReservations = computed(() =>
+  allReservations.value.filter((r) => r.status === 'past')
+);
+
+const loadReservations = async () => {
+  const accessToken = localStorage.getItem('accessToken');
+  if (!accessToken) {
+    router.push('/login');
+    return;
+  }
+  try {
+    const response = await httpRequest.get('/api/reservations/my');
+    if (Array.isArray(response.data)) {
+      const mapped = response.data.map((row) => mapReservationRow(row));
+      const allowedStatuses = new Set([...UPCOMING_STATUSES, ...PAST_STATUSES]);
+      allReservations.value = mapped.filter((row) =>
+        allowedStatuses.has(row.normalizedStatus)
+      );
+    }
+  } catch (error: any) {
+    if (error?.response?.status === 401) {
+      router.push('/login');
+    }
+  }
+};
+
 // 이메일 인증 모달 표시 여부
 const showEmailModal = ref(false);
 
@@ -307,6 +406,7 @@ const fetchUserInfo = async() => {
 onMounted(() => {
   loadDaumPostcodeScript();
   fetchUserInfo();
+  loadReservations();
   document.addEventListener('click', handleInterestOutsideClick);
 });
 
@@ -931,9 +1031,16 @@ const handleWithdraw = () => {
         </div>
       </div>
 
-      <ReservationHistory v-else-if="activeNav === 'history'" />
+      <ReservationHistory
+        v-else-if="activeNav === 'history'"
+        :reservations="upcomingReservations"
+      />
 
-      <UsageHistory v-else-if="activeNav === 'usage'" />
+      <UsageHistory
+        v-else-if="activeNav === 'usage'"
+        :reservations="pastReservations"
+        :user-id="memberId"
+      />
 
       <UserFavorites
         v-else-if="activeNav === 'favorite'"

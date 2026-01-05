@@ -97,4 +97,127 @@
                                  max_capacity = max_capacity
     </insert>
 
+    <select id="selectUserReservationList"
+            resultType="com.example.LunchGo.reservation.mapper.row.UserReservationListRow">
+        SELECT
+            r.reservation_id AS reservationId,
+            s.restaurant_id AS restaurantId,
+            r.reservation_code AS confirmationNumber,
+            res.name AS restaurantName,
+            DATE_FORMAT(s.slot_date, '%Y-%m-%d') AS date,
+            DATE_FORMAT(s.slot_time, '%H:%i') AS time,
+            r.party_size AS partySize,
+            r.status AS status,
+            r.request_message AS requestNote
+        FROM reservations r
+                 JOIN restaurant_reservation_slots s ON s.slot_id = r.slot_id
+                 JOIN restaurants res ON res.restaurant_id = s.restaurant_id
+        WHERE r.user_id = #{userId}
+          AND r.status IN ('TEMPORARY', 'CONFIRMED', 'PREPAID_CONFIRMED', 'COMPLETED', 'REFUND_PENDING', 'REFUNDED', 'CANCELLED', 'EXPIRED', 'NO_SHOW')
+        ORDER BY r.created_at DESC
+    </select>
+
+    <select id="selectUserReservationDetail"
+            resultType="com.example.LunchGo.reservation.mapper.row.UserReservationDetailRow">
+        SELECT
+            r.reservation_id AS reservationId,
+            r.reservation_code AS confirmationNumber,
+            s.restaurant_id AS restaurantId,
+            res.name AS restaurantName,
+            CASE
+                WHEN res.detail_address IS NULL OR res.detail_address = '' THEN res.road_address
+                ELSE CONCAT(res.road_address, ' ', res.detail_address)
+                END AS restaurantAddress,
+            res.phone AS restaurantPhone,
+            DATE_FORMAT(s.slot_date, '%Y-%m-%d') AS date,
+            DATE_FORMAT(s.slot_time, '%H:%i') AS time,
+            r.party_size AS partySize,
+            r.request_message AS requestNote,
+            COALESCE(r.total_amount, r.prepay_amount, r.deposit_amount, 0) AS amount,
+            CASE
+                WHEN r.reservation_type = 'PREORDER_PREPAY' THEN 'prepaid'
+                ELSE 'deposit'
+                END AS paymentType,
+            CASE
+                WHEN p.card_type = 'CORPORATE' THEN '법인카드'
+                WHEN p.card_type = 'PERSONAL' THEN '개인카드'
+                ELSE '신용카드'
+                END AS paymentMethod,
+            DATE_FORMAT(p.approved_at, '%Y. %m. %d. %H:%i') AS paidAt,
+            r.status AS status
+        FROM reservations r
+                 JOIN restaurant_reservation_slots s ON s.slot_id = r.slot_id
+                 JOIN restaurants res ON res.restaurant_id = s.restaurant_id
+                 LEFT JOIN payments p ON p.payment_id = (
+            SELECT p2.payment_id
+            FROM payments p2
+            WHERE p2.reservation_id = r.reservation_id
+            ORDER BY p2.created_at DESC
+            LIMIT 1
+            )
+        WHERE r.reservation_id = #{reservationId}
+          AND r.user_id = #{userId}
+    </select>
+
+    <select id="selectBusinessReservationList"
+            resultType="com.example.LunchGo.reservation.mapper.row.BusinessReservationListRow">
+        SELECT
+            r.reservation_id AS id,
+            u.name AS name,
+            u.phone AS phone,
+            CONCAT(DATE_FORMAT(s.slot_date, '%Y-%m-%d'), ' ', DATE_FORMAT(s.slot_time, '%H:%i')) AS datetime,
+            r.party_size AS guests,
+            COALESCE(r.total_amount, r.prepay_amount, r.deposit_amount, 0) AS amount,
+            CASE
+                WHEN r.status = 'TEMPORARY' THEN '대기'
+                WHEN r.status IN ('CONFIRMED', 'PREPAID_CONFIRMED') THEN '확정'
+                WHEN r.status = 'CANCELLED' THEN '취소'
+                ELSE '환불'
+                END AS status
+        FROM reservations r
+                 JOIN restaurant_reservation_slots s ON s.slot_id = r.slot_id
+                 JOIN restaurants res ON res.restaurant_id = s.restaurant_id
+                 JOIN users u ON u.user_id = r.user_id
+        WHERE res.restaurant_id = #{restaurantId}
+        ORDER BY s.slot_date DESC, s.slot_time DESC
+    </select>
+
+    <select id="selectAdminReservationList"
+            resultType="com.example.LunchGo.reservation.mapper.row.AdminReservationListRow">
+        SELECT
+            r.reservation_code AS id,
+            res.name AS restaurantName,
+            u.name AS customerName,
+            CONCAT(DATE_FORMAT(s.slot_date, '%Y-%m-%d'), ' ', DATE_FORMAT(s.slot_time, '%H:%i')) AS reservationDateTime,
+            r.party_size AS partySize,
+            CASE
+                WHEN r.reservation_type = 'PREORDER_PREPAY' THEN 'prepaid'
+                ELSE 'deposit'
+                END AS type,
+            CASE
+                WHEN r.status = 'TEMPORARY' THEN 'temp'
+                WHEN r.status IN ('CONFIRMED', 'PREPAID_CONFIRMED')
+                    AND TIMESTAMP(s.slot_date, s.slot_time) &lt; NOW() THEN 'completed'
+                WHEN r.status IN ('CONFIRMED', 'PREPAID_CONFIRMED') THEN 'confirmed'
+                WHEN r.status IN ('CANCELLED', 'EXPIRED') THEN
+                    CASE
+                        WHEN p.status = 'CANCELLED' THEN 'refunded'
+                        ELSE 'refund_pending'
+                        END
+                ELSE 'refund_pending'
+                END AS status
+        FROM reservations r
+                 JOIN restaurant_reservation_slots s ON s.slot_id = r.slot_id
+                 JOIN restaurants res ON res.restaurant_id = s.restaurant_id
+                 JOIN users u ON u.user_id = r.user_id
+                 LEFT JOIN payments p ON p.payment_id = (
+            SELECT p2.payment_id
+            FROM payments p2
+            WHERE p2.reservation_id = r.reservation_id
+            ORDER BY p2.created_at DESC
+            LIMIT 1
+            )
+        ORDER BY r.created_at DESC
+    </select>
+
 </mapper>

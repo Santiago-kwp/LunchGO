@@ -4,9 +4,12 @@ import { Filter, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 import StaffSideBar from '@/components/ui/StaffSideBar.vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
+import httpRequest from '@/router/httpRequest';
 
 const router = useRouter();
+const route = useRoute();
+const restaurantId = computed(() => Number(route.query.restaurantId || 0));
 
 // 권한 확인 로직 (실제 앱에서는 Pinia Store나 localStorage에서 가져옵니다)
 // 예: const authStore = useAuthStore(); const userRole = computed(() => authStore.userRole);
@@ -17,8 +20,8 @@ const goDetail = (id) => {
   router.push({ name: 'reservation-detail', params: { id: String(id) } });
 };
 
-const selectedDate = ref(new Date(2024, 9, 24));
-const currentMonth = ref(new Date(2024, 9, 1));
+const selectedDate = ref(new Date());
+const currentMonth = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
 // 선택 날짜를 "YYYY-MM-DD"로 관리 백엔드 연동 시 수정
 const selectedDateStr = computed(() => {
@@ -45,35 +48,7 @@ const dateFilteredReservations = computed(() => {
   );
 });
 
-const reservations = ref([
-  { id: 1, name: '홍길동', phone: '010-1234-5678', datetime: '2025-12-25 12:00', guests: 4, amount: 111000, status: '확정' },
-  { id: 2, name: '김영희', phone: '010-2345-6789', datetime: '2025-12-25 13:00', guests: 6, amount: 150000, status: '대기' },
-  { id: 3, name: '이철수', phone: '010-3456-7890', datetime: '2025-12-25 11:00', guests: 8, amount: 200000, status: '확정' },
-  { id: 4, name: '박민수', phone: '010-4567-8901', datetime: '2025-12-25 14:00', guests: 5, amount: 125000, status: '취소' },
-  // { id: 5, ... status: '환불' } 이런 데이터가 들어와도 필터/뱃지 동작함
-]);
-
-reservations.value.push({
-  id: 99,
-  name: '테스트',
-  phone: '010-0000-0000',
-  datetime: `${selectedDateStr.value} 12:00`,
-  guests: 2,
-  amount: 50000,
-  status: '확정',
-});
-
-for (let i = 0; i < 25; i++) {
-  reservations.value.push({
-    id: 200 + i,
-    name: `테스트${i + 1}`,
-    phone: '010-0000-0000',
-    datetime: `${selectedDateStr.value} ${String(10 + (i % 10)).padStart(2, '0')}:00`,
-    guests: 2 + (i % 4),
-    amount: 50000 + i * 1000,
-    status: i % 3 === 0 ? '확정' : i % 3 === 1 ? '대기' : '취소',
-  });
-}
+const reservations = ref([]);
 
 
 
@@ -164,6 +139,24 @@ const handleOutsideClick = (e) => {
 };
 onMounted(() => document.addEventListener('click', handleOutsideClick));
 onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick));
+
+const loadReservations = async () => {
+  if (!restaurantId.value) return;
+  try {
+    const response = await httpRequest.get('/api/business/reservations', {
+      restaurantId: restaurantId.value,
+    });
+    if (Array.isArray(response.data)) {
+      reservations.value = response.data;
+    }
+  } catch (error) {
+    console.error('예약 조회 실패:', error);
+  }
+};
+
+onMounted(() => {
+  loadReservations();
+});
 
 // --- 취소 모달 상태 ---
 const cancelModalOpen = ref(false);

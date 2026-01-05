@@ -1,10 +1,12 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed, onMounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
+import httpRequest from '@/router/httpRequest';
 
 const router = useRouter();
+const route = useRoute();
 
 const props = defineProps({
   id: { type: [String, Number], required: true },
@@ -75,107 +77,25 @@ const canCancel = computed(() => {
   return s === 'pending' || s === 'confirmed';
 });
 
-//임시 mock (나중에 이 부분만 API 호출로 교체)
-const reservations = ref ([
-  {
-    id: 1,
-    name: '홍길동',
-    phone: '010-1234-5678',
-    date: '2025-12-25',
-    time: '12:00',
-    guests: 4,
-    amount: 72000,
-    status: 'confirmed',
-    requestNote: '창가 자리 부탁드립니다. 아이 의자 필요해요.',
-    paymentType: 'prepaid',
-    preorderItems: [
-      { name: '런치 스테이크', qty: 2, price: 18000 },
-      { name: '파스타', qty: 1, price: 16000 },
-    ],
-  },
-  {
-    id: 2,
-    name: '김철수',
-    phone: '010-2345-6789',
-    date: '2025-12-25',
-    time: '13:00',
-    guests: 6,
-    amount: 108000,
-    status: 'confirmed',
-    requestNote: '',
-    paymentType: 'onsite',
-    preorderItems: [],
-  },
-  {
-    id: 3,
-    name: '이영희',
-    phone: '010-3456-7890',
-    date: '2025-12-25',
-    time: '12:30',
-    guests: 8,
-    amount: 144000,
-    status: 'pending',
-    requestNote: '조용한 자리 부탁드립니다.',
-    paymentType: 'onsite',
-    preorderItems: [],
-  },
-  {
-    id: 4,
-    name: '박민수',
-    phone: '010-4567-8901',
-    date: '2025-12-25',
-    time: '14:00',
-   paymentType: 'onsite',
-     guests: 5,
-    amount: 90000,
-    status: 'confirmed',
-    requestNote: '',
-    paymentType: 'onsite',
-    preorderItems: [],
-  },
-  {
-    id: 5,
-    name: '정수진',
-    phone: '010-5678-9012',
-    date: '2025-12-25',
-    time: '11:30',
-    guests: 4,
-    amount: 72000,
-    status: 'pending',
-    requestNote: '유아 동반입니다.',
-    paymentType: 'onsite',
-    preorderItems: [],
-  },
-  {
-    id: 6,
-    name: '최동훈',
-    phone: '010-6789-0123',
-    date: '2025-12-25',
-    time: '13:30',
-    guests: 7,
-    amount: 126000,
-    status: 'confirmed',
-    requestNote: '',
-    paymentType: 'onsite',
-    preorderItems: [],
-  },
-  {
-    id: 7,
-    name: '윤서연',
-    phone: '010-7890-1234',
-    date: '2025-12-25',
-    time: '12:00',
-    guests: 4,
-    amount: 72000,
-    status: 'cancelled',
-    requestNote: '',
-    preorderItems: [],
-  },
-]);
+const reservation = ref(null);
+const restaurantId = computed(() => Number(route.query.restaurantId || 0));
 
-const reservation = computed(() =>
-  reservations.value.find((r) => r.id === reservationId.value)
-);
+const loadReservation = async () => {
+  try {
+    const response = await httpRequest.get(
+      `/api/business/reservations/${reservationId.value}`,
+      restaurantId.value ? { restaurantId: restaurantId.value } : {}
+    );
+    const data = response.data ?? response;
+    reservation.value = data;
+  } catch (error) {
+    console.error('예약 상세 조회 실패:', error);
+  }
+};
+
+onMounted(() => {
+  loadReservation();
+});
 </script>
 
 <template>
