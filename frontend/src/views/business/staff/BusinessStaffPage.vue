@@ -20,8 +20,7 @@ const getStoredMember = () => {
 
 const member = computed(() => accountStore.member || getStoredMember());
 const ownerId = computed(() => {
-  const rawId =
-    member.value?.ownerId ?? member.value?.id ?? member.value?.memberId;
+  const rawId = member.value?.id;
   if (rawId === null || rawId === undefined) return null;
   const parsed = Number(rawId);
   return Number.isNaN(parsed) ? null : parsed;
