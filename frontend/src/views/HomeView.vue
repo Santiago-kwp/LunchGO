@@ -71,6 +71,7 @@ const {
 } = useCafeteriaRecommendation({ userId: DEFAULT_USER_ID });
 const cafeteriaImageUrl = computed(() => cafeteriaImageUrlRef.value);
 const homeListStateStorageKey = "homeListState";
+const searchQuery = ref("");
 const filterForm = reactive({
   sort: selectedSort.value,
   priceRange: selectedPriceRange.value,
@@ -205,6 +206,12 @@ const getSortId = (restaurant) => {
 };
 const processedRestaurants = computed(() => {
   let result = baseRestaurants.value.slice();
+  const normalizedQuery = searchQuery.value.trim().toLowerCase();
+  if (normalizedQuery) {
+    result = result.filter((restaurant) =>
+      String(restaurant.name || "").toLowerCase().includes(normalizedQuery)
+    );
+  }
 
   const distanceLimit = selectedDistanceKm.value;
   if (distanceLimit) {
@@ -1281,7 +1288,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="min-h-screen bg-[#f8f9fa]">
-    <AppHeader />
+    <AppHeader v-model:searchQuery="searchQuery" />
     <div
       v-if="isGeocodeExportMode"
       class="bg-white border-b border-[#e9ecef]"

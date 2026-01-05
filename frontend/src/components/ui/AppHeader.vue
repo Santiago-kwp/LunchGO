@@ -27,7 +27,19 @@ const userProfileImage = computed(
     member.value?.image ||
     'https://api.dicebear.com/9.x/avataaars/svg?seed=Felix'
 );
+const props = defineProps({
+  searchQuery: {
+    type: String,
+    default: '',
+  },
+});
+const emit = defineEmits(['update:searchQuery']);
+
 const isMenuOpen = ref(false);
+const searchText = computed({
+  get: () => props.searchQuery,
+  set: (value) => emit('update:searchQuery', value),
+});
 
 const toggleMenu = () => {
   isMenuOpen.value = !isMenuOpen.value;
@@ -65,6 +77,7 @@ const handleLogout = async () => {
         <input
           type="text"
           placeholder="검색"
+          v-model="searchText"
           class="w-full h-9 px-3 rounded-full border border-[#ced4da] bg-[#e9ecef] text-sm text-[#495057] focus:outline-none focus:ring-2 focus:ring-[#ff6b4a]"
         />
       </div>
