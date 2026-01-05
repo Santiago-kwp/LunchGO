@@ -34,6 +34,13 @@ const getReservationId = (reservation) =>
 const goCancel = (id) => {
   router.push({ name: "reservation-cancel", params: { id: String(id) } });
 };
+
+const shortConfirmationNumber = (value: unknown) => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  const last = raw.split('-').pop() || raw;
+  return String(last).slice(-4);
+};
 </script>
 
 <template>
@@ -55,7 +62,7 @@ const goCancel = (id) => {
               {{ reservation.restaurant.name }}
             </h3>
             <p class="text-xs text-[#6c757d]">
-              예약번호: {{ reservation.confirmationNumber }}
+              예약번호: {{ shortConfirmationNumber(reservation.confirmationNumber) }}
             </p>
           </div>
           <span

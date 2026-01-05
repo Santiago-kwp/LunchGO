@@ -62,6 +62,7 @@ public class BusinessReservationQueryService {
 
         return BusinessReservationDetailResponse.builder()
                 .id(reservation.getReservationId())
+                .reservationCode(reservation.getReservationCode())
                 .name(user.getName())
                 .phone(user.getPhone())
                 .date(slot.getSlotDate().toString())
@@ -82,7 +83,7 @@ public class BusinessReservationQueryService {
             case "TEMPORARY" -> "pending";
             case "CONFIRMED", "PREPAID_CONFIRMED" -> "confirmed";
             case "CANCELLED" -> "cancelled";
-            case "EXPIRED", "NOSHOW" -> "refunded";
+            case "EXPIRED", "NO_SHOW" -> "refunded";
             default -> "pending";
         };
     }
