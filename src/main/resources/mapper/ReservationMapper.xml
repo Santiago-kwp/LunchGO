@@ -49,9 +49,9 @@
             parameterType="com.example.LunchGo.reservation.domain.Reservation"
             useGeneratedKeys="true" keyProperty="reservationId">
         INSERT INTO reservations
-        (reservation_code, slot_id, user_id, party_size, reservation_type, status, request_message, hold_expires_at, payment_deadline_at, currency)
+        (reservation_code, slot_id, user_id, party_size, reservation_type, status, request_message, hold_expires_at, payment_deadline_at, deposit_amount, prepay_amount, total_amount, currency)
         VALUES
-            (#{reservationCode}, #{slotId}, #{userId}, #{partySize}, #{reservationType}, #{status}, #{requestMessage}, #{holdExpiresAt}, #{paymentDeadlineAt}, 'KRW')
+            (#{reservationCode}, #{slotId}, #{userId}, #{partySize}, #{reservationType}, #{status}, #{requestMessage}, #{holdExpiresAt}, #{paymentDeadlineAt}, #{depositAmount}, #{prepayAmount}, #{totalAmount}, 'KRW')
     </insert>
 
     <update id="updateReservationCode">
