@@ -9,6 +9,7 @@ import java.util.List;
 @Builder
 public class BusinessReservationDetailResponse {
     private Long id;
+    private String reservationCode;
     private String name;
     private String phone;
     private String date;       // YYYY-MM-DD

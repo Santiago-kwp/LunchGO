@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue';
-import { CheckCircle2, MapPin, Calendar, Clock, Users, Download, Share2 } from 'lucide-vue-next'; // Import Lucide icons for Vue
+import { CheckCircle2, MapPin, Calendar, Clock, Users } from 'lucide-vue-next';
 import { RouterLink, useRoute } from 'vue-router'; // Import Vue RouterLink
 import httpRequest from '@/router/httpRequest';
 import Button from '@/components/ui/Button.vue'; // Import custom Button
@@ -11,6 +11,13 @@ const reservationId = route.query.reservationId || null;
 const isLoading = ref(false);
 const errorMessage = ref('');
 const completionAttempted = ref(false);
+
+const shortConfirmationNumber = (value) => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  const last = raw.split('-').pop() || raw;
+  return String(last).slice(-4);
+};
 
 const reservation = ref({
   confirmationNumber: 'LG2024121500123',
@@ -118,54 +125,18 @@ onMounted(async () => {
         <p class="text-sm text-[#6c757d] leading-relaxed">
           예약 정보를 확인하시고
           <br />
-          방문 시 QR 코드를 제시해 주세요
+          방문 전 예약 내역을 확인해 주세요
         </p>
         <p v-if="isLoading" class="mt-3 text-xs text-[#6c757d]">예약 정보를 불러오는 중...</p>
         <p v-if="errorMessage" class="mt-3 text-xs text-red-500">{{ errorMessage }}</p>
       </div>
 
-      <!-- QR Code Section -->
-      <div class="bg-white px-4 py-6 border-b border-[#e9ecef]">
-        <div class="text-center">
-          <div class="w-48 h-48 mx-auto bg-white border-4 border-[#e9ecef] rounded-2xl flex items-center justify-center shadow-card mb-4">
-            <div class="w-40 h-40 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center">
-              <div class="grid grid-cols-8 gap-1 p-2">
-                <div
-                  v-for="(_, i) in Array.from({ length: 64 })"
-                  :key="i"
-                  :class="`w-2 h-2 ${Math.random() > 0.5 ? 'bg-[#1e3a5f]' : 'bg-white'} rounded-sm`"
-                />
-              </div>
-            </div>
-          </div>
-          <p class="text-xs text-[#6c757d] mb-4 leading-relaxed">방문 시 이 QR 코드를 제시해 주세요</p>
-
-          <div class="flex gap-2 justify-center">
-            <Button
-              variant="outline"
-              size="sm"
-              class="h-9 px-4 text-sm border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] rounded-lg"
-            >
-              <Download class="w-4 h-4 mr-1.5" />
-              저장
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              class="h-9 px-4 text-sm border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] rounded-lg"
-            >
-              <Share2 class="w-4 h-4 mr-1.5" />
-              공유
-            </Button>
-          </div>
-        </div>
-      </div>
-
       <!-- Confirmation Number -->
       <div class="bg-white px-4 py-5 border-b border-[#e9ecef]">
         <div class="text-center">
-          <p class="text-xs text-[#6c757d] mb-1">예약 번호</p>
-          <p class="text-lg font-bold text-[#1e3a5f] tracking-wide">{{ reservation.confirmationNumber }}</p>
+          <p class="text-lg font-bold text-[#1e3a5f] tracking-wide">
+            예약 번호 : {{ shortConfirmationNumber(reservation.confirmationNumber) }}
+          </p>
         </div>
       </div>
 
