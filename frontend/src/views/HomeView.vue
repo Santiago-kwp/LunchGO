@@ -205,6 +205,12 @@ const getRestaurantReviewCount = (restaurant) => {
   const summary = reviewSummaryCache.value[String(restaurant.id)];
   return summary?.reviews ?? restaurant.reviews ?? 0;
 };
+const getSortRating = (restaurant) => restaurant?.rating ?? 0;
+const getSortReviewCount = (restaurant) => restaurant?.reviews ?? 0;
+const getSortId = (restaurant) => {
+  const value = Number(restaurant?.id);
+  return Number.isFinite(value) ? value : 0;
+};
 const processedRestaurants = computed(() => {
   let result = baseRestaurants.value.slice();
 
@@ -233,25 +239,39 @@ const processedRestaurants = computed(() => {
 
   const sorters = {
     추천순: (a, b) => {
-      const ratingDiff = getRestaurantRating(b) - getRestaurantRating(a);
+      const ratingDiff = getSortRating(b) - getSortRating(a);
       if (ratingDiff !== 0) return ratingDiff;
-      return getRestaurantReviewCount(b) - getRestaurantReviewCount(a);
+      const reviewDiff = getSortReviewCount(b) - getSortReviewCount(a);
+      if (reviewDiff !== 0) return reviewDiff;
+      return getSortId(a) - getSortId(b);
     },
-    거리순: (a, b) => getDistance(a) - getDistance(b),
-    평점순: (a, b) => getRestaurantRating(b) - getRestaurantRating(a),
+    거리순: (a, b) => {
+      const distanceDiff = getDistance(a) - getDistance(b);
+      if (distanceDiff !== 0) return distanceDiff;
+      return getSortId(a) - getSortId(b);
+    },
+    평점순: (a, b) => {
+      const ratingDiff = getSortRating(b) - getSortRating(a);
+      if (ratingDiff !== 0) return ratingDiff;
+      return getSortId(a) - getSortId(b);
+    },
     가격순: (a, b) => {
       const priceA =
         resolveRestaurantPriceValue(a) ?? Number.POSITIVE_INFINITY;
       const priceB =
         resolveRestaurantPriceValue(b) ?? Number.POSITIVE_INFINITY;
-      return priceA - priceB;
+      const priceDiff = priceA - priceB;
+      if (priceDiff !== 0) return priceDiff;
+      return getSortId(a) - getSortId(b);
     },
     "낮은 가격순": (a, b) => {
       const priceA =
         resolveRestaurantPriceValue(a) ?? Number.POSITIVE_INFINITY;
       const priceB =
         resolveRestaurantPriceValue(b) ?? Number.POSITIVE_INFINITY;
-      return priceA - priceB;
+      const priceDiff = priceA - priceB;
+      if (priceDiff !== 0) return priceDiff;
+      return getSortId(a) - getSortId(b);
     },
   };
 

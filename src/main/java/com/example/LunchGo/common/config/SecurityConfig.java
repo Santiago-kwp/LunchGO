@@ -101,6 +101,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/owners/restaurants/*/reviews/*/comments/*").hasAuthority("ROLE_OWNER")
                         .requestMatchers(HttpMethod.POST, "/api/owners/restaurants/*/reviews/*/blind-requests").hasAuthority("ROLE_OWNER")
                         .requestMatchers(HttpMethod.GET, "/api/business/restaurants/*").hasAuthority("ROLE_OWNER")
+                        .requestMatchers(HttpMethod.GET, "/api/business/restaurants/*/images").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/admin/reviews").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/admin/forbidden-words").hasAuthority("ROLE_ADMIN")
