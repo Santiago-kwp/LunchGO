@@ -11,54 +11,60 @@ const instance = axios.create({
 
 // response interceptor
 instance.interceptors.response.use(
-  (res) => res,
+    (res) => res,
   async (err) => {
     const accountStore = useAccountStore();
+    const accessToken =
+      accountStore.accessToken || localStorage.getItem('accessToken');
 
-    if (err.response?.status === 401) {
-      const config = err.config || {};
+        if (err.response?.status === 401) {
+            const config = err.config || {};
 
-      const isAuthBypass =
-        config.skipAuth ||
-        config.url?.includes('/api/login') ||
-        config.url?.includes('/api/refresh');
+            const isAuthBypass =
+                config.skipAuth ||
+                config.url?.includes('/api/login') ||
+                config.url?.includes('/api/refresh');
 
       if (isAuthBypass) return Promise.reject(err);
 
-      if (config._retry) return Promise.reject(err);
-      config._retry = true;
-
-      try {
-        const refreshRes = await axios.post('/api/refresh', null, {
-          withCredentials: true,
-        });
-
-        const accessToken = refreshRes.data?.accessToken ?? refreshRes.data;
-        if (!accessToken || typeof accessToken !== 'string') {
-          throw new Error('invalid refresh token response');
-        }
-
-        accountStore.setAccessToken(accessToken);
-        localStorage.setItem('accessToken', accessToken);
-
-        config.headers = config.headers || {};
-        config.headers.Authorization = `Bearer ${accessToken}`;
-
-        return instance(config);
-      } catch (refreshError) {
-        const status = refreshError?.response?.status;
-        if (status === 401 || status === 403) {
-          accountStore.clearAccount?.();
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('member');
-          window.location.replace('/login');
-        }
-        return Promise.reject(refreshError);
+      if (!accessToken) {
+        return Promise.reject(err);
       }
-    }
 
-    return Promise.reject(err);
-  }
+            if (config._retry) return Promise.reject(err);
+            config._retry = true;
+
+            try {
+                const refreshRes = await axios.post('/api/refresh', null, {
+                    withCredentials: true,
+                });
+
+                const accessToken = refreshRes.data?.accessToken ?? refreshRes.data;
+                if (!accessToken || typeof accessToken !== 'string') {
+                    throw new Error('invalid refresh token response');
+                }
+
+                accountStore.setAccessToken(accessToken);
+                localStorage.setItem('accessToken', accessToken);
+
+                config.headers = config.headers || {};
+                config.headers.Authorization = `Bearer ${accessToken}`;
+
+                return instance(config);
+            } catch (refreshError) {
+                const status = refreshError?.response?.status;
+                if (status === 401 || status === 403) {
+                    accountStore.clearAccount?.();
+                    localStorage.removeItem('accessToken');
+                    localStorage.removeItem('member');
+                    window.location.replace('/login');
+                }
+                return Promise.reject(refreshError);
+            }
+        }
+
+        return Promise.reject(err);
+    }
 );
 
 const generateConfig = (options = {}) => {

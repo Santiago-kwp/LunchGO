@@ -41,7 +41,7 @@ import httpRequest from "@/router/httpRequest.js";
 
 const accountStore = useAccountStore();
 const isLoggedIn = computed(() =>
-  Boolean(accountStore.accessToken || localStorage.getItem("accessToken"))
+    Boolean(accountStore.accessToken || localStorage.getItem("accessToken"))
 );
 const DEFAULT_USER_ID = 2;
 
@@ -86,8 +86,8 @@ const filterBudgetStep = 10000;
 const filterBudgetPercent = computed(() => {
   if (filterBudgetMax <= filterBudgetMin) return 0;
   const clamped = Math.min(
-    Math.max(filterBudget.value, filterBudgetMin),
-    filterBudgetMax
+      Math.max(filterBudget.value, filterBudgetMin),
+      filterBudgetMax
   );
   return ((clamped - filterBudgetMin) / (filterBudgetMax - filterBudgetMin)) * 100;
 });
@@ -159,7 +159,7 @@ const {
   clearTrendingRestaurants,
 } = useTrendingRestaurants();
 const { budgetRecommendations, fetchBudgetRecommendations, clearBudgetRecommendations } =
-  useBudgetRecommendation();
+    useBudgetRecommendation();
 const {
   isTagMappingLoading,
   tagMappingRecommendations,
@@ -189,7 +189,7 @@ const TAG_MESSAGE_SPECIALITY = "\uD2B9\uC774\uC0AC\uD56D \uD0DC\uADF8\uB97C \uBA
 const TAG_MESSAGE_LOADING = "\uCD94\uCC9C \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4";
 const TAG_MESSAGE_ERROR = "\uCD94\uCC9C \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4";
 
-  "\uD2B9\uC774\uC0AC\uD56D \uD0DC\uADF8\uB97C \uBA3C\uC800 \uCD94\uAC00\uD574\uC8FC\uC138\uC694";
+"\uD2B9\uC774\uC0AC\uD56D \uD0DC\uADF8\uB97C \uBA3C\uC800 \uCD94\uAC00\uD574\uC8FC\uC138\uC694";
 
 const restaurants = restaurantData;
 const baseRestaurants = computed(() => {
@@ -224,7 +224,7 @@ const restaurantsPerPage = 10;
 const currentPage = ref(1);
 const isTrendingSort = computed(() => selectedRecommendation.value === RECOMMEND_TRENDING);
 const restaurantIndexById = new Map(
-  restaurants.map((restaurant) => [String(restaurant.id), restaurant])
+    restaurants.map((restaurant) => [String(restaurant.id), restaurant])
 );
 const restaurantImageCache = new Map();
 const restaurantImageOverrides = ref({});
@@ -248,12 +248,21 @@ const getSortId = (restaurant) => {
 };
 const processedRestaurants = computed(() => {
   let result = (selectedRecommendation.value === RECOMMEND_TASTE
+    ? tagMappingRecommendations.value
+    : baseRestaurants.value).slice();
+  const normalizedQuery = searchQuery.value.trim().toLowerCase();
+  if (normalizedQuery) {
+    result = result.filter((restaurant) =>
+      String(restaurant.name || "").toLowerCase().includes(normalizedQuery)
+    );
+  }
       ? tagMappingRecommendations.value
       : baseRestaurants.value).slice();
 
   const normalizedQuery = searchQuery.value.trim().toLowerCase();
   if (normalizedQuery) {
     result = result.filter((restaurant) =>
+        isWithinDistance(restaurant.coords, distanceLimit)
         String(restaurant.name || "").toLowerCase().includes(normalizedQuery)
     );
   }
@@ -272,7 +281,7 @@ const processedRestaurants = computed(() => {
 
   const center = defaultMapCenter;
   const getDistance = (restaurant) =>
-    haversineDistance(restaurant.coords, center);
+      haversineDistance(restaurant.coords, center);
 
   const sorters = {
     추천순: (a, b) => {
@@ -294,18 +303,18 @@ const processedRestaurants = computed(() => {
     },
     가격순: (a, b) => {
       const priceA =
-        resolveRestaurantPriceValue(a) ?? Number.POSITIVE_INFINITY;
+          resolveRestaurantPriceValue(a) ?? Number.POSITIVE_INFINITY;
       const priceB =
-        resolveRestaurantPriceValue(b) ?? Number.POSITIVE_INFINITY;
+          resolveRestaurantPriceValue(b) ?? Number.POSITIVE_INFINITY;
       const priceDiff = priceA - priceB;
       if (priceDiff !== 0) return priceDiff;
       return getSortId(a) - getSortId(b);
     },
     "낮은 가격순": (a, b) => {
       const priceA =
-        resolveRestaurantPriceValue(a) ?? Number.POSITIVE_INFINITY;
+          resolveRestaurantPriceValue(a) ?? Number.POSITIVE_INFINITY;
       const priceB =
-        resolveRestaurantPriceValue(b) ?? Number.POSITIVE_INFINITY;
+          resolveRestaurantPriceValue(b) ?? Number.POSITIVE_INFINITY;
       const priceDiff = priceA - priceB;
       if (priceDiff !== 0) return priceDiff;
       return getSortId(a) - getSortId(b);
@@ -327,11 +336,11 @@ const trendingCards = computed(() => {
   return trendingRestaurants.value.map((restaurant) => {
     const fallback = restaurantIndexById.get(String(restaurant.restaurantId));
     const addressParts = [restaurant.roadAddress, restaurant.detailAddress]
-      .filter(Boolean)
-      .join(" ");
+        .filter(Boolean)
+        .join(" ");
     const apiTags = Array.isArray(restaurant.tags)
-      ? restaurant.tags.map((tag) => ({ name: tag.content }))
-      : [];
+        ? restaurant.tags.map((tag) => ({ name: tag.content }))
+        : [];
     return {
       id: String(restaurant.restaurantId),
       name: restaurant.name || fallback?.name || "",
@@ -346,40 +355,40 @@ const trendingCards = computed(() => {
   });
 });
 const trendingRestaurantIdSet = computed(
-  () =>
-    new Set(
-      trendingRestaurants.value.map((restaurant) =>
-        String(restaurant.restaurantId)
-      )
-    )
+    () =>
+        new Set(
+            trendingRestaurants.value.map((restaurant) =>
+                String(restaurant.restaurantId)
+            )
+        )
 );
 const availableRestaurants = computed(() => {
   if (!isTrendingSort.value) {
     return processedRestaurants.value;
   }
   return processedRestaurants.value.filter(
-    (restaurant) => !trendingRestaurantIdSet.value.has(String(restaurant.id))
+      (restaurant) => !trendingRestaurantIdSet.value.has(String(restaurant.id))
   );
 });
 const displayRestaurants = computed(() => availableRestaurants.value);
 const totalPages = computed(() =>
-  Math.max(1, Math.ceil(displayRestaurants.value.length / restaurantsPerPage))
+    Math.max(1, Math.ceil(displayRestaurants.value.length / restaurantsPerPage))
 );
 const paginatedRestaurantsRaw = computed(() => {
   const start = (currentPage.value - 1) * restaurantsPerPage;
   return displayRestaurants.value.slice(start, start + restaurantsPerPage);
 });
 const paginatedRestaurants = computed(() =>
-  paginatedRestaurantsRaw.value.map((restaurant) =>
-    applyReviewSummary(restaurant)
-  )
+    paginatedRestaurantsRaw.value.map((restaurant) =>
+        applyReviewSummary(restaurant)
+    )
 );
 const pageGroupSize = 5;
 const currentPageGroupStart = computed(
-  () => Math.floor((currentPage.value - 1) / pageGroupSize) * pageGroupSize + 1
+    () => Math.floor((currentPage.value - 1) / pageGroupSize) * pageGroupSize + 1
 );
 const currentPageGroupEnd = computed(() =>
-  Math.min(totalPages.value, currentPageGroupStart.value + pageGroupSize - 1)
+    Math.min(totalPages.value, currentPageGroupStart.value + pageGroupSize - 1)
 );
 const pageNumbers = computed(() => {
   const length = currentPageGroupEnd.value - currentPageGroupStart.value + 1;
@@ -408,20 +417,20 @@ const mapDistanceSteps = Object.freeze([
   { label: "3km", level: 7 },
 ]);
 const defaultMapDistanceIndex = mapDistanceSteps.findIndex(
-  (step) => step.label === "500m"
+    (step) => step.label === "500m"
 );
 const mapDistanceStepIndex = ref(
-  defaultMapDistanceIndex === -1 ? 0 : defaultMapDistanceIndex
+    defaultMapDistanceIndex === -1 ? 0 : defaultMapDistanceIndex
 );
 const currentDistanceLabel = computed(
-  () => mapDistanceSteps[mapDistanceStepIndex.value].label
+    () => mapDistanceSteps[mapDistanceStepIndex.value].label
 );
 const distanceSliderFill = computed(() => {
   if (mapDistanceSteps.length <= 1) return 0;
   return (
-    ((mapDistanceSteps.length - 1 - mapDistanceStepIndex.value) /
-      (mapDistanceSteps.length - 1)) *
-    100
+      ((mapDistanceSteps.length - 1 - mapDistanceStepIndex.value) /
+          (mapDistanceSteps.length - 1)) *
+      100
   );
 });
 
@@ -486,8 +495,8 @@ const formatDateValue = (date) => {
 const toggleCalendar = () => {
   if (!isCalendarOpen.value) {
     calendarMonth.value = searchDate.value
-      ? new Date(searchDate.value)
-      : new Date();
+        ? new Date(searchDate.value)
+        : new Date();
   }
   isCalendarOpen.value = !isCalendarOpen.value;
 };
@@ -496,9 +505,9 @@ const selectCalendarDay = (day) => {
   if (!day) return;
 
   const selected = new Date(
-    calendarMonth.value.getFullYear(),
-    calendarMonth.value.getMonth(),
-    day
+      calendarMonth.value.getFullYear(),
+      calendarMonth.value.getMonth(),
+      day
   );
   searchDate.value = formatDateValue(selected);
   isCalendarOpen.value = false;
@@ -506,17 +515,17 @@ const selectCalendarDay = (day) => {
 
 const previousCalendarMonth = () => {
   calendarMonth.value = new Date(
-    calendarMonth.value.getFullYear(),
-    calendarMonth.value.getMonth() - 1,
-    1
+      calendarMonth.value.getFullYear(),
+      calendarMonth.value.getMonth() - 1,
+      1
   );
 };
 
 const nextCalendarMonth = () => {
   calendarMonth.value = new Date(
-    calendarMonth.value.getFullYear(),
-    calendarMonth.value.getMonth() + 1,
-    1
+      calendarMonth.value.getFullYear(),
+      calendarMonth.value.getMonth() + 1,
+      1
   );
 };
 
@@ -524,9 +533,9 @@ const isCalendarSelectedDay = (day) => {
   if (!day || !searchDate.value) return false;
   const selectedDate = new Date(searchDate.value);
   return (
-    selectedDate.getFullYear() === calendarMonth.value.getFullYear() &&
-    selectedDate.getMonth() === calendarMonth.value.getMonth() &&
-    selectedDate.getDate() === day
+      selectedDate.getFullYear() === calendarMonth.value.getFullYear() &&
+      selectedDate.getMonth() === calendarMonth.value.getMonth() &&
+      selectedDate.getDate() === day
   );
 };
 
@@ -549,14 +558,14 @@ watch(selectedSort, () => {
 });
 
 watch(
-  [selectedSort, availableRestaurants],
-  ([sortValue, list]) => {
-    if (sortValue !== "평점순") return;
-    list.forEach((restaurant) => {
-      fetchReviewSummary(restaurant.id);
-    });
-  },
-  { immediate: true }
+    [selectedSort, availableRestaurants],
+    ([sortValue, list]) => {
+      if (sortValue !== "평점순") return;
+      list.forEach((restaurant) => {
+        fetchReviewSummary(restaurant.id);
+      });
+    },
+    { immediate: true }
 );
 
 watch(selectedPriceRange, () => {
@@ -610,7 +619,7 @@ const updateSelectedMapRestaurant = (restaurant) => {
   selectedMapRestaurant.value = {
     ...restaurant,
     image:
-      restaurantImageOverrides.value[String(restaurant.id)] ?? restaurant.image,
+        restaurantImageOverrides.value[String(restaurant.id)] ?? restaurant.image,
     rating: summary?.rating ?? restaurant.rating,
     reviews: summary?.reviews ?? restaurant.reviews,
   };
@@ -627,13 +636,13 @@ const ensureReviewSummary = async (restaurant) => {
 };
 
 watch(
-  paginatedRestaurantsRaw,
-  (restaurants) => {
-    restaurants.forEach((restaurant) => {
-      fetchReviewSummary(restaurant.id);
-    });
-  },
-  { immediate: true }
+    paginatedRestaurantsRaw,
+    (restaurants) => {
+      restaurants.forEach((restaurant) => {
+        fetchReviewSummary(restaurant.id);
+      });
+    },
+    { immediate: true }
 );
 
 const resolveRestaurantCoords = async (restaurant) => {
@@ -749,15 +758,15 @@ const renderMapMarkers = async (kakaoMaps) => {
   mapMarkers.length = 0;
 
   const markerSvg =
-    "data:image/svg+xml;utf8," +
-    "<svg xmlns='http://www.w3.org/2000/svg' width='32' height='46' viewBox='0 0 32 46'>" +
-    "<path d='M16 1C8.8 1 3 6.8 3 14c0 9.3 13 30 13 30s13-20.7 13-30C29 6.8 23.2 1 16 1z' fill='%23ff6b4a' stroke='white' stroke-width='2'/>" +
-    "<circle cx='16' cy='14' r='5' fill='white'/>" +
-    "</svg>";
+      "data:image/svg+xml;utf8," +
+      "<svg xmlns='http://www.w3.org/2000/svg' width='32' height='46' viewBox='0 0 32 46'>" +
+      "<path d='M16 1C8.8 1 3 6.8 3 14c0 9.3 13 30 13 30s13-20.7 13-30C29 6.8 23.2 1 16 1z' fill='%23ff6b4a' stroke='white' stroke-width='2'/>" +
+      "<circle cx='16' cy='14' r='5' fill='white'/>" +
+      "</svg>";
   const markerImage = new kakaoMaps.MarkerImage(
-    markerSvg,
-    new kakaoMaps.Size(32, 46),
-    { offset: new kakaoMaps.Point(16, 46) }
+      markerSvg,
+      new kakaoMaps.Size(32, 46),
+      { offset: new kakaoMaps.Point(16, 46) }
   );
 
   const distanceLimit = selectedDistanceKm.value;
@@ -794,7 +803,7 @@ const fetchRestaurantImage = async (restaurantId) => {
   restaurantImageCache.set(key, null);
   try {
     const response = await axios.get(
-      `/api/business/restaurants/${restaurantId}/images`
+        `/api/business/restaurants/${restaurantId}/images`
     );
     const imageUrl = response.data?.[0]?.imageUrl;
     if (imageUrl) {
@@ -840,7 +849,7 @@ const scheduleMapZoom = (force = false) => {
       return;
     }
     const targetLevel =
-      pendingMapZoomLevel ?? levelForDistance(mapDistanceStepIndex.value);
+        pendingMapZoomLevel ?? levelForDistance(mapDistanceStepIndex.value);
     const attemptZoom = () => {
       if (!mapInstance.value) return;
       try {
@@ -876,8 +885,8 @@ const applyHomeMapZoom = (force = false) => {
 
 const changeMapDistance = (delta) => {
   const next = Math.min(
-    mapDistanceSteps.length - 1,
-    Math.max(0, mapDistanceStepIndex.value + delta)
+      mapDistanceSteps.length - 1,
+      Math.max(0, mapDistanceStepIndex.value + delta)
   );
   mapDistanceStepIndex.value = next;
 };
@@ -888,12 +897,12 @@ const resetMapToHome = () => {
   if (!kakaoMaps?.LatLng) return;
 
   const targetCenter = new kakaoMaps.LatLng(
-    defaultMapCenter.lat,
-    defaultMapCenter.lng
+      defaultMapCenter.lat,
+      defaultMapCenter.lng
   );
   mapInstance.value.panTo(targetCenter);
   mapDistanceStepIndex.value =
-    defaultMapDistanceIndex === -1 ? 0 : defaultMapDistanceIndex;
+      defaultMapDistanceIndex === -1 ? 0 : defaultMapDistanceIndex;
   applyHomeMapZoom();
 };
 
@@ -903,8 +912,8 @@ const initializeMap = async () => {
     const kakaoMaps = await loadKakaoMaps();
     kakaoMapsApi.value = kakaoMaps;
     const center = new kakaoMaps.LatLng(
-      defaultMapCenter.lat,
-      defaultMapCenter.lng
+        defaultMapCenter.lat,
+        defaultMapCenter.lng
     );
     mapInstance.value = new kakaoMaps.Map(mapContainer.value, {
       center,
@@ -943,9 +952,9 @@ onMounted(() => {
       const parsed = JSON.parse(storedHomeState);
       selectedSort.value = parsed.selectedSort ?? selectedSort.value;
       selectedPriceRange.value =
-        parsed.selectedPriceRange ?? selectedPriceRange.value;
+          parsed.selectedPriceRange ?? selectedPriceRange.value;
       selectedRecommendation.value =
-        parsed.selectedRecommendation ?? selectedRecommendation.value;
+          parsed.selectedRecommendation ?? selectedRecommendation.value;
       currentPage.value = parsed.currentPage ?? currentPage.value;
       if (selectedRecommendation.value === RECOMMEND_BUDGET) {
         selectedRecommendation.value = null;
@@ -1032,8 +1041,8 @@ const resolveRestaurantPriceValue = (restaurant) => {
   const directPrice = extractPriceValue(restaurant?.price ?? "");
   if (directPrice != null) return directPrice;
   const menuPrices = (restaurant?.menus || [])
-    .map((menu) => extractPriceValue(menu?.price ?? ""))
-    .filter((value) => Number.isFinite(value));
+      .map((menu) => extractPriceValue(menu?.price ?? ""))
+      .filter((value) => Number.isFinite(value));
   if (!menuPrices.length) return null;
   const total = menuPrices.reduce((sum, value) => sum + value, 0);
   return Math.round(total / menuPrices.length);
@@ -1051,14 +1060,14 @@ const haversineDistance = (coordsA = {}, coordsB = {}) => {
   const lat2 = toRad(coordsB.lat);
 
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2);
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return earthRadius * c;
 };
 
 const isValidCoords = (coords) =>
-  Number.isFinite(coords?.lat) && Number.isFinite(coords?.lng);
+    Number.isFinite(coords?.lat) && Number.isFinite(coords?.lng);
 
 const isWithinDistance = (coords, limitKm) => {
   if (!limitKm) return true;
@@ -1087,7 +1096,7 @@ watch(selectedDistanceKm, (distanceLimit) => {
   if (distanceLimit) {
     const label = `${distanceLimit}km`;
     const stepIndex = mapDistanceSteps.findIndex(
-      (step) => step.label === label
+        (step) => step.label === label
     );
     if (stepIndex !== -1) {
       mapDistanceStepIndex.value = stepIndex;
@@ -1184,7 +1193,7 @@ const toggleRecommendationOption = (option) => {
   }
 
   filterForm.recommendation =
-    filterForm.recommendation === option ? null : option;
+      filterForm.recommendation === option ? null : option;
 };
 
 const handleCafeteriaMenuEdit = () => {
@@ -1202,8 +1211,8 @@ const handleCafeteriaRecommendNow = async () => {
 
 const handleCafeteriaConfirmAndClose = async (days) => {
   const saved = await handleCafeteriaConfirm(
-    days,
-    resolveCafeteriaBaseDate()
+      days,
+      resolveCafeteriaBaseDate()
   );
   if (saved) {
     isFilterOpen.value = false;
@@ -1274,9 +1283,9 @@ onMounted(() => {
       const parsed = JSON.parse(storedHomeState);
       selectedSort.value = parsed.selectedSort ?? selectedSort.value;
       selectedPriceRange.value =
-        parsed.selectedPriceRange ?? selectedPriceRange.value;
+          parsed.selectedPriceRange ?? selectedPriceRange.value;
       selectedRecommendation.value =
-        parsed.selectedRecommendation ?? selectedRecommendation.value;
+          parsed.selectedRecommendation ?? selectedRecommendation.value;
       currentPage.value = parsed.currentPage ?? currentPage.value;
       if (selectedRecommendation.value === "예산 맞춤") {
         selectedRecommendation.value = null;
@@ -1304,14 +1313,14 @@ watch(isTrendingSort, (isActive) => {
 
 const persistHomeListState = () => {
   sessionStorage.setItem(
-    homeListStateStorageKey,
-    JSON.stringify({
-      selectedSort: selectedSort.value,
-      selectedPriceRange: selectedPriceRange.value,
-      selectedRecommendation: selectedRecommendation.value,
-      currentPage: currentPage.value,
-      scrollY: window.scrollY,
-    })
+      homeListStateStorageKey,
+      JSON.stringify({
+        selectedSort: selectedSort.value,
+        selectedPriceRange: selectedPriceRange.value,
+        selectedRecommendation: selectedRecommendation.value,
+        currentPage: currentPage.value,
+        scrollY: window.scrollY,
+      })
   );
 };
 
@@ -1324,11 +1333,11 @@ watch(currentPage, () => {
 });
 
 watch(
-  paginatedRestaurants,
-  (list) => {
-    list.forEach((restaurant) => fetchRestaurantImage(restaurant.id));
-  },
-  { immediate: true }
+    paginatedRestaurants,
+    (list) => {
+      list.forEach((restaurant) => fetchRestaurantImage(restaurant.id));
+    },
+    { immediate: true }
 );
 
 onBeforeUnmount(() => {
@@ -1340,8 +1349,8 @@ onBeforeUnmount(() => {
   <div class="min-h-screen bg-[#f8f9fa]">
     <AppHeader v-model:searchQuery="searchQuery" />
     <div
-      v-if="isGeocodeExportMode"
-      class="bg-white border-b border-[#e9ecef]"
+        v-if="isGeocodeExportMode"
+        class="bg-white border-b border-[#e9ecef]"
     >
       <div class="max-w-[500px] mx-auto px-4 py-3 text-xs text-[#495057]">
         <p class="font-semibold text-[#1e3a5f]">주소 좌표 생성 모드</p>
@@ -1372,39 +1381,39 @@ onBeforeUnmount(() => {
       <div class="relative h-64">
         <div ref="mapContainer" class="w-full h-full" />
         <div
-          class="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/20 via-transparent to-transparent"
+            class="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/20 via-transparent to-transparent"
         />
         <div
-          class="absolute top-4 right-4 z-10 pointer-events-auto flex flex-col items-center gap-2"
+            class="absolute top-4 right-4 z-10 pointer-events-auto flex flex-col items-center gap-2"
         >
           <button
-            @click="changeMapDistance(-1)"
-            class="w-8 h-8 rounded-sm bg-white shadow-card flex items-center justify-center text-[#1e3a5f] hover:bg-[#f8f9fa]"
+              @click="changeMapDistance(-1)"
+              class="w-8 h-8 rounded-sm bg-white shadow-card flex items-center justify-center text-[#1e3a5f] hover:bg-[#f8f9fa]"
           >
             <Plus class="w-4 h-4" />
           </button>
           <div
-            class="h-20 w-[6px] bg-white/80 rounded relative shadow-card overflow-hidden"
+              class="h-20 w-[6px] bg-white/80 rounded relative shadow-card overflow-hidden"
           >
             <div
-              class="absolute top-0 left-0 right-0 bg-[#ff6b4a] transition-all"
-              :style="{ height: `${distanceSliderFill}%` }"
+                class="absolute top-0 left-0 right-0 bg-[#ff6b4a] transition-all"
+                :style="{ height: `${distanceSliderFill}%` }"
             ></div>
           </div>
           <button
-            @click="changeMapDistance(1)"
-            class="w-8 h-8 rounded-sm bg-white shadow-card flex items-center justify-center text-[#1e3a5f] hover:bg-[#f8f9fa]"
+              @click="changeMapDistance(1)"
+              class="w-8 h-8 rounded-sm bg-white shadow-card flex items-center justify-center text-[#1e3a5f] hover:bg-[#f8f9fa]"
           >
             <Minus class="w-4 h-4" />
           </button>
           <div
-            class="mt-2 px-3 py-1 rounded-full bg-white text-xs font-semibold text-[#1e3a5f] shadow-card"
+              class="mt-2 px-3 py-1 rounded-full bg-white text-xs font-semibold text-[#1e3a5f] shadow-card"
           >
             반경 {{ currentDistanceLabel }}
           </div>
         </div>
         <div
-          class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-card flex items-center gap-2 text-sm text-[#1e3a5f]"
+            class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-card flex items-center gap-2 text-sm text-[#1e3a5f]"
         >
           <MapPin class="w-4 h-4 text-[#ff6b4a]" />
           <span>{{ currentLocation }} · {{ currentDistanceLabel }} 반경</span>
@@ -1414,37 +1423,37 @@ onBeforeUnmount(() => {
       <div class="px-4 py-5">
         <div v-if="isLoggedIn">
           <CafeteriaRecommendationSection
-            :recommendations="cafeteriaRecommendations"
-            :favoriteRestaurantIds="favoriteRestaurantIds"
-            :onToggleFavorite="toggleRestaurantFavorite"
-            :onOpenSearch="() => (isSearchOpen = true)"
-            :onClearRecommendations="clearCafeteriaRecommendations"
-            :isModalOpen="isCafeteriaModalOpen"
-            :isProcessing="isCafeteriaOcrLoading"
-            :ocrResult="cafeteriaOcrResult"
-            :days="cafeteriaDaysDraft"
-            :errorMessage="cafeteriaOcrError"
-            :initialImageUrl="cafeteriaImageUrl"
-            :onModalClose="() => (isCafeteriaModalOpen = false)"
-            :onFileChange="handleCafeteriaFileChange"
-            :onRunOcr="() => handleCafeteriaOcr(resolveCafeteriaBaseDate())"
-            :onConfirm="handleCafeteriaConfirmAndClose"
+              :recommendations="cafeteriaRecommendations"
+              :favoriteRestaurantIds="favoriteRestaurantIds"
+              :onToggleFavorite="toggleRestaurantFavorite"
+              :onOpenSearch="() => (isSearchOpen = true)"
+              :onClearRecommendations="clearCafeteriaRecommendations"
+              :isModalOpen="isCafeteriaModalOpen"
+              :isProcessing="isCafeteriaOcrLoading"
+              :ocrResult="cafeteriaOcrResult"
+              :days="cafeteriaDaysDraft"
+              :errorMessage="cafeteriaOcrError"
+              :initialImageUrl="cafeteriaImageUrl"
+              :onModalClose="() => (isCafeteriaModalOpen = false)"
+              :onFileChange="handleCafeteriaFileChange"
+              :onRunOcr="() => handleCafeteriaOcr(resolveCafeteriaBaseDate())"
+              :onConfirm="handleCafeteriaConfirmAndClose"
           />
         </div>
         <div
-          v-else
-          class="mb-6 rounded-2xl border border-[#e9ecef] bg-white p-4 text-sm text-[#6c757d]"
+            v-else
+            class="mb-6 rounded-2xl border border-[#e9ecef] bg-white p-4 text-sm text-[#6c757d]"
         >
           로그인하면 구내식당 대체 추천을 받을 수 있어요.
         </div>
 
         <div
-          v-if="!cafeteriaRecommendations.length"
-          class="flex items-center gap-2 mb-4"
+            v-if="!cafeteriaRecommendations.length"
+            class="flex items-center gap-2 mb-4"
         >
           <button
-            @click="openFilterModal"
-            class="flex items-center gap-1.5 text-sm text-[#6c757d] hover:text-[#ff6b4a] transition-colors"
+              @click="openFilterModal"
+              class="flex items-center gap-1.5 text-sm text-[#6c757d] hover:text-[#ff6b4a] transition-colors"
           >
             <SlidersHorizontal class="w-4 h-4" />
             <span>필터</span>
@@ -1453,60 +1462,60 @@ onBeforeUnmount(() => {
 
         <div v-if="!cafeteriaRecommendations.length" class="space-y-6">
           <div
-            v-if="tagMappingNotice"
-            class="rounded-2xl border border-[#e9ecef] bg-white px-4 py-3 text-sm text-[#6c757d]"
+              v-if="tagMappingNotice"
+              class="rounded-2xl border border-[#e9ecef] bg-white px-4 py-3 text-sm text-[#6c757d]"
           >
             {{ tagMappingNotice }}
           </div>
 
           <TrendingRecommendationSection
-            :isActive="isTrendingSort"
-            :isLoading="isTrendingLoading"
-            :error="trendingError"
-            :cards="trendingCards"
-            :favoriteRestaurantIds="favoriteRestaurantIds"
-            :onToggleFavorite="toggleRestaurantFavorite"
-            :onClear="clearTrendingRecommendation"
+              :isActive="isTrendingSort"
+              :isLoading="isTrendingLoading"
+              :error="trendingError"
+              :cards="trendingCards"
+              :favoriteRestaurantIds="favoriteRestaurantIds"
+              :onToggleFavorite="toggleRestaurantFavorite"
+              :onClear="clearTrendingRecommendation"
           />
 
           <div
-            v-if="!paginatedRestaurants.length"
-            class="w-full px-4 py-10 text-center text-sm text-[#6c757d]"
+              v-if="!paginatedRestaurants.length"
+              class="w-full px-4 py-10 text-center text-sm text-[#6c757d]"
           >
             해당 검색 결과가 없습니다.
           </div>
           <RestaurantCardList
-            v-else
-            :restaurants="paginatedRestaurants"
-            :favoriteRestaurantIds="favoriteRestaurantIds"
-            :onToggleFavorite="toggleRestaurantFavorite"
+              v-else
+              :restaurants="paginatedRestaurants"
+              :favoriteRestaurantIds="favoriteRestaurantIds"
+              :onToggleFavorite="toggleRestaurantFavorite"
           />
         </div>
 
         <div
-          v-if="!cafeteriaRecommendations.length && totalPages > 1"
-          class="mt-6"
+            v-if="!cafeteriaRecommendations.length && totalPages > 1"
+            class="mt-6"
         >
           <nav
-            class="flex flex-wrap items-center justify-center gap-2 text-sm"
-            aria-label="페이지네이션"
+              class="flex flex-wrap items-center justify-center gap-2 text-sm"
+              aria-label="페이지네이션"
           >
             <button
-              type="button"
-              class="min-w-[56px] h-9 px-4 rounded-2xl border border-[#e9ecef] bg-white text-[#495057] font-medium transition-colors disabled:text-[#c7cdd3] disabled:border-[#f1f3f5] disabled:cursor-not-allowed"
-              :disabled="!canGoPrevious"
-              @click="goToPreviousPage"
+                type="button"
+                class="min-w-[56px] h-9 px-4 rounded-2xl border border-[#e9ecef] bg-white text-[#495057] font-medium transition-colors disabled:text-[#c7cdd3] disabled:border-[#f1f3f5] disabled:cursor-not-allowed"
+                :disabled="!canGoPrevious"
+                @click="goToPreviousPage"
             >
               이전
             </button>
 
             <button
-              v-for="page in pageNumbers"
-              :key="page"
-              type="button"
-              @click="goToPage(page)"
-              :aria-current="page === currentPage ? 'page' : undefined"
-              :class="[
+                v-for="page in pageNumbers"
+                :key="page"
+                type="button"
+                @click="goToPage(page)"
+                :aria-current="page === currentPage ? 'page' : undefined"
+                :class="[
                 'min-w-[36px] h-9 px-3 rounded-2xl border font-medium transition-colors',
                 page === currentPage
                   ? 'bg-gradient-to-r from-[#ff6b4a] via-[#ff805f] to-[#ff987d] text-white border-transparent shadow-button-hover'
@@ -1517,10 +1526,10 @@ onBeforeUnmount(() => {
             </button>
 
             <button
-              type="button"
-              class="min-w-[56px] h-9 px-4 rounded-2xl border border-[#e9ecef] bg-white text-[#495057] font-medium transition-colors disabled:text-[#c7cdd3] disabled:border-[#f1f3f5] disabled:cursor-not-allowed"
-              :disabled="!canGoNext"
-              @click="goToNextPage"
+                type="button"
+                class="min-w-[56px] h-9 px-4 rounded-2xl border border-[#e9ecef] bg-white text-[#495057] font-medium transition-colors disabled:text-[#c7cdd3] disabled:border-[#f1f3f5] disabled:cursor-not-allowed"
+                :disabled="!canGoNext"
+                @click="goToNextPage"
             >
               다음
             </button>
@@ -1529,20 +1538,20 @@ onBeforeUnmount(() => {
       </div>
 
       <div
-        v-if="selectedMapRestaurant"
-        class="fixed bottom-20 left-0 right-0 z-[60] px-4"
+          v-if="selectedMapRestaurant"
+          class="fixed bottom-20 left-0 right-0 z-[60] px-4"
       >
         <div class="max-w-[500px] mx-auto">
           <RouterLink
-            :to="`/restaurant/${selectedMapRestaurant.id}`"
-            class="block bg-white border border-[#e9ecef] shadow-card rounded-2xl p-4"
-            @click="closeMapRestaurantModal"
+              :to="`/restaurant/${selectedMapRestaurant.id}`"
+              class="block bg-white border border-[#e9ecef] shadow-card rounded-2xl p-4"
+              @click="closeMapRestaurantModal"
           >
             <div class="flex gap-3">
               <img
-                :src="selectedMapRestaurant.image || '/placeholder.svg'"
-                :alt="selectedMapRestaurant.name"
-                class="w-20 h-20 rounded-xl object-cover flex-shrink-0"
+                  :src="selectedMapRestaurant.image || '/placeholder.svg'"
+                  :alt="selectedMapRestaurant.name"
+                  class="w-20 h-20 rounded-xl object-cover flex-shrink-0"
               />
               <div class="flex-1 min-w-0">
                 <div class="flex items-start justify-between gap-2 mb-1">
@@ -1555,15 +1564,15 @@ onBeforeUnmount(() => {
                     </p>
                   </div>
                   <button
-                    @click.stop.prevent="closeMapRestaurantModal"
-                    class="text-[#adb5bd] hover:text-[#495057]"
+                      @click.stop.prevent="closeMapRestaurantModal"
+                      class="text-[#adb5bd] hover:text-[#495057]"
                   >
                     <X class="w-4 h-4" />
                   </button>
                 </div>
                 <div class="flex items-center gap-2 text-xs text-[#6c757d]">
                   <span
-                    class="flex items-center gap-1 text-[#1e3a5f] font-semibold"
+                      class="flex items-center gap-1 text-[#1e3a5f] font-semibold"
                   >
                     <Star class="w-3.5 h-3.5 fill-[#ffc107] text-[#ffc107]" />
                     {{ selectedMapRestaurant.rating }}
@@ -1587,19 +1596,19 @@ onBeforeUnmount(() => {
 
     <!-- Filter Modal -->
     <div
-      v-if="isFilterOpen"
-      class="fixed inset-0 z-[100] bg-black/50 flex items-end"
+        v-if="isFilterOpen"
+        class="fixed inset-0 z-[100] bg-black/50 flex items-end"
     >
       <div
-        class="w-full max-w-[500px] mx-auto bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300"
+          class="w-full max-w-[500px] mx-auto bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300"
       >
         <div
-          class="sticky top-0 bg-white border-b border-[#e9ecef] px-4 py-4 flex items-center justify-between"
+            class="sticky top-0 bg-white border-b border-[#e9ecef] px-4 py-4 flex items-center justify-between"
         >
           <h3 class="text-lg font-semibold text-[#1e3a5f]">필터 및 정렬</h3>
           <button
-            @click="closeFilterModal"
-            class="text-[#6c757d] hover:text-[#1e3a5f]"
+              @click="closeFilterModal"
+              class="text-[#6c757d] hover:text-[#1e3a5f]"
           >
             <X class="w-6 h-6" />
           </button>
@@ -1611,10 +1620,10 @@ onBeforeUnmount(() => {
             <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">정렬</h4>
             <div class="flex flex-wrap gap-2">
               <button
-                v-for="option in sortOptions"
-                :key="option"
-                @click="filterForm.sort = option"
-                :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  v-for="option in sortOptions"
+                  :key="option"
+                  @click="filterForm.sort = option"
+                  :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   filterForm.sort === option
                     ? 'gradient-primary text-white'
                     : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
@@ -1632,10 +1641,10 @@ onBeforeUnmount(() => {
             </h4>
             <div class="flex flex-wrap gap-2">
               <button
-                v-for="range in priceRanges"
-                :key="range"
-                @click="toggleFilterPriceRange(range)"
-                :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  v-for="range in priceRanges"
+                  :key="range"
+                  @click="toggleFilterPriceRange(range)"
+                  :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   filterForm.priceRange === range
                     ? 'gradient-primary text-white'
                     : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
@@ -1651,11 +1660,11 @@ onBeforeUnmount(() => {
             <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">추천옵션</h4>
             <div class="flex flex-wrap gap-2">
               <button
-                v-for="option in recommendationOptions"
-                :key="option"
-                type="button"
-                @click="toggleRecommendationOption(option)"
-                :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  v-for="option in recommendationOptions"
+                  :key="option"
+                  type="button"
+                  @click="toggleRecommendationOption(option)"
+                  :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   filterForm.recommendation === option
                     ? 'gradient-primary text-white'
                     : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
@@ -1665,8 +1674,8 @@ onBeforeUnmount(() => {
               </button>
             </div>
             <div
-              v-if="filterForm.recommendation === '예산 맞춤'"
-              class="mt-4 rounded-xl border border-[#e9ecef] bg-[#f8f9fa] p-4 space-y-4"
+                v-if="filterForm.recommendation === '예산 맞춤'"
+                class="mt-4 rounded-xl border border-[#e9ecef] bg-[#f8f9fa] p-4 space-y-4"
             >
               <div class="flex items-center justify-between">
                 <p class="text-sm font-semibold text-[#1e3a5f]">총 예산</p>
@@ -1676,15 +1685,15 @@ onBeforeUnmount(() => {
               </div>
               <div class="space-y-2">
                 <input
-                  type="range"
-                  :min="filterBudgetMin"
-                  :max="filterBudgetMax"
-                  :step="filterBudgetStep"
-                  v-model.number="filterBudget"
-                  :style="{
+                    type="range"
+                    :min="filterBudgetMin"
+                    :max="filterBudgetMax"
+                    :step="filterBudgetStep"
+                    v-model.number="filterBudget"
+                    :style="{
                     background: `linear-gradient(to right, #ff6b4a 0%, #ff6b4a ${filterBudgetPercent}%, #e9ecef ${filterBudgetPercent}%, #e9ecef 100%)`,
                   }"
-                  class="w-full h-2 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#ff6b4a] [&::-webkit-slider-thumb]:cursor-pointer"
+                    class="w-full h-2 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#ff6b4a] [&::-webkit-slider-thumb]:cursor-pointer"
                 />
                 <div class="flex justify-between text-xs text-[#6c757d]">
                   <span>0원</span>
@@ -1697,11 +1706,11 @@ onBeforeUnmount(() => {
                 </label>
                 <div class="flex items-center gap-2">
                   <input
-                    type="number"
-                    min="1"
-                    max="20"
-                    v-model.number="filterPartySize"
-                    class="w-20 px-3 py-2 rounded-lg border border-[#dee2e6] text-sm text-[#1e3a5f] bg-white focus:outline-none focus:ring-2 focus:ring-[#ff6b4a] focus:border-transparent"
+                      type="number"
+                      min="1"
+                      max="20"
+                      v-model.number="filterPartySize"
+                      class="w-20 px-3 py-2 rounded-lg border border-[#dee2e6] text-sm text-[#1e3a5f] bg-white focus:outline-none focus:ring-2 focus:ring-[#ff6b4a] focus:border-transparent"
                   />
                   <span class="text-sm text-[#6c757d]">명</span>
                 </div>
@@ -1711,24 +1720,24 @@ onBeforeUnmount(() => {
               </div>
             </div>
             <div
-              v-if="filterForm.recommendation === '구내식당 대체 추천'"
-              class="mt-3 flex items-center justify-end gap-2"
+                v-if="filterForm.recommendation === '구내식당 대체 추천'"
+                class="mt-3 flex items-center justify-end gap-2"
             >
               <div class="flex items-center gap-2">
                 <button
-                  type="button"
-                  class="px-3 py-2 rounded-lg text-xs font-semibold border border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] disabled:opacity-60 disabled:cursor-not-allowed"
-                  :disabled="isCheckingMenus"
-                  @click="handleCafeteriaMenuEdit"
+                    type="button"
+                    class="px-3 py-2 rounded-lg text-xs font-semibold border border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] disabled:opacity-60 disabled:cursor-not-allowed"
+                    :disabled="isCheckingMenus"
+                    @click="handleCafeteriaMenuEdit"
                 >
                   {{ hasConfirmedMenus ? '구내식당 메뉴 수정' : '구내식당 메뉴 입력' }}
                 </button>
                 <button
-                  v-if="hasConfirmedMenus"
-                  type="button"
-                  class="px-3 py-2 rounded-lg text-xs font-semibold gradient-primary text-white disabled:opacity-60 disabled:cursor-not-allowed"
-                  :disabled="isCheckingMenus"
-                  @click="handleCafeteriaRecommendNow"
+                    v-if="hasConfirmedMenus"
+                    type="button"
+                    class="px-3 py-2 rounded-lg text-xs font-semibold gradient-primary text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                    :disabled="isCheckingMenus"
+                    @click="handleCafeteriaRecommendNow"
                 >
                   추천받기
                 </button>
@@ -1741,18 +1750,18 @@ onBeforeUnmount(() => {
         </div>
 
         <div
-          class="sticky bottom-0 bg-white border-t border-[#e9ecef] p-4 flex gap-3"
+            class="sticky bottom-0 bg-white border-t border-[#e9ecef] p-4 flex gap-3"
         >
           <Button
-            @click="resetFilters"
-            variant="outline"
-            class="flex-1 h-12 text-[#495057] border-[#dee2e6] hover:bg-[#f8f9fa] rounded-xl bg-transparent"
+              @click="resetFilters"
+              variant="outline"
+              class="flex-1 h-12 text-[#495057] border-[#dee2e6] hover:bg-[#f8f9fa] rounded-xl bg-transparent"
           >
             초기화
           </Button>
           <Button
-            @click="applyFilters"
-            class="flex-1 h-12 gradient-primary text-white rounded-xl"
+              @click="applyFilters"
+              class="flex-1 h-12 gradient-primary text-white rounded-xl"
           >
             적용하기
           </Button>
@@ -1762,19 +1771,19 @@ onBeforeUnmount(() => {
 
     <!-- Search Modal -->
     <div
-      v-if="isSearchOpen"
-      class="fixed inset-0 z-[100] bg-black/50 flex items-end"
+        v-if="isSearchOpen"
+        class="fixed inset-0 z-[100] bg-black/50 flex items-end"
     >
       <div
-        class="w-full max-w-[500px] mx-auto bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300"
+          class="w-full max-w-[500px] mx-auto bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300"
       >
         <div
-          class="sticky top-0 bg-white border-b border-[#e9ecef] px-4 py-4 flex items-center justify-between"
+            class="sticky top-0 bg-white border-b border-[#e9ecef] px-4 py-4 flex items-center justify-between"
         >
           <h3 class="text-lg font-semibold text-[#1e3a5f]">검색 필터</h3>
           <button
-            @click="isSearchOpen = false"
-            class="text-[#6c757d] hover:text-[#1e3a5f]"
+              @click="isSearchOpen = false"
+              class="text-[#6c757d] hover:text-[#1e3a5f]"
           >
             <X class="w-6 h-6" />
           </button>
@@ -1786,58 +1795,58 @@ onBeforeUnmount(() => {
             <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">예약 날짜</h4>
             <div class="relative">
               <button
-                type="button"
-                @click="toggleCalendar"
-                class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg text-sm flex items-center justify-between text-left text-[#495057] focus:outline-none focus:ring-2 focus:ring-[#ff6b4a] focus:border-transparent"
+                  type="button"
+                  @click="toggleCalendar"
+                  class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg text-sm flex items-center justify-between text-left text-[#495057] focus:outline-none focus:ring-2 focus:ring-[#ff6b4a] focus:border-transparent"
               >
                 <span
-                  :class="searchDate ? 'text-[#1e3a5f]' : 'text-[#adb5bd]'"
-                  >{{ formattedSearchDate }}</span
+                    :class="searchDate ? 'text-[#1e3a5f]' : 'text-[#adb5bd]'"
+                >{{ formattedSearchDate }}</span
                 >
                 <Calendar class="w-5 h-5 text-[#ff6b4a]" />
               </button>
 
               <div
-                v-if="isCalendarOpen"
-                class="absolute right-0 top-full mt-2 w-72 bg-white border border-[#e9ecef] rounded-xl shadow-card z-20"
+                  v-if="isCalendarOpen"
+                  class="absolute right-0 top-full mt-2 w-72 bg-white border border-[#e9ecef] rounded-xl shadow-card z-20"
               >
                 <div
-                  class="flex items-center justify-between px-4 py-3 border-b border-[#e9ecef]"
+                    class="flex items-center justify-between px-4 py-3 border-b border-[#e9ecef]"
                 >
                   <button
-                    @click.stop="previousCalendarMonth"
-                    class="p-1 rounded-full hover:bg-[#f8f9fa] transition-colors"
+                      @click.stop="previousCalendarMonth"
+                      class="p-1 rounded-full hover:bg-[#f8f9fa] transition-colors"
                   >
                     <ChevronLeft class="w-4 h-4 text-[#495057]" />
                   </button>
                   <span class="text-sm font-semibold text-[#1e3a5f]">{{
-                    formattedCalendarMonth
-                  }}</span>
+                      formattedCalendarMonth
+                    }}</span>
                   <button
-                    @click.stop="nextCalendarMonth"
-                    class="p-1 rounded-full hover:bg-[#f8f9fa] transition-colors"
+                      @click.stop="nextCalendarMonth"
+                      class="p-1 rounded-full hover:bg-[#f8f9fa] transition-colors"
                   >
                     <ChevronRight class="w-4 h-4 text-[#495057]" />
                   </button>
                 </div>
                 <div class="px-4 py-3">
                   <div
-                    class="grid grid-cols-7 text-center text-xs text-[#6c757d] mb-2"
+                      class="grid grid-cols-7 text-center text-xs text-[#6c757d] mb-2"
                   >
                     <span
-                      v-for="dayName in weekdayLabels"
-                      :key="dayName"
-                      class="py-1"
-                      >{{ dayName }}</span
+                        v-for="dayName in weekdayLabels"
+                        :key="dayName"
+                        class="py-1"
+                    >{{ dayName }}</span
                     >
                   </div>
                   <div class="grid grid-cols-7 gap-1">
                     <button
-                      v-for="(day, index) in calendarDays"
-                      :key="index"
-                      :disabled="!day"
-                      @click.stop="selectCalendarDay(day)"
-                      :class="[
+                        v-for="(day, index) in calendarDays"
+                        :key="index"
+                        :disabled="!day"
+                        @click.stop="selectCalendarDay(day)"
+                        :class="[
                         'w-9 h-9 rounded-full text-sm transition-colors',
                         !day ? 'cursor-default opacity-0' : '',
                         day && isCalendarSelectedDay(day)
@@ -1858,10 +1867,10 @@ onBeforeUnmount(() => {
             <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">시간대</h4>
             <div class="grid grid-cols-4 gap-2">
               <button
-                v-for="time in timeSlots"
-                :key="time"
-                @click="searchTime = time"
-                :class="`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                  v-for="time in timeSlots"
+                  :key="time"
+                  @click="searchTime = time"
+                  :class="`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                   searchTime === time
                     ? 'gradient-primary text-white'
                     : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
@@ -1877,10 +1886,10 @@ onBeforeUnmount(() => {
             <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">음식 종류</h4>
             <div class="flex flex-wrap gap-2">
               <button
-                v-for="category in categories"
-                :key="category"
-                @click="toggleSearchCategory(category)"
-                :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  v-for="category in categories"
+                  :key="category"
+                  @click="toggleSearchCategory(category)"
+                  :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   searchCategories.includes(category)
                     ? 'gradient-primary text-white'
                     : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
@@ -1896,22 +1905,22 @@ onBeforeUnmount(() => {
             <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">인원 수</h4>
             <div class="flex items-center gap-4">
               <button
-                @click="searchPartySize = Math.max(4, searchPartySize - 1)"
-                class="w-10 h-10 rounded-lg border border-[#dee2e6] flex items-center justify-center hover:bg-[#f8f9fa] transition-colors disabled:opacity-50"
-                :disabled="searchPartySize <= 4"
+                  @click="searchPartySize = Math.max(4, searchPartySize - 1)"
+                  class="w-10 h-10 rounded-lg border border-[#dee2e6] flex items-center justify-center hover:bg-[#f8f9fa] transition-colors disabled:opacity-50"
+                  :disabled="searchPartySize <= 4"
               >
                 <Minus class="w-4 h-4 text-[#495057]" />
               </button>
               <div class="flex-1 text-center">
                 <span class="text-2xl font-semibold text-[#1e3a5f]">{{
-                  searchPartySize
-                }}</span>
+                    searchPartySize
+                  }}</span>
                 <span class="text-sm text-[#6c757d] ml-1">명</span>
               </div>
               <button
-                @click="searchPartySize = Math.min(12, searchPartySize + 1)"
-                class="w-10 h-10 rounded-lg border border-[#dee2e6] flex items-center justify-center hover:bg-[#f8f9fa] transition-colors disabled:opacity-50"
-                :disabled="searchPartySize >= 12"
+                  @click="searchPartySize = Math.min(12, searchPartySize + 1)"
+                  class="w-10 h-10 rounded-lg border border-[#dee2e6] flex items-center justify-center hover:bg-[#f8f9fa] transition-colors disabled:opacity-50"
+                  :disabled="searchPartySize >= 12"
               >
                 <Plus class="w-4 h-4 text-[#495057]" />
               </button>
@@ -1923,10 +1932,10 @@ onBeforeUnmount(() => {
             <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">거리</h4>
             <div class="flex flex-wrap gap-2">
               <button
-                v-for="distance in distances"
-                :key="distance"
-                @click="searchDistance = distance"
-                :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  v-for="distance in distances"
+                  :key="distance"
+                  @click="searchDistance = distance"
+                  :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   searchDistance === distance
                     ? 'gradient-primary text-white'
                     : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
@@ -1942,10 +1951,10 @@ onBeforeUnmount(() => {
             <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">식당 태그</h4>
             <div class="flex flex-wrap gap-2">
               <button
-                v-for="tag in restaurantTags"
-                :key="tag"
-                @click="toggleSearchTag(tag)"
-                :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  v-for="tag in restaurantTags"
+                  :key="tag"
+                  @click="toggleSearchTag(tag)"
+                  :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   searchTags.includes(tag)
                     ? 'gradient-primary text-white'
                     : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
@@ -1961,10 +1970,10 @@ onBeforeUnmount(() => {
             <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">기피 재료</h4>
             <div class="flex flex-wrap gap-2">
               <button
-                v-for="ingredient in ingredients"
-                :key="ingredient"
-                @click="toggleAvoidIngredient(ingredient)"
-                :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  v-for="ingredient in ingredients"
+                  :key="ingredient"
+                  @click="toggleAvoidIngredient(ingredient)"
+                  :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   avoidIngredients.includes(ingredient)
                     ? 'bg-red-500 text-white'
                     : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
@@ -1977,18 +1986,18 @@ onBeforeUnmount(() => {
         </div>
 
         <div
-          class="sticky bottom-0 bg-white border-t border-[#e9ecef] p-4 flex gap-3"
+            class="sticky bottom-0 bg-white border-t border-[#e9ecef] p-4 flex gap-3"
         >
           <Button
-            @click="resetSearch"
-            variant="outline"
-            class="flex-1 h-12 text-[#495057] border-[#dee2e6] hover:bg-[#f8f9fa] rounded-xl bg-transparent"
+              @click="resetSearch"
+              variant="outline"
+              class="flex-1 h-12 text-[#495057] border-[#dee2e6] hover:bg-[#f8f9fa] rounded-xl bg-transparent"
           >
             초기화
           </Button>
           <Button
-            @click="applySearch"
-            class="flex-1 h-12 gradient-primary text-white rounded-xl"
+              @click="applySearch"
+              class="flex-1 h-12 gradient-primary text-white rounded-xl"
           >
             검색하기
           </Button>
