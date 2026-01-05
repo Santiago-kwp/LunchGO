@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { RouterLink, useRoute } from 'vue-router'; // Import useRoute to get dynamic params
 import {
   ArrowLeft,
@@ -17,16 +17,19 @@ import {
 } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
-import { loadKakaoMaps } from '@/utils/kakao';
-import { restaurants as restaurantData, getRestaurantById } from '@/data/restaurants';
-import axios from 'axios';
+import { loadKakaoMaps, geocodeAddress } from '@/utils/kakao';
+import httpRequest from "@/router/httpRequest.js";
+import axios from "axios";
 
 const route = useRoute();
 const restaurantId = route.params.id || '1'; // Default to '1' if id is not available
-const restaurantInfo = ref(getRestaurantById(restaurantId) || restaurantData[0]);
+const restaurantInfo = ref(null);
+const isLoading = ref(true);
+const error = ref(null);
 
 const currentImageIndex = ref(0);
 
+// 기본 이미지 갤러리 설정
 const defaultGallery = [
   { url: '/modern-korean-restaurant-interior.jpg', alt: '식당 메인 이미지' },
   { url: '/elegant-dining-room-setup.jpg', alt: '식당 내부 전경' },
@@ -34,82 +37,51 @@ const defaultGallery = [
   { url: '/restaurant-private-room-atmosphere.jpg', alt: '식당 분위기' },
 ];
 
-const restaurantImages = ref(
-  restaurantInfo.value?.gallery?.length
-    ? restaurantInfo.value.gallery.map((url, index) => ({
-        url,
-        alt: `${restaurantInfo.value?.name || '식당'} 이미지 ${index + 1}`,
-      }))
-    : defaultGallery,
-);
-
-const handlePrevImage = () => {
-  currentImageIndex.value =
-    currentImageIndex.value === 0
-      ? restaurantImages.value.length - 1
-      : currentImageIndex.value - 1;
-};
-
-const handleNextImage = () => {
-  currentImageIndex.value =
-    currentImageIndex.value === restaurantImages.value.length - 1
-      ? 0
-      : currentImageIndex.value + 1;
-};
-
-const defaultMenus = [
-  {
-    name: 'A코스',
-    price: '35,000원',
-    description: '전채 + 메인 + 디저트',
-    image: '/korean-appetizer-main-dessert.jpg',
-  },
-  {
-    name: 'B코스',
-    price: '45,000원',
-    description: '전채 + 메인 + 디저트 + 와인',
-    image: '/premium-course-meal-with-wine.jpg',
-  },
-  {
-    name: '파스타',
-    price: '18,000원',
-    description: '단품',
-    image: '/italian-pasta-dish.png',
-  },
-];
-
-const representativeMenus = ref(
-  restaurantInfo.value?.menus?.length ? restaurantInfo.value.menus : defaultMenus,
-);
+const restaurantImages = ref(defaultGallery);
+const representativeMenus = ref([]);
 const isRestaurantFavorite = ref(false);
-
-const highlightTags = computed(() => {
-  if (!restaurantInfo.value?.topTags?.length) return '';
-  return restaurantInfo.value.topTags
-    .slice(0, 2)
-    .map((tag) => tag.name)
-    .join(', ');
-});
 
 const restaurantName = computed(() => restaurantInfo.value?.name || '식당명');
 
 const ratingDisplay = computed(() => {
   const summaryRating = restaurantReviewSummary.value?.avgRating;
   const rawRating = summaryRating ?? restaurantInfo.value?.rating;
-  const value = Number(rawRating);
-  return Number.isFinite(value) ? value.toFixed(1) : '0.0';
+  return Number(rawRating).toFixed(1);
 });
 
-const reviewCountDisplay = computed(() => restaurantReviewSummary.value?.reviewCount ?? restaurantInfo.value?.reviews ?? 0);
-const addressDisplay = computed(() => restaurantInfo.value?.address || '주소 정보가 곧 업데이트됩니다.');
+const reviewCountDisplay = computed(
+  () => restaurantReviewSummary.value?.reviewCount ?? restaurantInfo.value?.reviews ?? 0,
+);
+const addressDisplay = computed(
+  () => restaurantInfo.value?.address || '주소 정보가 곧 업데이트됩니다.',
+);
 const phoneDisplay = computed(() => restaurantInfo.value?.phone || '문의처 준비중');
 const hoursDisplay = computed(
   () => restaurantInfo.value?.hours || '영업시간 정보가 곧 업데이트됩니다.',
 );
-const capacityDisplay = computed(() => restaurantInfo.value?.capacity || '최소 4인 ~ 최대 12인');
+const capacityDisplay = computed(
+  () => restaurantInfo.value?.capacity || '최소 4인 ~ 최대 12인',
+);
 const taglineDisplay = computed(
   () => restaurantInfo.value?.tagline || '대표 태그 정보가 곧 업데이트됩니다.',
 );
+const highlightTags = computed(() => {
+  if (!restaurantInfo.value?.tags?.length) return '';
+  return restaurantInfo.value.tags
+    .slice(0, 2)
+    .map((tag) => tag.content || tag.name)
+    .join(', ');
+});
+
+const handlePrevImage = () => {
+  currentImageIndex.value =
+    (currentImageIndex.value - 1 + restaurantImages.value.length) %
+    restaurantImages.value.length;
+};
+
+const handleNextImage = () => {
+  currentImageIndex.value = (currentImageIndex.value + 1) % restaurantImages.value.length;
+};
 
 const detailMapContainer = ref(null);
 let detailMapInstance = null;
@@ -178,11 +150,10 @@ const modalImageUrl = ref('');
 const modalImageIndex = ref(0);
 const modalImages = ref([]);
 
-// 이미지 클릭 시 모달 열기
 const openImageModal = (images, index) => {
-  modalImages.value = images;
+  modalImages.value = images.map((img) => (typeof img === 'object' ? img.url : img));
   modalImageIndex.value = index;
-  modalImageUrl.value = images[index];
+  modalImageUrl.value = modalImages.value[index];
   isImageModalOpen.value = true;
 };
 
@@ -190,30 +161,59 @@ const toggleRestaurantFavorite = () => {
   isRestaurantFavorite.value = !isRestaurantFavorite.value;
 };
 
-const applyRestaurantImages = (imageUrls = []) => {
-  if (!Array.isArray(imageUrls) || imageUrls.length === 0) return;
-  restaurantImages.value = imageUrls.map((url, index) => ({
-    url,
-    alt: `${restaurantInfo.value?.name || '식당'} 이미지 ${index + 1}`,
-  }));
-  restaurantInfo.value = {
-    ...restaurantInfo.value,
-    image: imageUrls[0],
-    gallery: imageUrls,
-  };
-};
-
-const loadRestaurantImages = async () => {
+const fetchRestaurantDetail = async () => {
+  isLoading.value = true;
+  error.value = null;
   try {
-    const response = await axios.get(
-      `/api/business/restaurants/${restaurantId}/images`,
-    );
-    const imageUrls = (response.data || [])
-      .map((item) => item?.imageUrl)
-      .filter(Boolean);
-    applyRestaurantImages(imageUrls);
-  } catch (error) {
-    console.error('식당 이미지 데이터를 불러오지 못했습니다:', error);
+    const response = await httpRequest.get(`/api/restaurants/${restaurantId}`);
+    const details = response.data;
+
+    // API 응답과 geocode 결과를 조합하여 restaurantInfo 구성
+    const coords = await geocodeAddress(details.roadAddress);
+
+    restaurantInfo.value = {
+      id: details.restaurantId,
+      name: details.name,
+      phone: details.phone,
+      address: `${details.roadAddress} ${details.detailAddress || ''}`.trim(),
+      hours: `${details.openTime} - ${details.closeTime}`,
+      capacity: `최대 ${details.reservationLimit}인`,
+      tagline: details.description,
+      tags: details.tags,
+      coords: coords,
+      // API 응답에 rating과 reviews가 없으므로 review 요약 정보로 대체
+      rating: restaurantReviewSummary.value?.avgRating || 0,
+      reviews: restaurantReviewSummary.value?.reviewCount || 0,
+    };
+
+    // 메뉴 정보 설정
+    if (details.menus?.length) {
+      representativeMenus.value = details.menus
+        .filter((menu) => menu.category.code === 'MAIN') // 'MAIN' 카테고리만 필터링
+        .slice(0, 3) // 처음 3개만 선택
+        .map((menu) => ({
+          ...menu,
+          price: `${menu.price.toLocaleString()}원`, // 숫자 가격을 문자열로 변환
+          imageUrl: menu.imageUrl || '/placeholder.svg', // 이미지 URL 추가
+        }));
+    } else {
+      representativeMenus.value = [];
+    }
+
+    // 이미지 갤러리 설정
+    if (details.images?.length) {
+      restaurantImages.value = details.images.map((img, index) => ({
+        url: img.imageUrl,
+        alt: `${details.name} 이미지 ${index + 1}`,
+      }));
+    } else {
+      restaurantImages.value = defaultGallery;
+    }
+  } catch (err) {
+    console.error('식당 상세 정보를 불러오는 데 실패했습니다:', err);
+    error.value = '데이터를 불러올 수 없습니다.';
+  } finally {
+    isLoading.value = false;
   }
 };
 
@@ -228,7 +228,7 @@ const loadRepresentativeReviews = async () => {
     });
     const data = response.data?.data ?? response.data;
     restaurantReviewSummary.value = data?.summary ?? null;
-    representativeReviews.value = (data?.items || []).map(mapReviewItem);
+    representativeReviews.value = (data?.items || []).slice(0, 3).map(mapReviewItem);
   } catch (error) {
     console.error('리뷰 데이터를 불러오지 못했습니다:', error);
     representativeReviews.value = [];
@@ -243,17 +243,12 @@ const closeImageModal = () => {
 // 모달에서 이전/다음 이미지
 const handleModalPrevImage = () => {
   modalImageIndex.value =
-    modalImageIndex.value === 0
-      ? modalImages.value.length - 1
-      : modalImageIndex.value - 1;
+    (modalImageIndex.value - 1 + modalImages.value.length) % modalImages.value.length;
   modalImageUrl.value = modalImages.value[modalImageIndex.value];
 };
 
 const handleModalNextImage = () => {
-  modalImageIndex.value =
-    modalImageIndex.value === modalImages.value.length - 1
-      ? 0
-      : modalImageIndex.value + 1;
+  modalImageIndex.value = (modalImageIndex.value + 1) % modalImages.value.length;
   modalImageUrl.value = modalImages.value[modalImageIndex.value];
 };
 
@@ -262,44 +257,32 @@ const toggleReviewExpand = (review) => {
   review.isExpanded = !review.isExpanded;
 };
 
-// 리뷰 텍스트 길이 체크 (70자 이상이면 더보기 버튼 표시)
-const shouldShowExpandButton = (content) => {
-  return content.length > 70;
-};
+const shouldShowExpandButton = (content) => content.length > 70;
 
-// 리뷰 텍스트 자르기 (접혀있을 때)
 const truncateText = (content, isExpanded) => {
-  if (isExpanded || content.length <= 70) {
-    return content;
-  }
+  if (isExpanded || content.length <= 70) return content;
   return content.substring(0, 70) + '...';
 };
 
-// 마우스 드래그 스크롤 기능
 const setupDragScroll = (element) => {
   if (!element) return;
-
   let isDown = false;
   let startX;
   let scrollLeft;
-
   element.addEventListener('mousedown', (e) => {
     isDown = true;
     element.style.cursor = 'grabbing';
     startX = e.pageX - element.offsetLeft;
     scrollLeft = element.scrollLeft;
   });
-
   element.addEventListener('mouseleave', () => {
     isDown = false;
     element.style.cursor = 'grab';
   });
-
   element.addEventListener('mouseup', () => {
     isDown = false;
     element.style.cursor = 'grab';
   });
-
   element.addEventListener('mousemove', (e) => {
     if (!isDown) return;
     e.preventDefault();
@@ -310,14 +293,16 @@ const setupDragScroll = (element) => {
 };
 
 const initializeDetailMap = async () => {
-  if (!detailMapContainer.value || !restaurantInfo.value?.coords) return;
+  if (!detailMapContainer.value || !restaurantInfo.value?.coords) {
+    console.warn('지도 컨테이너 또는 좌표 정보가 없어 지도를 초기화할 수 없습니다.');
+    return;
+  }
   try {
     const kakaoMaps = await loadKakaoMaps();
     const center = new kakaoMaps.LatLng(
       restaurantInfo.value.coords.lat,
       restaurantInfo.value.coords.lng,
     );
-
     const markerSvg =
       "data:image/svg+xml;utf8," +
       "<svg xmlns='http://www.w3.org/2000/svg' width='32' height='46' viewBox='0 0 32 46'>" +
@@ -329,19 +314,16 @@ const initializeDetailMap = async () => {
       new kakaoMaps.Size(32, 46),
       { offset: new kakaoMaps.Point(16, 46) },
     );
-
     detailMapInstance = new kakaoMaps.Map(detailMapContainer.value, {
       center,
       level: detailLevelForDistance(detailMapDistanceStepIndex.value),
     });
     detailMapInstance.setZoomable(false);
-
     detailMarker = new kakaoMaps.Marker({
       position: center,
       title: restaurantName.value,
       image: markerImage,
     });
-
     detailMarker.setMap(detailMapInstance);
     applyDetailMapZoom();
   } catch (error) {
@@ -369,18 +351,19 @@ const changeDetailMapDistance = (delta) => {
   detailMapDistanceStepIndex.value = next;
 };
 
-// 컴포넌트 마운트 후 드래그 스크롤 및 지도 설정
-onMounted(() => {
+onMounted(async () => {
   if (typeof window !== 'undefined') {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
+
+  // 리뷰 데이터와 식당 상세 정보를 병렬로 로드
+  await Promise.all([loadRepresentativeReviews(), fetchRestaurantDetail()]);
+
+  // 드래그 스크롤 기능 설정
   const scrollContainers = document.querySelectorAll('.review-image-scroll');
   scrollContainers.forEach((container) => {
     setupDragScroll(container);
   });
-  initializeDetailMap();
-  loadRepresentativeReviews();
-  loadRestaurantImages();
 });
 
 onBeforeUnmount(() => {
@@ -389,6 +372,13 @@ onBeforeUnmount(() => {
   }
   detailMarker = null;
   detailMapInstance = null;
+});
+
+watch(restaurantInfo, async (newValue) => {
+  if (newValue && newValue.coords) {
+    await nextTick();
+    initializeDetailMap();
+  }
 });
 
 watch(detailMapDistanceStepIndex, () => {
@@ -409,328 +399,377 @@ watch(detailMapDistanceStepIndex, () => {
     </header>
 
     <main class="max-w-[500px] mx-auto pb-24">
-      <div
-        class="relative w-full h-64 bg-gradient-to-br from-orange-400 to-pink-400 overflow-hidden"
-      >
-        <img
-          :src="restaurantImages[currentImageIndex].url || '/placeholder.svg'"
-          :alt="restaurantImages[currentImageIndex].alt"
-          class="w-full h-full object-cover"
-        />
+      <!-- Loading Spinner -->
+      <div v-if="isLoading" class="flex justify-center items-center h-64">
+        <div
+          class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#ff6b4a]"
+        ></div>
+      </div>
 
-        <!-- Left Arrow -->
-        <button
-          @click="handlePrevImage"
-          class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow-lg transition-all"
-          aria-label="이전 이미지"
+      <!-- Error Message -->
+      <div v-else-if="error" class="text-center py-10 px-4">
+        <p class="text-red-500 font-semibold">
+          {{ error }}
+        </p>
+        <Button @click="fetchRestaurantDetail" class="mt-4">재시도</Button>
+      </div>
+
+      <!-- Restaurant Content -->
+      <template v-if="!isLoading && restaurantInfo">
+        <div
+          class="relative w-full h-64 bg-gradient-to-br from-orange-400 to-pink-400 overflow-hidden"
         >
-          <ChevronLeft class="w-5 h-5 text-[#1e3a5f]" />
-        </button>
-
-        <!-- Right Arrow -->
-        <button
-          @click="handleNextImage"
-          class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow-lg transition-all"
-          aria-label="다음 이미지"
-        >
-          <ChevronRight class="w-5 h-5 text-[#1e3a5f]" />
-        </button>
-
-        <!-- Image Indicators -->
-        <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
-          <button
-            v-for="(_, idx) in restaurantImages"
-            :key="idx"
-            @click="currentImageIndex = idx"
-            :class="`w-2 h-2 rounded-full transition-all ${
-              idx === currentImageIndex
-                ? 'bg-white w-6'
-                : 'bg-white/50 hover:bg-white/75'
-            }`"
-            :aria-label="`이미지 ${idx + 1}로 이동`"
+          <img
+            :src="restaurantImages[currentImageIndex]?.url || '/placeholder.svg'"
+            :alt="restaurantImages[currentImageIndex]?.alt || '식당 이미지'"
+            class="w-full h-full object-cover"
           />
-        </div>
-      </div>
 
-      <!-- Restaurant Info -->
-      <div class="bg-white px-4 py-5 border-b border-[#e9ecef]">
-        <div class="flex items-start justify-between mb-3">
-          <div class="flex-1">
-            <h2 class="text-xl font-bold text-[#1e3a5f] mb-2">
-              {{ restaurantName }}
-            </h2>
-            <div class="flex items-center gap-1 mb-2">
-              <Star class="w-4 h-4 fill-[#ffc107] text-[#ffc107]" />
-              <span class="text-base font-semibold text-[#1e3a5f]">{{ ratingDisplay }}</span>
-              <span class="text-sm text-[#6c757d]">({{ reviewCountDisplay }}개 리뷰)</span>
-            </div>
-            <p class="text-sm text-[#6c757d] mb-3 leading-relaxed">
-              {{ taglineDisplay }}
-            </p>
-            <p v-if="highlightTags" class="text-xs text-[#adb5bd] mb-3 leading-relaxed">
-              대표 태그: {{ highlightTags }}
-            </p>
-          </div>
+          <!-- Left Arrow -->
           <button
-            type="button"
-            class="p-2 rounded-full bg-[#f8f9fa] text-[#adb5bd] hover:text-[#ff6b4a] transition-colors"
-            :aria-pressed="isRestaurantFavorite"
-            @click="toggleRestaurantFavorite"
+            @click="handlePrevImage"
+            class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow-lg transition-all"
+            aria-label="이전 이미지"
           >
-            <Star
-              class="w-5 h-5"
-              :class="isRestaurantFavorite ? 'fill-current text-[#ff6b4a]' : 'fill-white'"
-            />
-            <span class="sr-only">
-              {{ isRestaurantFavorite ? '즐겨찾기 해제' : '즐겨찾기에 추가' }}
-            </span>
+            <ChevronLeft class="w-5 h-5 text-[#1e3a5f]" />
           </button>
-        </div>
 
-        <div class="space-y-2.5">
-          <div class="flex items-start gap-2 text-sm">
-            <MapPin class="w-4 h-4 text-[#6c757d] mt-0.5 flex-shrink-0" />
-            <span class="text-[#495057] leading-relaxed">{{ addressDisplay }}</span>
-          </div>
-          <div class="flex items-start gap-2 text-sm">
-            <Clock class="w-4 h-4 text-[#6c757d] mt-0.5 flex-shrink-0" />
-            <span class="text-[#495057] leading-relaxed">{{ hoursDisplay }}</span>
-          </div>
-          <div class="flex items-start gap-2 text-sm">
-            <Phone class="w-4 h-4 text-[#6c757d] mt-0.5 flex-shrink-0" />
-            <span class="text-[#495057] leading-relaxed">{{ phoneDisplay }}</span>
-          </div>
-          <div class="flex items-start gap-2 text-sm">
-            <Users class="w-4 h-4 text-[#6c757d] mt-0.5 flex-shrink-0" />
-            <span class="text-[#495057] leading-relaxed">{{ capacityDisplay }}</span>
-          </div>
-        </div>
-      </div>
+          <!-- Right Arrow -->
+          <button
+            @click="handleNextImage"
+            class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow-lg transition-all"
+            aria-label="다음 이미지"
+          >
+            <ChevronRight class="w-5 h-5 text-[#1e3a5f]" />
+          </button>
 
-      <div class="px-4 py-5 bg-white border-b border-[#e9ecef]">
-        <h3 class="text-lg font-semibold text-[#1e3a5f] mb-3">위치 안내</h3>
-        <div class="relative w-full h-56 rounded-xl border border-[#e9ecef] overflow-hidden">
-          <div ref="detailMapContainer" class="absolute inset-0" />
-          <div class="absolute top-3 right-3 z-10 flex flex-col items-center gap-2 pointer-events-auto">
+          <!-- Image Indicators -->
+          <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
             <button
-              @click="changeDetailMapDistance(-1)"
-              class="w-7 h-7 rounded-sm bg-white shadow-card flex items-center justify-center text-[#1e3a5f] hover:bg-[#f8f9fa]"
-            >
-              <Plus class="w-3.5 h-3.5" />
-            </button>
-            <div class="h-16 w-[5px] bg-white/80 rounded relative shadow-card overflow-hidden">
-              <div
-                class="absolute top-0 left-0 right-0 bg-[#ff6b4a] transition-all"
-                :style="{ height: `${detailDistanceSliderFill}%` }"
-              ></div>
-            </div>
-            <button
-              @click="changeDetailMapDistance(1)"
-              class="w-7 h-7 rounded-sm bg-white shadow-card flex items-center justify-center text-[#1e3a5f] hover:bg-[#f8f9fa]"
-            >
-              <Minus class="w-3.5 h-3.5" />
-            </button>
-            <div
-              class="mt-1 px-2 py-1 rounded-full bg-white text-[11px] font-semibold text-[#1e3a5f] shadow-card"
-            >
-              반경 {{ detailCurrentDistanceLabel }}
-            </div>
-          </div>
-        </div>
-        <p class="text-xs text-[#6c757d] mt-2">{{ addressDisplay }}</p>
-      </div>
-
-      <!-- Representative Menus -->
-      <div class="px-4 py-5 bg-white border-b border-[#e9ecef]">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-[#1e3a5f]">대표 메뉴</h3>
-          <RouterLink
-            :to="{ name: 'restaurant-menus', params: { id: restaurantId } }"
-            class="flex items-center gap-1 text-sm text-[#ff6b4a] font-medium hover:text-[#ff8570] transition-colors"
-          >
-            메뉴 전체보기
-            <ChevronRight class="w-4 h-4" />
-          </RouterLink>
-        </div>
-
-        <div class="space-y-3">
-          <Card
-            v-for="(item, idx) in representativeMenus"
-            :key="idx"
-            class="p-3 border-[#e9ecef] rounded-xl bg-white shadow-card hover:shadow-md transition-shadow"
-          >
-            <div class="flex items-center gap-3">
-              <img
-                :src="item.image || '/placeholder.svg'"
-                :alt="item.name"
-                class="w-20 h-20 rounded-lg object-cover flex-shrink-0"
-              />
-              <div class="flex-1 min-w-0">
-                <p class="font-semibold text-[#1e3a5f] mb-1">{{ item.name }}</p>
-                <p
-                  v-if="item.description"
-                  class="text-xs text-[#6c757d] leading-relaxed mb-2"
-                >
-                  {{ item.description }}
-                </p>
-                <p class="font-semibold text-[#ff6b4a]">{{ item.price }}</p>
-              </div>
-            </div>
-          </Card>
-        </div>
-      </div>
-
-      <!-- Representative Reviews -->
-      <div class="px-4 py-5 bg-white border-b border-[#e9ecef]">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-[#1e3a5f]">리뷰</h3>
-          <RouterLink
-            :to="{ name: 'restaurant-reviews', params: { id: restaurantId } }"
-            class="flex items-center gap-1 text-sm text-[#ff6b4a] font-medium hover:text-[#ff8570] transition-colors"
-          >
-            리뷰 전체보기
-            <ChevronRight class="w-4 h-4" />
-          </RouterLink>
-        </div>
-
-        <div class="space-y-3">
-          <div v-for="review in representativeReviews" :key="review.id">
-            <Card
-              :class="`p-4 border-[#e9ecef] rounded-xl bg-white shadow-card hover:shadow-md transition-shadow ${
-                review.isBlinded ? 'opacity-60' : ''
+              v-for="(_, idx) in restaurantImages"
+              :key="idx"
+              @click="currentImageIndex = idx"
+              :class="`w-2 h-2 rounded-full transition-all ${
+                idx === currentImageIndex
+                  ? 'bg-white w-6'
+                  : 'bg-white/50 hover:bg-white/75'
               }`"
-            >
-              <div class="flex items-center justify-between mb-3">
-                <div class="flex items-center gap-2">
-                  <div class="flex flex-col">
-                    <div class="flex items-center gap-2">
-                      <span class="font-semibold text-[#1e3a5f] text-sm">{{
-                        review.author
-                      }}</span>
-                      <span
-                        v-if="review.company"
-                        class="font-semibold text-[#1e3a5f] text-sm"
-                        >({{ review.company }})</span
-                      >
-                      <div v-if="!review.isBlinded" class="flex items-center gap-1">
-                        <Star
-                          v-for="(_, i) in Array.from({
-                            length: review.rating,
-                          })"
-                          :key="i"
-                          class="w-3.5 h-3.5 fill-[#ffc107] text-[#ffc107]"
-                        />
-                      </div>
-                    </div>
-                    <span
-                      v-if="!review.isBlinded && review.visitCount"
-                      class="text-xs text-[#6c757d] mt-0.5"
-                    >
-                      {{ review.visitCount }}번째 방문
-                    </span>
-                  </div>
-                </div>
-                <span class="text-xs text-[#6c757d]">{{ review.date }}</span>
-              </div>
+              :aria-label="`이미지 ${idx + 1}로 이동`"
+            />
+          </div>
+        </div>
 
-              <!-- 리뷰 이미지 갤러리 (스크롤 방식) -->
+        <!-- Restaurant Info -->
+        <div class="bg-white px-4 py-5 border-b border-[#e9ecef]">
+          <div class="flex items-start justify-between mb-3">
+            <div class="flex-1">
+              <h2 class="text-xl font-bold text-[#1e3a5f] mb-2">
+                {{ restaurantName }}
+              </h2>
+              <div class="flex items-center gap-1 mb-2">
+                <Star class="w-4 h-4 fill-[#ffc107] text-[#ffc107]" />
+                <span class="text-base font-semibold text-[#1e3a5f]">{{
+                  ratingDisplay
+                }}</span>
+                <span class="text-sm text-[#6c757d]"
+                  >({{ reviewCountDisplay }}개 리뷰)</span
+                >
+              </div>
+              <p class="text-sm text-[#6c757d] mb-3 leading-relaxed">
+                {{ taglineDisplay }}
+              </p>
+              <p
+                v-if="highlightTags"
+                class="text-xs text-[#adb5bd] mb-3 leading-relaxed"
+              >
+                대표 태그: {{ highlightTags }}
+              </p>
+            </div>
+            <button
+              type="button"
+              class="p-2 rounded-full bg-[#f8f9fa] text-[#adb5bd] hover:text-[#ff6b4a] transition-colors"
+              :aria-pressed="isRestaurantFavorite"
+              @click="toggleRestaurantFavorite"
+            >
+              <Star
+                class="w-5 h-5"
+                :class="
+                  isRestaurantFavorite ? 'fill-current text-[#ff6b4a]' : 'fill-white'
+                "
+              />
+              <span class="sr-only">
+                {{ isRestaurantFavorite ? '즐겨찾기 해제' : '즐겨찾기에 추가' }}
+              </span>
+            </button>
+          </div>
+
+          <div class="space-y-2.5">
+            <div class="flex items-start gap-2 text-sm">
+              <MapPin class="w-4 h-4 text-[#6c757d] mt-0.5 flex-shrink-0" />
+              <span class="text-[#495057] leading-relaxed">{{
+                addressDisplay
+              }}</span>
+            </div>
+            <div class="flex items-start gap-2 text-sm">
+              <Clock class="w-4 h-4 text-[#6c757d] mt-0.5 flex-shrink-0" />
+              <span class="text-[#495057] leading-relaxed">{{ hoursDisplay }}</span>
+            </div>
+            <div class="flex items-start gap-2 text-sm">
+              <Phone class="w-4 h-4 text-[#6c757d] mt-0.5 flex-shrink-0" />
+              <span class="text-[#495057] leading-relaxed">{{ phoneDisplay }}</span>
+            </div>
+            <div class="flex items-start gap-2 text-sm">
+              <Users class="w-4 h-4 text-[#6c757d] mt-0.5 flex-shrink-0" />
+              <span class="text-[#495057] leading-relaxed">{{
+                capacityDisplay
+              }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="px-4 py-5 bg-white border-b border-[#e9ecef]">
+          <h3 class="text-lg font-semibold text-[#1e3a5f] mb-3">위치 안내</h3>
+          <div
+            class="relative w-full h-56 rounded-xl border border-[#e9ecef] overflow-hidden"
+          >
+            <div ref="detailMapContainer" class="absolute inset-0" />
+            <div
+              class="absolute top-3 right-3 z-10 flex flex-col items-center gap-2 pointer-events-auto"
+            >
+              <button
+                @click="changeDetailMapDistance(-1)"
+                class="w-7 h-7 rounded-sm bg-white shadow-card flex items-center justify-center text-[#1e3a5f] hover:bg-[#f8f9fa]"
+              >
+                <Plus class="w-3.5 h-3.5" />
+              </button>
               <div
-                v-if="!review.isBlinded && review.images && review.images.length > 0"
-                class="mb-3 -mx-4"
+                class="h-16 w-[5px] bg-white/80 rounded relative shadow-card overflow-hidden"
               >
                 <div
-                  class="flex gap-2 overflow-x-auto px-4 snap-x snap-mandatory scrollbar-hide review-image-scroll cursor-grab active:cursor-grabbing"
-                >
-                  <div
-                    v-for="(image, idx) in review.images"
-                    :key="idx"
-                    class="flex-shrink-0 snap-start"
-                    :class="
-                      idx === 0 ? 'w-[calc(100%-3rem)]' : 'w-[calc(100%-6rem)]'
-                    "
+                  class="absolute top-0 left-0 right-0 bg-[#ff6b4a] transition-all"
+                  :style="{ height: `${detailDistanceSliderFill}%` }"
+                ></div>
+              </div>
+              <button
+                @click="changeDetailMapDistance(1)"
+                class="w-7 h-7 rounded-sm bg-white shadow-card flex items-center justify-center text-[#1e3a5f] hover:bg-[#f8f9fa]"
+              >
+                <Minus class="w-3.5 h-3.5" />
+              </button>
+              <div
+                class="mt-1 px-2 py-1 rounded-full bg-white text-[11px] font-semibold text-[#1e3a5f] shadow-card"
+              >
+                반경 {{ detailCurrentDistanceLabel }}
+              </div>
+            </div>
+          </div>
+          <p class="text-xs text-[#6c757d] mt-2">{{ addressDisplay }}</p>
+        </div>
+
+        <!-- Representative Menus -->
+        <div class="px-4 py-5 bg-white border-b border-[#e9ecef]">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-[#1e3a5f]">대표 메뉴</h3>
+            <RouterLink
+              :to="{ name: 'restaurant-menus', params: { id: restaurantId } }"
+              class="flex items-center gap-1 text-sm text-[#ff6b4a] font-medium hover:text-[#ff8570] transition-colors"
+            >
+              메뉴 전체보기
+              <ChevronRight class="w-4 h-4" />
+            </RouterLink>
+          </div>
+
+          <div class="space-y-3">
+            <Card
+              v-for="(item, idx) in representativeMenus"
+              :key="idx"
+              class="p-3 border-[#e9ecef] rounded-xl bg-white shadow-card hover:shadow-md transition-shadow"
+            >
+              <div class="flex items-center gap-3">
+                <img
+                  :src="item.imageUrl || '/placeholder.svg'"
+                  :alt="item.name"
+                  class="w-20 h-20 rounded-lg object-cover flex-shrink-0"
+                />
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-[#1e3a5f] mb-1">{{ item.name }}</p>
+                  <p
+                    v-if="item.description"
+                    class="text-xs text-[#6c757d] leading-relaxed mb-2"
                   >
-                    <div
-                      class="relative rounded-lg overflow-hidden bg-[#f8f9fa] h-48 cursor-pointer hover:opacity-95 transition-opacity"
-                      @click="openImageModal(review.images, idx)"
-                    >
-                      <img
-                        :src="image || '/placeholder.svg'"
-                        :alt="`리뷰 이미지 ${idx + 1}`"
-                        class="w-full h-full object-cover pointer-events-none"
-                      />
-                      <!-- 이미지 카운터 -->
-                      <div
-                        class="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full"
-                      >
-                        {{ idx + 1 }} / {{ review.images.length }}
-                      </div>
-                    </div>
-                  </div>
+                    {{ item.description }}
+                  </p>
+                  <p class="font-semibold text-[#ff6b4a]">{{ item.price }}</p>
                 </div>
-              </div>
-
-              <!-- 리뷰 내용 -->
-              <div v-if="!review.isBlinded">
-                <p class="text-sm text-[#495057] leading-relaxed mb-2">
-                  {{ truncateText(review.content, review.isExpanded) }}
-                </p>
-
-                <!-- 더보기/접기 버튼 -->
-                <button
-                  v-if="shouldShowExpandButton(review.content)"
-                  @click.prevent="toggleReviewExpand(review)"
-                  class="text-xs text-[#6c757d] hover:text-[#ff6b4a] font-medium mb-3 transition-colors"
-                >
-                  {{ review.isExpanded ? '접기' : '더보기' }}
-                </button>
-
-                <!-- 태그 -->
-                <RouterLink
-                  :to="`/restaurant/${restaurantId}/reviews/${review.id}`"
-                  class="block"
-                >
-                  <div
-                    v-if="review.tags && review.tags.length > 0"
-                    class="flex flex-wrap gap-1.5"
-                  >
-                    <span
-                      v-for="(tag, idx) in review.tags"
-                      :key="idx"
-                      class="inline-flex items-center px-2.5 py-1 text-xs rounded-full bg-gradient-to-r from-[#ff6b4a] to-[#ff8e72] text-white font-semibold shadow-sm"
-                    >
-                      {{ tag }}
-                    </span>
-                  </div>
-                </RouterLink>
-              </div>
-              <div v-else>
-                <p class="text-sm text-[#495057] leading-relaxed mb-2">
-                  {{ review.content }}
-                </p>
-                <span
-                  class="inline-block px-2.5 py-1 text-xs rounded-full bg-[#6c757d] text-white"
-                >
-                  사유: {{ review.blindReason }}
-                </span>
               </div>
             </Card>
           </div>
         </div>
-      </div>
 
-      <!-- Additional Info -->
-      <div class="bg-white px-4 py-5 border-t border-[#e9ecef]">
-        <h3 class="text-base font-semibold text-[#1e3a5f] mb-3">예약 안내</h3>
-        <div class="space-y-2 text-sm text-[#495057] leading-relaxed">
-          <p>• 예약은 최소 1일 전까지 가능합니다.</p>
-          <p>
-            • 예약 취소는 1일 전까지 무료이며, 당일 취소 시 위약금이 발생할 수
-            있습니다.
-          </p>
-          <p>• 인원 변경은 예약일 기준 2일 전까지 가능합니다.</p>
-          <p>• 노쇼 시 향후 예약이 제한될 수 있습니다.</p>
+        <!-- Representative Reviews -->
+        <div class="px-4 py-5 bg-white border-b border-[#e9ecef]">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-[#1e3a5f]">리뷰</h3>
+            <RouterLink
+              :to="{ name: 'restaurant-reviews', params: { id: restaurantId } }"
+              class="flex items-center gap-1 text-sm text-[#ff6b4a] font-medium hover:text-[#ff8570] transition-colors"
+            >
+              리뷰 전체보기
+              <ChevronRight class="w-4 h-4" />
+            </RouterLink>
+          </div>
+
+          <div v-if="representativeReviews.length > 0" class="space-y-3">
+            <div v-for="review in representativeReviews" :key="review.id">
+              <Card
+                :class="`p-4 border-[#e9ecef] rounded-xl bg-white shadow-card hover:shadow-md transition-shadow ${
+                  review.isBlinded ? 'opacity-60' : ''
+                }`"
+              >
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center gap-2">
+                    <div class="flex flex-col">
+                      <div class="flex items-center gap-2">
+                        <span class="font-semibold text-[#1e3a5f] text-sm">{{
+                          review.author
+                        }}</span>
+                        <span
+                          v-if="review.company"
+                          class="font-semibold text-[#1e3a5f] text-sm"
+                          >({{ review.company }})</span
+                        >
+                        <div
+                          v-if="!review.isBlinded"
+                          class="flex items-center gap-1"
+                        >
+                          <Star
+                            v-for="(_, i) in Array.from({
+                              length: review.rating,
+                            })"
+                            :key="i"
+                            class="w-3.5 h-3.5 fill-[#ffc107] text-[#ffc107]"
+                          />
+                        </div>
+                      </div>
+                      <span
+                        v-if="!review.isBlinded && review.visitCount"
+                        class="text-xs text-[#6c757d] mt-0.5"
+                      >
+                        {{ review.visitCount }}번째 방문
+                      </span>
+                    </div>
+                  </div>
+                  <span class="text-xs text-[#6c757d]">{{ review.date }}</span>
+                </div>
+
+                <!-- 리뷰 이미지 갤러리 (스크롤 방식) -->
+                <div
+                  v-if="
+                    !review.isBlinded && review.images && review.images.length > 0
+                  "
+                  class="mb-3 -mx-4"
+                >
+                  <div
+                    class="flex gap-2 overflow-x-auto px-4 snap-x snap-mandatory scrollbar-hide review-image-scroll cursor-grab active:cursor-grabbing"
+                  >
+                    <div
+                      v-for="(image, idx) in review.images"
+                      :key="idx"
+                      class="flex-shrink-0 snap-start"
+                      :class="
+                        idx === 0
+                          ? 'w-[calc(100%-3rem)]'
+                          : 'w-[calc(100%-6rem)]'
+                      "
+                    >
+                      <div
+                        class="relative rounded-lg overflow-hidden bg-[#f8f9fa] h-48 cursor-pointer hover:opacity-95 transition-opacity"
+                        @click="openImageModal(review.images, idx)"
+                      >
+                        <img
+                          :src="image || '/placeholder.svg'"
+                          :alt="`리뷰 이미지 ${idx + 1}`"
+                          class="w-full h-full object-cover pointer-events-none"
+                        />
+                        <!-- 이미지 카운터 -->
+                        <div
+                          class="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full"
+                        >
+                          {{ idx + 1 }} / {{ review.images.length }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 리뷰 내용 -->
+                <div v-if="!review.isBlinded">
+                  <p class="text-sm text-[#495057] leading-relaxed mb-2">
+                    {{ truncateText(review.content, review.isExpanded) }}
+                  </p>
+
+                  <!-- 더보기/접기 버튼 -->
+                  <button
+                    v-if="shouldShowExpandButton(review.content)"
+                    @click.prevent="toggleReviewExpand(review)"
+                    class="text-xs text-[#6c757d] hover:text-[#ff6b4a] font-medium mb-3 transition-colors"
+                  >
+                    {{ review.isExpanded ? '접기' : '더보기' }}
+                  </button>
+
+                  <!-- 태그 -->
+                  <RouterLink
+                    :to="`/restaurant/${restaurantId}/reviews/${review.id}`"
+                    class="block"
+                  >
+                    <div
+                      v-if="review.tags && review.tags.length > 0"
+                      class="flex flex-wrap gap-1.5"
+                    >
+                      <span
+                        v-for="(tag, idx) in review.tags"
+                        :key="idx"
+                        class="inline-flex items-center px-2.5 py-1 text-xs rounded-full bg-gradient-to-r from-[#ff6b4a] to-[#ff8e72] text-white font-semibold shadow-sm"
+                      >
+                        {{ tag }}
+                      </span>
+                    </div>
+                  </RouterLink>
+                </div>
+                <div v-else>
+                  <p class="text-sm text-[#495057] leading-relaxed mb-2">
+                    {{ review.content }}
+                  </p>
+                  <span
+                    class="inline-block px-2.5 py-1 text-xs rounded-full bg-[#6c757d] text-white"
+                  >
+                    사유: {{ review.blindReason }}
+                  </span>
+                </div>
+              </Card>
+            </div>
+          </div>
+          <div v-else class="text-center py-8 text-sm text-[#6c757d]">
+            <p>작성된 리뷰가 없습니다.</p>
+          </div>
         </div>
-      </div>
+
+        <!-- Additional Info -->
+        <div class="bg-white px-4 py-5 border-t border-[#e9ecef]">
+          <h3 class="text-base font-semibold text-[#1e3a5f] mb-3">
+            예약 안내
+          </h3>
+          <div class="space-y-2 text-sm text-[#495057] leading-relaxed">
+            <p>• 예약은 최소 1일 전까지 가능합니다.</p>
+            <p>
+              • 예약 취소는 1일 전까지 무료이며, 당일 취소 시 위약금이 발생할 수
+              있습니다.
+            </p>
+            <p>• 인원 변경은 예약일 기준 2일 전까지 가능합니다.</p>
+            <p>• 노쇼 시 향후 예약이 제한될 수 있습니다.</p>
+          </div>
+        </div>
+      </template>
     </main>
 
     <!-- Fixed Bottom Buttons -->
