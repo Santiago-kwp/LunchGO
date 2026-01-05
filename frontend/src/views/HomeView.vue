@@ -247,21 +247,14 @@ const getSortId = (restaurant) => {
   return Number.isFinite(value) ? value : 0;
 };
 const processedRestaurants = computed(() => {
-  let result = baseRestaurants.value.slice();
+  let result = (selectedRecommendation.value === RECOMMEND_TASTE
+      ? tagMappingRecommendations.value
+      : baseRestaurants.value).slice();
+
   const normalizedQuery = searchQuery.value.trim().toLowerCase();
   if (normalizedQuery) {
     result = result.filter((restaurant) =>
-      String(restaurant.name || "").toLowerCase().includes(normalizedQuery)
-    );
-  }
-  let result = (selectedRecommendation.value === RECOMMEND_TASTE
-    ? tagMappingRecommendations.value
-    : baseRestaurants.value).slice();
-
-  const distanceLimit = selectedDistanceKm.value;
-  if (distanceLimit) {
-    result = result.filter((restaurant) =>
-      isWithinDistance(restaurant.coords, distanceLimit)
+        String(restaurant.name || "").toLowerCase().includes(normalizedQuery)
     );
   }
 
