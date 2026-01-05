@@ -58,6 +58,7 @@ jobs:
               docker pull pgw10243/lunchgo-backend:dev
               docker run --env-file /opt/lunchgo/.env \
                 -e SCOUTER_OBJ_NAME=lunchgo-prod-$(hostname) \
+                -v /opt/scouter/scouter/agent.java:/app/scouter/agent.java:ro \
                 -v /opt/scouter/scouter/agent.java/conf/scouter.conf:/app/scouter/conf/scouter.conf:ro \
                 -p 8080:8080 --name lunchgo-backend -d pgw10243/lunchgo-backend:dev
             "

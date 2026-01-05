@@ -418,6 +418,12 @@ docker run --env-file /opt/lunchgo/.env \
   pgw10243/lunchgo-backend:dev
 ```
 
+**마운트 옵션 구분**
+- `-v /opt/scouter/scouter/agent.java:/app/scouter/agent.java:ro`
+  - Agent JAR이 포함된 디렉터리(필수). 없으면 컨테이너가 즉시 종료됨.
+- `-v /opt/scouter/scouter/agent.java/conf/scouter.conf:/app/scouter/conf/scouter.conf:ro`
+  - 환경별 설정 파일 주입(Collector IP/포트). Agent 디렉터리 마운트와 별도.
+
 ### 2) Collector UI에 객체가 보이지 않음
 **증상**
 - Agent 로그는 찍히는데 UI에 객체가 표시되지 않음
@@ -451,6 +457,23 @@ docker run -d --name scouter-server \
   eclipse-temurin:11-jre \
   bash -lc "nohup java -Dscouter.config=/opt/scouter/server/conf/scouter.conf -Xmx1024m -classpath ./scouter-server-boot.jar scouter.boot.Boot ./lib > nohup.out & tail -f nohup.out"
 ```
+
+### 3) Today Visitor가 0으로 보임
+**증상**
+- IP Summary/XLog는 정상인데 `Today Visitor`만 0
+
+**원인**
+- Visitor는 HTTP Session 생성 기준으로 집계됨
+- REST API가 Stateless로 동작하면 `JSESSIONID`가 생성되지 않아 Visitor가 0일 수 있음
+
+**확인**
+```bash
+curl -i http://<bastion-ip>/api/login | rg -i "Set-Cookie|JSESSIONID"
+```
+- `JSESSIONID`가 없으면 Visitor 0이 정상 동작
+
+**대응**
+- Visitor 대신 `IP Summary`, `XLog`, `Active Service`, `TPS/Elapsed`를 기준으로 모니터링
 
 ## macOS Scouter Client 실행 이슈(압축 해제 문제)
 macOS에서 Scouter Client가 SIGSEGV로 종료되는 경우, 잘못된 압축 해제가 원인일 수 있다.
