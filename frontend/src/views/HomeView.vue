@@ -256,11 +256,14 @@ const processedRestaurants = computed(() => {
       String(restaurant.name || "").toLowerCase().includes(normalizedQuery)
     );
   }
+      ? tagMappingRecommendations.value
+      : baseRestaurants.value).slice();
 
-  const distanceLimit = selectedDistanceKm.value;
-  if (distanceLimit) {
+  const normalizedQuery = searchQuery.value.trim().toLowerCase();
+  if (normalizedQuery) {
     result = result.filter((restaurant) =>
         isWithinDistance(restaurant.coords, distanceLimit)
+        String(restaurant.name || "").toLowerCase().includes(normalizedQuery)
     );
   }
 
