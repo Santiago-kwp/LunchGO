@@ -247,23 +247,20 @@ const getSortId = (restaurant) => {
   return Number.isFinite(value) ? value : 0;
 };
 const processedRestaurants = computed(() => {
-  let result = (selectedRecommendation.value === RECOMMEND_TASTE
-    ? tagMappingRecommendations.value
-    : baseRestaurants.value).slice();
+  let result = baseRestaurants.value.slice();
+  if (selectedRecommendation.value === RECOMMEND_TASTE) {
+    result = tagMappingRecommendations.value.slice();
+  }
   const normalizedQuery = searchQuery.value.trim().toLowerCase();
   if (normalizedQuery) {
     result = result.filter((restaurant) =>
       String(restaurant.name || "").toLowerCase().includes(normalizedQuery)
     );
   }
-      ? tagMappingRecommendations.value
-      : baseRestaurants.value).slice();
-
-  const normalizedQuery = searchQuery.value.trim().toLowerCase();
-  if (normalizedQuery) {
+  const distanceLimit = selectedDistanceKm.value;
+  if (distanceLimit) {
     result = result.filter((restaurant) =>
-        isWithinDistance(restaurant.coords, distanceLimit)
-        String(restaurant.name || "").toLowerCase().includes(normalizedQuery)
+      isWithinDistance(restaurant.coords, distanceLimit)
     );
   }
 
