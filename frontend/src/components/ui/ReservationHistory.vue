@@ -28,6 +28,9 @@ const getStatusInfo = (reservationStatus) => {
 
 const router = useRouter();
 
+const getReservationId = (reservation) =>
+  reservation?.id ?? reservation?.reservationId ?? null;
+
 const goCancel = (id) => {
   router.push({ name: "reservation-cancel", params: { id: String(id) } });
 };
@@ -92,7 +95,10 @@ const goCancel = (id) => {
 
         <div class="flex gap-2">
           <RouterLink
-            :to="`/restaurant/${reservation.restaurant.id}/confirmation`"
+            :to="{
+              path: `/restaurant/${reservation.restaurant.id}/confirmation`,
+              query: { reservationId: getReservationId(reservation) },
+            }"
             class="flex-1"
           >
             <Button

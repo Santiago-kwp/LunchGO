@@ -21,6 +21,10 @@ public class Reservation {
 
     private String requestMessage;
 
+    private Integer depositAmount;
+    private Integer prepayAmount;
+    private Integer totalAmount;
+
     private LocalDateTime holdExpiresAt;
     private LocalDateTime paymentDeadlineAt;
 

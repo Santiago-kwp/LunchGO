@@ -1,13 +1,17 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { RouterLink, useRoute } from 'vue-router'; // Import useRoute to get dynamic params
+import { RouterLink, useRoute, useRouter } from 'vue-router'; // Import useRoute to get dynamic params
 import { ArrowLeft, Plus, Minus, ShoppingCart } from 'lucide-vue-next';
 import { getMenuCategoriesByRestaurant } from '@/data/restaurantMenus';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
+import httpRequest from '@/router/httpRequest';
+import { useAccountStore } from '@/stores/account';
 
 const route = useRoute();
+const router = useRouter();
 const restaurantId = route.params.id || '1'; // Default to '1' if id is not available
+const accountStore = useAccountStore();
 
 const cart = ref([]); // Use ref for the cart array
 
@@ -66,8 +70,96 @@ const partySize = computed(() => {
   return Number.isFinite(q) && q > 0 ? q : 1;
 });
 
+const isSubmitting = ref(false);
+const submitErrorMessage = ref('');
+
+const resolveUserId = () => {
+  const storeMemberId = accountStore.member?.id;
+  if (storeMemberId) return storeMemberId;
+  const rawMember = localStorage.getItem('member');
+  if (!rawMember) return null;
+  try {
+    return JSON.parse(rawMember)?.id ?? null;
+  } catch (e) {
+    return null;
+  }
+};
+
+const selectedSlotDate = computed(() => {
+  const idx = Number(route.query.dateIndex);
+  if (!Number.isFinite(idx)) return null;
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + idx);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+});
+
+const selectedSlotTime = computed(() => {
+  const t = String(route.query.time || '');
+  return t ? (t.length === 5 ? `${t}:00` : t) : null;
+});
+
 // 1인당 최소 1개 => 총 선택 개수 >= 인원수
 const canProceed = computed(() => totalItems.value >= partySize.value);
+
+const createReservation = async () => {
+  if (!selectedSlotDate.value || !selectedSlotTime.value) {
+    throw new Error('예약 정보가 없습니다. 다시 예약 과정을 진행해 주세요.');
+  }
+  const userId = resolveUserId();
+  if (!userId) {
+    throw new Error('로그인이 필요합니다.');
+  }
+
+  const payload = {
+    userId,
+    restaurantId: Number(restaurantId),
+    slotDate: selectedSlotDate.value,
+    slotTime: selectedSlotTime.value,
+    partySize: Number(partySize.value),
+    reservationType: 'PREORDER_PREPAY',
+    requestMessage: String(route.query.requestNote || '').trim() || null,
+    totalAmount: totalAmount.value,
+  };
+
+  const res = await httpRequest.post('/api/reservations', payload);
+  return res.data;
+};
+
+const handleProceed = async () => {
+  if (!canProceed.value || isSubmitting.value) return;
+  submitErrorMessage.value = '';
+  isSubmitting.value = true;
+
+  try {
+    const created = await createReservation();
+    const reservationId = created?.reservationId;
+
+    if (!reservationId) {
+      throw new Error('예약 생성에 실패했습니다. 다시 시도해 주세요.');
+    }
+
+    router.push({
+      path: `/restaurant/${restaurantId}/payment`,
+      query: {
+        type: 'full',
+        totalAmount: totalAmount.value,
+        partySize: route.query.partySize,
+        requestNote: route.query.requestNote,
+        dateIndex: route.query.dateIndex,
+        time: route.query.time,
+        reservationId: String(reservationId),
+      },
+    });
+  } catch (e) {
+    submitErrorMessage.value = e?.message || '예약 생성 중 오류가 발생했습니다.';
+  } finally {
+    isSubmitting.value = false;
+  }
+};
 </script>
 
 <template>
@@ -147,24 +239,14 @@ const canProceed = computed(() => totalItems.value >= partySize.value);
           </div>
           <p class="text-lg font-bold text-[#1e3a5f]">{{ totalAmount.toLocaleString() }}원</p>
         </div>
-        <RouterLink
+        <Button
           v-if="canProceed"
-          :to="{
-            path: `/restaurant/${restaurantId}/payment`,
-            query: {
-              type: 'full',
-              totalAmount: totalAmount, 
-              partySize: route.query.partySize,
-              requestNote: route.query.requestNote,
-              dateIndex: route.query.dateIndex,
-              time: route.query.time,
-            },
-          }"
+          :disabled="isSubmitting"
+          @click="handleProceed"
+          class="w-full h-12 gradient-primary text-white font-semibold text-base rounded-xl shadow-button-hover hover:shadow-button-pressed"
         >
-          <Button class="w-full h-12 gradient-primary text-white font-semibold text-base rounded-xl shadow-button-hover hover:shadow-button-pressed">
-            {{ totalAmount.toLocaleString() }}원 결제하기
-          </Button>
-        </RouterLink>
+          {{ totalAmount.toLocaleString() }}원 결제하기
+        </Button>
 
         <Button
           v-else

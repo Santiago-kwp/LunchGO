@@ -3,6 +3,7 @@ package com.example.LunchGo.reservation.service;
 import com.example.LunchGo.reservation.domain.Reservation;
 import com.example.LunchGo.reservation.domain.ReservationSlot;
 import com.example.LunchGo.reservation.domain.ReservationStatus;
+import com.example.LunchGo.reservation.domain.ReservationType;
 import com.example.LunchGo.reservation.dto.ReservationCreateRequest;
 import com.example.LunchGo.reservation.dto.ReservationCreateResponse;
 import com.example.LunchGo.reservation.mapper.ReservationMapper;
@@ -23,6 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReservationServiceImpl implements ReservationService {
 
     private static final DateTimeFormatter CODE_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final int DEPOSIT_PER_PERSON_DEFAULT = 5000;
+    private static final int DEPOSIT_PER_PERSON_LARGE = 10000;
+    private static final int DEPOSIT_LARGE_THRESHOLD = 7;
 
     private final ReservationMapper reservationMapper;
     private final ReservationSlotService reservationSlotService;
@@ -51,6 +55,18 @@ public class ReservationServiceImpl implements ReservationService {
         reservation.setStatus(ReservationStatus.TEMPORARY);
         reservation.setRequestMessage(trimToNull(request.getRequestMessage()));
         reservation.setHoldExpiresAt(LocalDateTime.now().plusMinutes(7));
+
+        if (ReservationType.RESERVATION_DEPOSIT.equals(request.getReservationType())) {
+            int perPerson = request.getPartySize() >= DEPOSIT_LARGE_THRESHOLD
+                ? DEPOSIT_PER_PERSON_LARGE
+                : DEPOSIT_PER_PERSON_DEFAULT;
+            int depositAmount = perPerson * request.getPartySize();
+            reservation.setDepositAmount(depositAmount);
+            reservation.setTotalAmount(depositAmount);
+        } else if (ReservationType.PREORDER_PREPAY.equals(request.getReservationType())) {
+            reservation.setPrepayAmount(request.getTotalAmount());
+            reservation.setTotalAmount(request.getTotalAmount());
+        }
 
         reservationMapper.insertReservation(reservation);
 
@@ -91,6 +107,11 @@ public class ReservationServiceImpl implements ReservationService {
 
         if (request.getReservationType() == null) {
             throw new IllegalArgumentException("reservationType is required");
+        }
+
+        if (ReservationType.PREORDER_PREPAY.equals(request.getReservationType())
+            && (request.getTotalAmount() == null || request.getTotalAmount() <= 0)) {
+            throw new IllegalArgumentException("totalAmount is required for preorder");
         }
 
         if (request.getRequestMessage() != null && request.getRequestMessage().length() > 50) {

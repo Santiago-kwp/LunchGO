@@ -22,4 +22,7 @@ public class ReservationCreateRequest {
 
     // 선택 입력 (<= 50)
     private String requestMessage;
+
+    // 선주문/선결제 총액
+    private Integer totalAmount;
 }

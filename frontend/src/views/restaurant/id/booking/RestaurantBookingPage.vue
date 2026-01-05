@@ -5,6 +5,7 @@ import { ArrowLeft, CalendarIcon, Users } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import httpRequest from '@/router/httpRequest';
+import { useAccountStore } from '@/stores/account';
 
 const route = useRoute();
 const router = useRouter();
@@ -12,7 +13,19 @@ const bookingType = route.query.type || 'reservation';
 const isPreorder = computed(() => bookingType === 'preorder');
 const restaurantId = route.params.id;
 
-const DEFAULT_USER_ID = 2;
+const accountStore = useAccountStore();
+
+const resolveUserId = () => {
+  const storeMemberId = accountStore.member?.id;
+  if (storeMemberId) return storeMemberId;
+  const rawMember = localStorage.getItem('member');
+  if (!rawMember) return null;
+  try {
+    return JSON.parse(rawMember)?.id ?? null;
+  } catch (e) {
+    return null;
+  }
+};
 
 const selectedDateIndex = ref(null);
 const selectedTime = ref(null);
@@ -68,9 +81,13 @@ const createReservation = async () => {
   if (!selectedSlotDate.value || !selectedSlotTime.value) return null;
 
   const normalizeTime = (t) => (t && t.length === 5 ? `${t}:00` : t);
+  const userId = resolveUserId();
+  if (!userId) {
+    throw new Error('로그인이 필요합니다.');
+  }
 
   const payload = {
-    userId: DEFAULT_USER_ID,
+    userId,
     restaurantId: Number(restaurantId),
     slotDate: selectedSlotDate.value,      // "YYYY-MM-DD"
     slotTime: normalizeTime(selectedTime.value), // "11:00:00"
@@ -90,13 +107,6 @@ const handleProceed = async () => {
   createErrorMessage.value = '';
 
   try {
-    const created = await createReservation();
-    const reservationId = created?.reservationId;
-
-    if (!reservationId) {
-      throw new Error('예약 생성에 실패했습니다. 다시 시도해 주세요.');
-    }
-
     if (isPreorder.value) {
       router.push({
         path: `/restaurant/${restaurantId}/menu`,
@@ -106,10 +116,16 @@ const handleProceed = async () => {
           requestNote: String(requestNote.value || ''),
           dateIndex: String(selectedDateIndex.value),
           time: String(selectedTime.value),
-          reservationId: String(reservationId),
         },
       });
       return;
+    }
+
+    const created = await createReservation();
+    const reservationId = created?.reservationId;
+
+    if (!reservationId) {
+      throw new Error('예약 생성에 실패했습니다. 다시 시도해 주세요.');
     }
 
     router.push({
