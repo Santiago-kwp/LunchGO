@@ -17,7 +17,11 @@ const userRole = ref('owner'); // 현재는 직접 입력으로 바꿔야함(own
 
 
 const goDetail = (id) => {
-  router.push({ name: 'reservation-detail', params: { id: String(id) } });
+  router.push({
+    name: 'reservation-detail',
+    params: { id: String(id) },
+    query: restaurantId.value ? { ...route.query, restaurantId: String(restaurantId.value) } : { ...route.query },
+  });
 };
 
 const selectedDate = ref(new Date());
@@ -140,6 +144,26 @@ const handleOutsideClick = (e) => {
 onMounted(() => document.addEventListener('click', handleOutsideClick));
 onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick));
 
+const ensureRestaurantId = async () => {
+  if (restaurantId.value) return restaurantId.value;
+
+  try {
+    const res = await httpRequest.get('/api/business/owner/restaurant');
+    const rid = res.data?.restaurantId;
+
+    if (rid) {
+      await router.replace({
+        query: { ...route.query, restaurantId: String(rid) },
+      });
+      return Number(rid);
+    }
+  } catch (e) {
+    console.error('사업자 restaurantId 조회 실패:', e);
+  }
+
+  return 0;
+};
+
 const loadReservations = async () => {
   if (!restaurantId.value) return;
   try {
@@ -154,8 +178,11 @@ const loadReservations = async () => {
   }
 };
 
-onMounted(() => {
-  loadReservations();
+onMounted(async () => {
+  const rid = await ensureRestaurantId();
+  if (rid) {
+    await loadReservations();
+  }
 });
 
 // --- 취소 모달 상태 ---

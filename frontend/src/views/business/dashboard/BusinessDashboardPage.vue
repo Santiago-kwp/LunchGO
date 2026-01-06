@@ -16,7 +16,11 @@ const restaurantId = computed(() => Number(route.query.restaurantId || 0));
 const userRole = ref('owner'); // 현재는 직접 입력으로 바꿔야함(owner/staff)
 
 const goDetail = (id) => {
-  router.push({ name: 'reservation-detail', params: { id: String(id) } });
+  router.push({
+    name: 'reservation-detail',
+    params: { id: String(id) },
+    query: restaurantId.value ? { ...route.query, restaurantId: String(restaurantId.value) } : { ...route.query },
+  });
 };
 
 // 필터 상태
@@ -100,6 +104,26 @@ const splitDateTime = (datetime) => {
   return { date: parts[0] || '', time: parts[1] || '' };
 };
 
+const ensureRestaurantId = async () => {
+  if (restaurantId.value) return restaurantId.value;
+
+  try {
+    const res = await httpRequest.get('/api/business/owner/restaurant');
+    const rid = res.data?.restaurantId;
+
+    if (rid) {
+      await router.replace({
+        query: { ...route.query, restaurantId: String(rid) },
+      });
+      return Number(rid);
+    }
+  } catch (e) {
+    console.error('사업자 restaurantId 조회 실패:', e);
+  }
+
+  return 0;
+};
+
 const loadReservations = async () => {
   if (!restaurantId.value) return;
   try {
@@ -126,8 +150,11 @@ const loadReservations = async () => {
   }
 };
 
-onMounted(() => {
-  loadReservations();
+onMounted(async () => {
+  const rid = await ensureRestaurantId();
+  if (rid) {
+    await loadReservations();
+  }
 });
 
 const reservationsForDate = computed(() =>
