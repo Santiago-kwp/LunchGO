@@ -62,8 +62,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,
                                 "/api/restaurants/*/reviews",
                                 "/api/restaurants/*/reviews/*",
-                                "/api/restaurants/trending",
-                                "/api/restaurants/*"
+                                "/api/restaurants/trending"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/tags/search").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/reviews/tags").hasAuthority("ROLE_USER")
