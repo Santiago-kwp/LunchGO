@@ -151,6 +151,55 @@ const fetchSearchTags = async () => {
   }
 };
 
+const getStoredMember = () => {
+  const raw = localStorage.getItem("member");
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const resolveMemberId = () => {
+  const member = accountStore.member || getStoredMember();
+  return member?.id ?? member?.userId ?? member?.memberId ?? null;
+};
+
+const fetchUserAddress = async () => {
+  const userId = resolveMemberId();
+  if (!userId) return null;
+  try {
+    const response = await httpRequest.get(`/api/info/user/${userId}`);
+    const data = response.data;
+    return data?.companyAddress || null;
+  } catch (error) {
+    return null;
+  }
+};
+
+const applyUserMapCenter = async () => {
+  if (!isLoggedIn.value) return;
+  const address = await fetchUserAddress();
+  if (!address) {
+    currentLocation.value = fallbackAddress;
+    mapCenter.value = { ...fallbackMapCenter };
+    return;
+  }
+  currentLocation.value = address;
+  try {
+    const coords = await geocodeAddress(address);
+    mapCenter.value = coords;
+    if (mapInstance.value && kakaoMapsApi.value?.LatLng) {
+      const center = new kakaoMapsApi.value.LatLng(coords.lat, coords.lng);
+      mapInstance.value.setCenter(center);
+      scheduleMapMarkerRender();
+    }
+  } catch (error) {
+    // keep fallback center if geocode fails
+  }
+};
+
 const {
   isTrendingLoading,
   trendingRestaurants,
@@ -240,8 +289,25 @@ const applyReviewSummary = (restaurant) => {
     reviews: summary.reviews ?? restaurant.reviews,
   };
 };
-const getSortRating = (restaurant) => restaurant?.rating ?? 0;
-const getSortReviewCount = (restaurant) => restaurant?.reviews ?? 0;
+const getSortRating = (restaurant) => {
+  const summary = reviewSummaryCache.value[String(restaurant?.id)];
+  if (summary && summary.rating != null) {
+    return summary.rating;
+  }
+  return restaurant?.rating ?? 0;
+};
+const getSortReviewCount = (restaurant) => {
+  const summary = reviewSummaryCache.value[String(restaurant?.id)];
+  if (summary && summary.reviews != null) {
+    return summary.reviews;
+  }
+  return restaurant?.reviews ?? 0;
+};
+const getSortRecommendScore = (restaurant) => {
+  const rating = getSortRating(restaurant);
+  const reviews = getSortReviewCount(restaurant);
+  return rating * 20 + Math.log10(reviews + 1) * 10;
+};
 const getSortId = (restaurant) => {
   const value = Number(restaurant?.id);
   return Number.isFinite(value) ? value : 0;
@@ -276,12 +342,14 @@ const processedRestaurants = computed(() => {
     }
   }
 
-  const center = defaultMapCenter;
+  const center = mapCenter.value;
   const getDistance = (restaurant) =>
       haversineDistance(restaurant.coords, center);
 
   const sorters = {
     추천순: (a, b) => {
+      const scoreDiff = getSortRecommendScore(b) - getSortRecommendScore(a);
+      if (scoreDiff !== 0) return scoreDiff;
       const ratingDiff = getSortRating(b) - getSortRating(a);
       if (ratingDiff !== 0) return ratingDiff;
       const reviewDiff = getSortReviewCount(b) - getSortReviewCount(a);
@@ -318,7 +386,10 @@ const processedRestaurants = computed(() => {
     },
   };
 
-  if (selectedRecommendation.value !== RECOMMEND_TASTE) {
+  if (
+    selectedRecommendation.value !== RECOMMEND_TASTE ||
+    selectedSort.value === "평점순"
+  ) {
     const sorter = sorters[selectedSort.value] || sorters[Object.keys(sorters)[0]];
     result.sort(sorter);
   }
@@ -400,11 +471,13 @@ const mapInstance = ref(null);
 const kakaoMapsApi = ref(null);
 const isMapReady = ref(false);
 const mapMarkers = [];
-const defaultMapCenter = restaurants[0]?.coords || {
+const fallbackMapCenter = {
   lat: 37.394374,
   lng: 127.110636,
 };
-const currentLocation = ref("경기도 성남시 분당구 판교동");
+const fallbackAddress = "경기도 성남시 분당구 판교역로 235";
+const mapCenter = ref({ ...fallbackMapCenter });
+const currentLocation = ref(fallbackAddress);
 const mapDistanceSteps = Object.freeze([
   { label: "100m", level: 2 },
   { label: "250m", level: 3 },
@@ -894,8 +967,8 @@ const resetMapToHome = () => {
   if (!kakaoMaps?.LatLng) return;
 
   const targetCenter = new kakaoMaps.LatLng(
-      defaultMapCenter.lat,
-      defaultMapCenter.lng
+      mapCenter.value.lat,
+      mapCenter.value.lng
   );
   mapInstance.value.panTo(targetCenter);
   mapDistanceStepIndex.value =
@@ -909,8 +982,8 @@ const initializeMap = async () => {
     const kakaoMaps = await loadKakaoMaps();
     kakaoMapsApi.value = kakaoMaps;
     const center = new kakaoMaps.LatLng(
-        defaultMapCenter.lat,
-        defaultMapCenter.lng
+        mapCenter.value.lat,
+        mapCenter.value.lng
     );
     mapInstance.value = new kakaoMaps.Map(mapContainer.value, {
       center,
@@ -931,8 +1004,9 @@ const initializeMap = async () => {
 };
 
 
-onMounted(() => {
-  initializeMap();
+onMounted(async () => {
+  await applyUserMapCenter();
+  await initializeMap();
   if (typeof window !== "undefined") {
     const params = new URLSearchParams(window.location.search);
     if (params.get("geocode") === "1") {
@@ -1069,7 +1143,7 @@ const isValidCoords = (coords) =>
 const isWithinDistance = (coords, limitKm) => {
   if (!limitKm) return true;
   if (!isValidCoords(coords)) return false;
-  return haversineDistance(coords, defaultMapCenter) <= limitKm;
+  return haversineDistance(coords, mapCenter.value) <= limitKm;
 };
 
 let mapRenderRafId = 0;
