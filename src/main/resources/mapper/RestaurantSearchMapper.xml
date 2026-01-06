@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.LunchGo.restaurant.mapper.RestaurantSearchMapper">
+
+    <select id="findAvailableRestaurantIds" parameterType="com.example.LunchGo.restaurant.dto.RestaurantSearchParameter" resultType="long">
+        SELECT DISTINCT r.id
+        FROM restaurants r
+
+        <!-- 날짜/시간 검색이 있을 경우에만 예약 가능 여부 판별을 위해 JOIN -->
+        <if test="date != null and time != null and time != ''">
+            LEFT JOIN restaurant_reservation_slots rrs
+            ON r.id = rrs.restaurant_id
+            AND rrs.slot_date = #{date}
+            AND rrs.slot_time = #{time}
+        </if>
+
+        <!-- TODO: 태그 검색 기능 추가 시, 여기에 INNER JOIN 구문 추가 -->
+
+
+        <where>
+            <!-- TODO: 태그 검색 기능 추가 시, 여기에 AND 조건으로 태그 필터링 구문 추가 -->
+
+
+            <!-- 날짜/시간/인원수에 따른 예약 가능 여부 필터링 조건 -->
+            <if test="date != null and time != null and time != ''">
+                AND (
+                    -- 1. 식당의 일반적인 운영 시간 확인
+                    (#{time} BETWEEN r.open_time AND r.close_time)
+                    AND
+                    -- 시나리오 1: 해당 날짜/시간에 예약 슬롯이 아예 없는 경우
+                    (rrs.slot_id IS NULL OR
+                        -- 시나리오 2: 해당 날짜/시간에 예약 슬롯이 있지만 잔여석이 충분한 경우
+                        (rrs.slot_id IS NOT NULL AND r.reservation_limit >= (
+                            -- `sumPartySizeBySlotId`의 로직을 서브쿼리로 구현
+                            SELECT COALESCE(SUM(res.party_size), 0)
+                            FROM reservations res
+                            WHERE res.slot_id = rrs.slot_id
+                            AND res.status IN ('TEMPORARY', 'CONFIRMED', 'PREPAID_CONFIRM')
+                        ) + #{partySize})
+                    )
+                )
+            </if>
+        </where>
+    </select>
+
+</mapper>
