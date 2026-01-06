@@ -6,13 +6,30 @@ import { Filter, Bell, CheckCircle2, XCircle, Clock, Search } from 'lucide-vue-n
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 import StaffSideBar from '@/components/ui/StaffSideBar.vue';
+import { useAccountStore } from '@/stores/account';
+import httpRequest from '@/router/httpRequest';
 
 const router = useRouter();
 const route = useRoute();
+const accountStore = useAccountStore();
 
-// 권한 확인 로직 (실제 앱에서는 Pinia Store나 localStorage에서 가져옵니다)
-// 예: const authStore = useAuthStore(); const userRole = computed(() => authStore.userRole);
-const userRole = ref('owner'); // 현재는 직접 입력으로 바꿔야함(owner/staff)
+const getStoredMember = () => {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem('member');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+};
+
+const member = computed(() => accountStore.member || getStoredMember());
+const userRole = computed(() => {
+  if (member.value?.role === 'ROLE_OWNER') return 'owner';
+  if (member.value?.role === 'ROLE_STAFF') return 'staff';
+  return '';
+});
 
 // const activeMenu = computed(() =>
 //   route.query.from === 'notifications' ? 'notifications' : 'reservations'
@@ -24,6 +41,22 @@ const goReservationDetail = (reservationId) => {
     params: { id: String(reservationId) },
     query: { from: 'notifications' },
   });
+};
+
+const handleWillVisitAction = async (notification) => {
+  try {
+    await httpRequest.patch(`/api/reservations/${notification.reservationId}/complete`);
+
+    alert("방문 확정 처리 되었습니다.");
+
+    notifications.value = notifications.value.filter((n) => n.id !== notification.id); //방문 확정되면 해당 row 제거
+  } catch (error) {
+    const status = error?.response?.status;
+    if (status === 404) {
+      alert('[404 Not Found] 예약 정보를 찾을 수 없습니다.');
+    }
+    console.log("error: "+ error);
+  }
 };
 
 // ---- mock data (나중에 API로 교체) ----
@@ -285,6 +318,13 @@ const statusIcon = (s) => {
                           class="bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] text-white px-3 py-2 rounded-lg text-xs hover:opacity-90"
                         >
                           예약 상세
+                        </button>
+                        <button
+                          v-if="n.responseStatus === 'will_visit'"
+                          @click="handleWillVisitAction(n)"
+                          class="bg-white text-[#FF6B4A] border border-[#FF6B4A] px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#FFF0EC] cursor-pointer transition-colors"
+                        >
+                          방문 확정
                         </button>
                       </div>
                     </td>

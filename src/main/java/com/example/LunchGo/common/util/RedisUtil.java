@@ -6,6 +6,7 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
 @RequiredArgsConstructor
 @Service
@@ -40,4 +41,20 @@ public class RedisUtil {
         template.delete(key);
     }
     //데이터 즉시 삭제(인증 성공 시 사용하게 됨)
+
+    public boolean updateData(String key, String newValue) {
+        if (!existData(key)) { //데이터가 없는 경우
+            return false;
+        }
+
+        long ttlMillis = template.getExpire(key, TimeUnit.MILLISECONDS);
+        ValueOperations<String, String> ops = template.opsForValue();
+        ops.set(key, newValue);
+
+        if (ttlMillis > 0) {
+            template.expire(key, Duration.ofMillis(ttlMillis)); //시간 남았으면 그대로 설정
+        }
+
+        return true;
+    }
 }

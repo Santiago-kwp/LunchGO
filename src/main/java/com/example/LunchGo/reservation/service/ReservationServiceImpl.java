@@ -1,13 +1,13 @@
 package com.example.LunchGo.reservation.service;
 
-import com.example.LunchGo.reservation.domain.Reservation;
-import com.example.LunchGo.reservation.domain.ReservationSlot;
-import com.example.LunchGo.reservation.domain.ReservationStatus;
-import com.example.LunchGo.reservation.domain.ReservationType;
+import com.example.LunchGo.common.util.RedisUtil;
+import com.example.LunchGo.reservation.domain.*;
 import com.example.LunchGo.reservation.dto.ReservationCreateRequest;
 import com.example.LunchGo.reservation.dto.ReservationCreateResponse;
 import com.example.LunchGo.reservation.mapper.ReservationMapper;
 import com.example.LunchGo.reservation.mapper.row.ReservationCreateRow;
+
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -15,8 +15,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +32,7 @@ public class ReservationServiceImpl implements ReservationService {
 
     private final ReservationMapper reservationMapper;
     private final ReservationSlotService reservationSlotService;
+    private final RedisUtil redisUtil;
 
 
     @Override
@@ -78,6 +81,14 @@ public class ReservationServiceImpl implements ReservationService {
             // 생성 직후 조회 실패면 데이터 이상이므로 런타임 에러로 바로 터뜨림
             throw new IllegalStateException("created reservation not found");
         }
+
+        //제대로 생성이 된 경우 redis에 응답대기로 방문 확정 관련 상태 넣어놓기
+        LocalDateTime slotDateTime = LocalDateTime.of(request.getSlotDate(), request.getSlotTime());
+        long ttlMillis = Duration.between(LocalDateTime.now(), slotDateTime).toMillis(); //예약 날짜 - now 만큼 밀리초로 redis에 주입
+        if (ttlMillis < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST); //음수가 나오는 경우 = 과거 시간을 예약한 경우
+        }
+        redisUtil.setDataExpire(String.valueOf(reservation.getReservationId()), VisitStatus.PENDING.name(),ttlMillis);
 
         return new ReservationCreateResponse(
                 row.getReservationId(),
