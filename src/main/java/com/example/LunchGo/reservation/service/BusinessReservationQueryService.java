@@ -40,6 +40,23 @@ public class BusinessReservationQueryService {
                 .toList();
     }
 
+    public List<BusinessReservationItemResponse> getListByDate(Long restaurantId, LocalDate slotDate) {
+        List<BusinessReservationListRow> rows =
+                reservationMapper.selectBusinessReservationListByDate(restaurantId, slotDate);
+
+        return rows.stream()
+                .map(row -> BusinessReservationItemResponse.builder()
+                        .id(row.getId())
+                        .name(row.getName())
+                        .phone(row.getPhone())
+                        .datetime(row.getDatetime())
+                        .guests(row.getGuests())
+                        .amount(row.getAmount())
+                        .status(row.getStatus())
+                        .build())
+                .toList();
+    }
+
     public BusinessReservationDetailResponse getDetail(Long reservationId) {
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ReservationNotFoundException(String.valueOf(reservationId)));

@@ -19,7 +19,7 @@ const goDetail = (id) => {
   router.push({
     name: 'reservation-detail',
     params: { id: String(id) },
-    query: restaurantId.value ? { ...route.query, restaurantId: String(restaurantId.value) } : { ...route.query },
+    query: { ...route.query },
   });
 };
 
@@ -107,28 +107,27 @@ const splitDateTime = (datetime) => {
 const ensureRestaurantId = async () => {
   if (restaurantId.value) return restaurantId.value;
 
+  // 사업자 로그인 상태면 백엔드에서 owner의 식당 id를 받아서 쿼리에 박아넣음
   try {
     const res = await httpRequest.get('/api/business/owner/restaurant');
-    const rid = res.data?.restaurantId;
-
+    const rid = res?.data?.restaurantId;
     if (rid) {
       await router.replace({
+        path: route.path,
         query: { ...route.query, restaurantId: String(rid) },
       });
       return Number(rid);
     }
   } catch (e) {
-    console.error('사업자 restaurantId 조회 실패:', e);
+    console.error('restaurantId 자동 조회 실패:', e);
   }
-
   return 0;
 };
-
-const loadReservations = async () => {
-  if (!restaurantId.value) return;
+const loadReservations = async (rid) => {
+  if (!rid) return;
   try {
     const response = await httpRequest.get('/api/business/reservations', {
-      restaurantId: restaurantId.value,
+      restaurantId: rid,
     });
     if (Array.isArray(response.data)) {
       reservations.value = response.data.map((row) => {
@@ -151,15 +150,16 @@ const loadReservations = async () => {
 };
 
 onMounted(async () => {
+  selectedDate.value = new Date();
   const rid = await ensureRestaurantId();
   if (rid) {
-    await loadReservations();
+    await loadReservations(rid);
   }
 });
 
-const reservationsForDate = computed(() =>
-  reservations.value.filter((r) => r.date === selectedDateStr.value)
-);
+const reservationsForDate = computed(() => {
+  return reservations.value.filter((r) => r.date === selectedDateStr.value);
+});
 
 //필터 적용된 예약 리스트
 const filteredReservations = computed(() => {
