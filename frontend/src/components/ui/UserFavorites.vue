@@ -311,7 +311,7 @@ const statusLabel = (status: LinkItem['status']) => {
               즐겨찾기 공유
             </h3>
             <button
-              class="text-xs text-[#868e96] flex items-center gap-1"
+              class="text-xs text-[#1e3a5f] flex items-center gap-1"
               @click="fetchLinkLists"
             >
               <RefreshCw class="w-3 h-3" />
@@ -344,7 +344,7 @@ const statusLabel = (status: LinkItem['status']) => {
                   <p class="text-sm font-semibold text-[#1e3a5f]">
                     {{ user.nickname || user.name }}
                   </p>
-                  <p class="text-xs text-[#868e96]">{{ user.email }}</p>
+                  <p class="text-xs text-[#1e3a5f]">{{ user.email }}</p>
                 </div>
                 <button class="btn-outline-sm" @click="handleRequestLink(user)">
                   <UserPlus class="w-4 h-4 mr-1" />
@@ -357,8 +357,8 @@ const statusLabel = (status: LinkItem['status']) => {
 
         <div class="bg-white border border-[#e9ecef] rounded-xl p-4 shadow-sm">
           <h4 class="font-semibold text-[#1e3a5f] text-sm mb-3">링크 요청함</h4>
-          <div v-if="isLinkLoading" class="text-xs text-[#adb5bd]">불러오는 중...</div>
-          <div v-else-if="sentLinks.length === 0" class="text-xs text-[#adb5bd]">
+          <div v-if="isLinkLoading" class="text-xs text-[#1e3a5f]">불러오는 중...</div>
+          <div v-else-if="sentLinks.length === 0" class="text-xs text-[#1e3a5f]">
             요청한 링크가 없습니다.
           </div>
           <div v-else class="space-y-2">
@@ -371,10 +371,10 @@ const statusLabel = (status: LinkItem['status']) => {
                 <p class="font-semibold text-[#1e3a5f]">
                   {{ link.counterpartNickname || link.counterpartName }}
                 </p>
-                <p class="text-[#868e96]">{{ link.counterpartEmail }}</p>
+                <p class="text-[#1e3a5f]">{{ link.counterpartEmail }}</p>
               </div>
               <div class="flex items-center gap-2">
-                <span class="text-[#868e96]">{{ statusLabel(link.status) }}</span>
+                <span class="text-[#1e3a5f]">{{ statusLabel(link.status) }}</span>
                 <button
                   class="text-xs text-[#ff6b4a]"
                   @click="handleDeleteLink(link.counterpartId)"
@@ -388,8 +388,8 @@ const statusLabel = (status: LinkItem['status']) => {
 
         <div class="bg-white border border-[#e9ecef] rounded-xl p-4 shadow-sm">
           <h4 class="font-semibold text-[#1e3a5f] text-sm mb-3">링크 수신함</h4>
-          <div v-if="isLinkLoading" class="text-xs text-[#adb5bd]">불러오는 중...</div>
-          <div v-else-if="receivedLinks.length === 0" class="text-xs text-[#adb5bd]">
+          <div v-if="isLinkLoading" class="text-xs text-[#1e3a5f]">불러오는 중...</div>
+          <div v-else-if="receivedLinks.length === 0" class="text-xs text-[#1e3a5f]">
             수신된 링크가 없습니다.
           </div>
           <div v-else class="space-y-2">
@@ -402,10 +402,10 @@ const statusLabel = (status: LinkItem['status']) => {
                 <p class="font-semibold text-[#1e3a5f]">
                   {{ link.counterpartNickname || link.counterpartName }}
                 </p>
-                <p class="text-[#868e96]">{{ link.counterpartEmail }}</p>
+                <p class="text-[#1e3a5f]">{{ link.counterpartEmail }}</p>
               </div>
               <div class="flex items-center gap-2">
-                <span class="text-[#868e96]">{{ statusLabel(link.status) }}</span>
+                <span class="text-[#1e3a5f]">{{ statusLabel(link.status) }}</span>
                 <div v-if="link.status === 'PENDING'" class="flex gap-2">
                   <button
                     class="text-xs text-[#1e3a5f]"
@@ -434,7 +434,7 @@ const statusLabel = (status: LinkItem['status']) => {
 
         <div class="bg-white border border-[#e9ecef] rounded-xl p-4 shadow-sm">
           <h4 class="font-semibold text-[#1e3a5f] text-sm mb-3">공유 폴더</h4>
-          <div v-if="sharedFolders.length === 0" class="text-xs text-[#adb5bd]">
+          <div v-if="sharedFolders.length === 0" class="text-xs text-[#1e3a5f]">
             승인된 링크가 없습니다.
           </div>
           <div v-else class="space-y-2">
@@ -447,7 +447,7 @@ const statusLabel = (status: LinkItem['status']) => {
               <p class="font-semibold text-[#1e3a5f]">
                 {{ link.counterpartNickname || link.counterpartName }}
               </p>
-              <p class="text-[#868e96]">{{ link.counterpartEmail }}</p>
+              <p class="text-[#1e3a5f]">{{ link.counterpartEmail }}</p>
             </button>
           </div>
 
@@ -455,7 +455,7 @@ const statusLabel = (status: LinkItem['status']) => {
             <div class="flex items-center justify-between mb-2">
               <p class="text-xs font-semibold text-[#1e3a5f]">공유된 즐겨찾기</p>
               <button
-                class="text-xs text-[#868e96]"
+                class="text-xs text-[#1e3a5f]"
                 @click="handleOpenSharedFolder(selectedSharedUserId)"
               >
                 새로고침
@@ -475,7 +475,7 @@ const statusLabel = (status: LinkItem['status']) => {
                 </div>
               </div>
             </div>
-            <div v-else-if="sharedBookmarks.length === 0" class="text-xs text-[#adb5bd]">
+            <div v-else-if="sharedBookmarks.length === 0" class="text-xs text-[#1e3a5f]">
               공유된 즐겨찾기가 없습니다.
             </div>
             <div v-else class="space-y-2">
@@ -508,9 +508,9 @@ const statusLabel = (status: LinkItem['status']) => {
                     <span class="text-[11px] font-semibold text-[#1e3a5f]">
                       {{ restaurant.reviewCount > 0 ? restaurant.rating.toFixed(1) : '리뷰 없음' }}
                     </span>
-                    <span class="text-[10px] text-[#868e96]">({{ restaurant.reviewCount }})</span>
+                    <span class="text-[10px] text-[#1e3a5f]">({{ restaurant.reviewCount }})</span>
                   </div>
-                  <p class="text-[10px] text-[#868e96] mt-1 truncate">
+                  <p class="text-[10px] text-[#1e3a5f] mt-1 truncate">
                     {{ restaurant.roadAddress }} {{ restaurant.detailAddress }}
                   </p>
                 </div>
@@ -522,7 +522,7 @@ const statusLabel = (status: LinkItem['status']) => {
 
       <div v-if="favorites.length > 0">
         <div class="px-2 py-4 border-b border-[#e9ecef] mb-2">
-          <p class="text-sm text-[#495057]">
+          <p class="text-sm text-[#1e3a5f]">
             총 <span class="font-semibold text-[#ff6b4a]">{{ favorites.length }}개</span>의 즐겨찾기
           </p>
         </div>
@@ -574,13 +574,13 @@ const statusLabel = (status: LinkItem['status']) => {
                   <span class="text-sm font-bold text-[#1e3a5f]">
                     {{ restaurant.reviewCount > 0 ? restaurant.rating.toFixed(1) : '리뷰 없음' }}
                   </span>
-                  <span class="text-xs text-[#868e96]">({{ restaurant.reviewCount }})</span>
+                  <span class="text-xs text-[#1e3a5f]">({{ restaurant.reviewCount }})</span>
                 </div>
 
-                <p class="text-xs text-[#868e96] mb-1.5 truncate">{{ restaurant.description }}</p>
+                <p class="text-xs text-[#1e3a5f] mb-1.5 truncate">{{ restaurant.description }}</p>
                 <p class="text-sm font-bold text-[#1e3a5f]">
                   {{ restaurant.avgMainPrice ? `${restaurant.avgMainPrice.toLocaleString()}원` : '가격 미정' }}
-                  <span v-if="restaurant.reservationLimit" class="text-xs text-[#868e96]">
+                  <span v-if="restaurant.reservationLimit" class="text-xs text-[#1e3a5f]">
                     · 최대 {{ restaurant.reservationLimit }}인
                   </span>
                   </p>
@@ -628,7 +628,7 @@ const statusLabel = (status: LinkItem['status']) => {
         </div>
       </div>
 
-      <div v-else class="py-20 flex flex-col items-center justify-center text-[#ADB5BD]">
+      <div v-else class="py-20 flex flex-col items-center justify-center text-[#1e3a5f]">
         <Star class="w-12 h-12 mb-3 opacity-20" />
         <p class="text-sm">즐겨찾기한 항목이 없습니다.</p>
       </div>
@@ -662,7 +662,7 @@ const statusLabel = (status: LinkItem['status']) => {
   padding: 0 14px;
   font-size: 12px;
   font-weight: 600;
-  color: #495057;
+  color: #1e3a5f;
   background: white;
   border: 1.5px solid #e9ecef;
   border-radius: 10px;

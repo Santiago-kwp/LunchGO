@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { ArrowLeft } from "lucide-vue-next";
 import httpRequest from "@/router/httpRequest";
-import { useBookmarkShare } from "@/composables/useBookmarkShare";
+import { useFavorites } from "@/composables/useFavorites";
 import { useAccountStore } from "@/stores/account";
 import Pagination from "@/components/ui/Pagination.vue";
 
@@ -12,7 +12,7 @@ import ReservationHistory from "@/components/ui/ReservationHistory.vue"; // 예�
 import UsageHistory from "@/components/ui/UsageHistory.vue"; // 지난 예약(이용완료/환불) 목록
 
 const route = useRoute();
-const { getMyBookmarks } = useBookmarkShare();
+const { fetchFavorites, favoriteRestaurantIds, clearFavorites } = useFavorites();
 const accountStore = useAccountStore();
 
 const devUserId = import.meta.env.DEV ? 1 : 0;
@@ -21,7 +21,6 @@ const loadError = ref("");
 
 // 탭 상태 관리 ('upcoming' | 'past')
 const activeTab = ref("upcoming");
-const favorites = ref([]);
 const upcomingReservations = ref([]);
 const pastReservations = ref([]);
 const pastSearchQuery = ref("");
@@ -59,15 +58,11 @@ onMounted(() => {
 });
 
 const loadFavorites = async () => {
-  if (!memberId.value) return;
-  try {
-    const response = await getMyBookmarks(memberId.value);
-    const data = Array.isArray(response.data) ? response.data : [];
-    favorites.value = data.map((item) => item.restaurantId);
-  } catch (error) {
-    console.error("즐겨찾기 목록 조회 실패:", error);
-    favorites.value = [];
+  if (!memberId.value) {
+    clearFavorites();
+    return;
   }
+  await fetchFavorites(memberId.value);
 };
 
 const statusMap = {
@@ -299,7 +294,7 @@ watch(
           <UsageHistory
             :reservations="pagedPastReservations"
             :user-id="memberId"
-            :favorites="favorites"
+            :favorites="favoriteRestaurantIds"
           />
 
           <div class="flex items-center justify-center py-4">

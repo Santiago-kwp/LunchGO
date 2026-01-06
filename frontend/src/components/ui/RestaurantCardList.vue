@@ -2,6 +2,7 @@
 import { RouterLink } from "vue-router";
 import { Star } from "lucide-vue-next";
 import Card from "@/components/ui/Card.vue";
+import FavoriteStarButton from "@/components/ui/FavoriteStarButton.vue";
 
 const props = defineProps({
   restaurants: {
@@ -21,9 +22,6 @@ const props = defineProps({
     default: () => {},
   },
 });
-
-const isRestaurantFavorite = (restaurantId) =>
-  props.favoriteRestaurantIds.includes(restaurantId);
 
 const normalizeTag = (tag) => {
   if (!tag) return null;
@@ -80,28 +78,7 @@ const formatRating = (rating) => {
       <Card
         class="relative overflow-hidden border-[#e9ecef] rounded-xl bg-white shadow-card hover:shadow-lg transition-shadow cursor-pointer"
       >
-        <button
-          type="button"
-          class="absolute top-3 right-3 z-10 p-2 rounded-full bg-white/90 shadow-card text-[#c4c4c4] hover:text-[#ff6b4a] transition-colors"
-          :aria-pressed="isRestaurantFavorite(restaurant.id)"
-          @click.stop.prevent="onToggleFavorite(restaurant.id)"
-        >
-          <Star
-            class="w-4 h-4"
-            :class="
-              isRestaurantFavorite(restaurant.id)
-                ? 'fill-current text-[#ff6b4a]'
-                : 'text-[#adb5bd] fill-white'
-            "
-          />
-          <span class="sr-only">
-            {{
-              isRestaurantFavorite(restaurant.id)
-                ? '즐겨찾기 해제'
-                : '즐겨찾기에 추가'
-            }}
-          </span>
-        </button>
+        <FavoriteStarButton :restaurant-id="restaurant.id" />
         <div class="flex gap-3 p-2">
           <div
             class="relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden"
@@ -119,7 +96,7 @@ const formatRating = (rating) => {
                 {{ restaurant.name }}
               </h4>
             </div>
-            <p class="text-xs text-[#6c757d] mb-1 truncate">
+            <p class="text-xs text-gray-700 mb-1 truncate">
               {{ restaurant.address }}
             </p>
             <div class="flex items-center gap-1 mb-1.5">
@@ -127,7 +104,7 @@ const formatRating = (rating) => {
               <span class="text-sm font-medium text-[#1e3a5f]">
                 {{ formatRating(restaurant.rating) }}
               </span>
-              <span class="text-xs text-[#6c757d]"
+              <span class="text-xs text-gray-700"
                 >(리뷰수 : {{ restaurant.reviews ?? 0 }})</span
               >
             </div>

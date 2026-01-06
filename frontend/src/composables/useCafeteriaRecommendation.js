@@ -53,9 +53,17 @@ export const useCafeteriaRecommendation = ({ userId, storageKey } = {}) => {
     sessionStorage.removeItem(resolvedStorageKey);
   };
 
+  const resolveUserId = () => {
+    if (typeof userId === "function") return userId();
+    if (userId && typeof userId === "object" && "value" in userId) {
+      return userId.value;
+    }
+    return userId ?? null;
+  };
+
   const fetchCafeteriaWeekMenus = async (baseDate) => {
     const response = await httpRequest.get("/api/cafeteria/menus/week", {
-      userId,
+      userId: resolveUserId(),
       baseDate,
     });
     return response.data;
@@ -63,7 +71,7 @@ export const useCafeteriaRecommendation = ({ userId, storageKey } = {}) => {
 
   const fetchCafeteriaRecommendations = async (baseDate, limit = 2) => {
     const response = await httpRequest.get("/api/cafeteria/recommendations", {
-      userId,
+      userId: resolveUserId(),
       baseDate,
       limit,
     });
@@ -91,7 +99,7 @@ export const useCafeteriaRecommendation = ({ userId, storageKey } = {}) => {
 
     try {
       const response = await httpRequest.post("/api/cafeteria/menus/ocr", formData, {
-        params: { userId, baseDate },
+        params: { userId: resolveUserId(), baseDate },
         headers: { "Content-Type": "multipart/form-data" },
       });
       cafeteriaOcrResult.value = response.data;
@@ -114,7 +122,7 @@ export const useCafeteriaRecommendation = ({ userId, storageKey } = {}) => {
 
     try {
       await httpRequest.post("/api/cafeteria/menus/confirm", {
-        userId,
+        userId: resolveUserId(),
         imageUrl: cafeteriaImageUrl.value,
         rawText: cafeteriaRawText.value,
         days,

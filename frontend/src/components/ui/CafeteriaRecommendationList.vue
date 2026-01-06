@@ -1,19 +1,11 @@
 <script setup>
 import Card from "@/components/ui/Card.vue";
 import { RouterLink } from "vue-router";
-import { Star } from "lucide-vue-next";
+import FavoriteStarButton from "@/components/ui/FavoriteStarButton.vue";
 
 defineProps({
   recommendations: {
     type: Array,
-    required: true,
-  },
-  favoriteRestaurantIds: {
-    type: Array,
-    required: true,
-  },
-  onToggleFavorite: {
-    type: Function,
     required: true,
   },
 });
@@ -45,28 +37,7 @@ defineProps({
           <Card
             class="relative overflow-hidden border-[#e9ecef] rounded-xl bg-white shadow-card hover:shadow-lg transition-shadow cursor-pointer"
           >
-            <button
-              type="button"
-              class="absolute top-3 right-3 z-10 p-2 rounded-full bg-white/90 shadow-card text-[#c4c4c4] hover:text-[#ff6b4a] transition-colors"
-              :aria-pressed="favoriteRestaurantIds.includes(restaurant.id)"
-              @click.stop.prevent="onToggleFavorite(restaurant.id)"
-            >
-              <Star
-                class="w-4 h-4"
-                :class="
-                  favoriteRestaurantIds.includes(restaurant.id)
-                    ? 'fill-current text-[#ff6b4a]'
-                    : 'text-[#adb5bd] fill-white'
-                "
-              />
-              <span class="sr-only">
-                {{
-                  favoriteRestaurantIds.includes(restaurant.id)
-                    ? '즐겨찾기 해제'
-                    : '즐겨찾기에 추가'
-                }}
-              </span>
-            </button>
+            <FavoriteStarButton :restaurant-id="restaurant.id" />
             <div class="flex gap-3 p-2">
               <div
                 class="relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden"

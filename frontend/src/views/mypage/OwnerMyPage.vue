@@ -323,7 +323,7 @@ const handleWithdraw = () => {
               class="absolute bottom-1 right-1 bg-white border border-[#DEE2E6] p-2.5 rounded-full shadow-md hover:bg-[#F8F9FA] transition-all active:scale-95 group"
             >
               <Camera
-                class="w-5 h-5 text-[#495057] group-hover:text-[#1E3A5F]"
+                class="w-5 h-5 text-[#1E3A5F] group-hover:text-[#1E3A5F]"
               />
             </button>
           </div>
@@ -459,7 +459,7 @@ const handleWithdraw = () => {
             <div class="flex justify-center">
               <button
                 @click="handleWithdraw"
-                class="text-[#ADB5BD] text-sm underline underline-offset-4 hover:text-[#FF6B4A] transition-colors"
+                class="text-[#1E3A5F] text-sm underline underline-offset-4 hover:text-[#1E3A5F] transition-colors"
               >
                 회원 탈퇴
               </button>
@@ -526,7 +526,7 @@ const handleWithdraw = () => {
   display: block;
   font-size: 13px;
   font-weight: 600;
-  color: #495057;
+  color: #1e3a5f;
   margin-bottom: 8px;
 }
 
@@ -545,10 +545,10 @@ const handleWithdraw = () => {
 /* Readonly 상태 */
 .input-field:read-only {
   background-color: #f8f9fa;
-  color: #495057;
+  color: #1e3a5f;
   cursor: default;
   opacity: 1;
-  -webkit-text-fill-color: #495057;
+  -webkit-text-fill-color: #1e3a5f;
 }
 
 .input-field:read-only:focus {
@@ -564,7 +564,7 @@ const handleWithdraw = () => {
 }
 
 .input-field::placeholder {
-  color: #adb5bd;
+  color: #1e3a5f;
 }
 
 /* Button Styles */
@@ -573,7 +573,7 @@ const handleWithdraw = () => {
   padding: 0 20px;
   font-size: 14px;
   font-weight: 600;
-  color: #495057;
+  color: #1e3a5f;
   background: white;
   border: 1px solid #dee2e6;
   border-radius: 12px;

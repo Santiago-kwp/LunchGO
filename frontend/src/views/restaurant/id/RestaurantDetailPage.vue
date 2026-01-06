@@ -17,6 +17,8 @@ import {
 } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
+import FavoriteStarButton from "@/components/ui/FavoriteStarButton.vue";
+import { useFavorites } from "@/composables/useFavorites";
 import { loadKakaoMaps, geocodeAddress } from '@/utils/kakao';
 import { useAccountStore } from '@/stores/account';
 import httpRequest from "@/router/httpRequest.js";
@@ -24,6 +26,7 @@ import axios from "axios";
 
 const accountStore = useAccountStore();
 const isLoggedIn = computed(() => accountStore.loggedIn);
+const { fetchFavorites, clearFavorites, userId } = useFavorites();
 
 const route = useRoute();
 const restaurantId = route.params.id || 1; // Default to '1' if id is not available
@@ -43,7 +46,6 @@ const defaultGallery = [
 
 const restaurantImages = ref(defaultGallery);
 const representativeMenus = ref([]);
-const isRestaurantFavorite = ref(false);
 
 const restaurantName = computed(() => restaurantInfo.value?.name || '식당명');
 
@@ -161,9 +163,17 @@ const openImageModal = (images, index) => {
   isImageModalOpen.value = true;
 };
 
-const toggleRestaurantFavorite = () => {
-  isRestaurantFavorite.value = !isRestaurantFavorite.value;
-};
+watch(
+  () => userId.value,
+  (nextUserId) => {
+    if (!nextUserId) {
+      clearFavorites();
+      return;
+    }
+    fetchFavorites(nextUserId);
+  },
+  { immediate: true }
+);
 
 const fetchRestaurantDetail = async () => {
   isLoading.value = true;
@@ -476,56 +486,44 @@ watch(detailMapDistanceStepIndex, () => {
                 <span class="text-base font-semibold text-[#1e3a5f]">{{
                   ratingDisplay
                 }}</span>
-                <span class="text-sm text-[#6c757d]"
+                <span class="text-sm text-gray-700"
                   >({{ reviewCountDisplay }}개 리뷰)</span
                 >
               </div>
-              <p class="text-sm text-[#6c757d] mb-3 leading-relaxed">
+              <p class="text-sm text-gray-700 mb-3 leading-relaxed">
                 {{ taglineDisplay }}
               </p>
               <p
                 v-if="highlightTags"
-                class="text-xs text-[#adb5bd] mb-3 leading-relaxed"
+                class="text-xs text-gray-700 mb-3 leading-relaxed"
               >
                 대표 태그: {{ highlightTags }}
               </p>
             </div>
-            <button
-              type="button"
-              class="p-2 rounded-full bg-[#f8f9fa] text-[#adb5bd] hover:text-[#ff6b4a] transition-colors"
-              :aria-pressed="isRestaurantFavorite"
-              @click="toggleRestaurantFavorite"
-            >
-              <Star
-                class="w-5 h-5"
-                :class="
-                  isRestaurantFavorite ? 'fill-current text-[#ff6b4a]' : 'fill-white'
-                "
-              />
-              <span class="sr-only">
-                {{ isRestaurantFavorite ? '즐겨찾기 해제' : '즐겨찾기에 추가' }}
-              </span>
-            </button>
+            <FavoriteStarButton
+              :restaurant-id="restaurantInfo?.id || Number(restaurantId)"
+              button-class="p-2 rounded-full bg-[#f8f9fa] text-gray-700 hover:text-[#ff6b4a] transition-colors"
+            />
           </div>
 
           <div class="space-y-2.5">
             <div class="flex items-start gap-2 text-sm">
-              <MapPin class="w-4 h-4 text-[#6c757d] mt-0.5 flex-shrink-0" />
-              <span class="text-[#495057] leading-relaxed">{{
+              <MapPin class="w-4 h-4 text-gray-700 mt-0.5 flex-shrink-0" />
+              <span class="text-gray-700 leading-relaxed">{{
                 addressDisplay
               }}</span>
             </div>
             <div class="flex items-start gap-2 text-sm">
-              <Clock class="w-4 h-4 text-[#6c757d] mt-0.5 flex-shrink-0" />
-              <span class="text-[#495057] leading-relaxed">{{ hoursDisplay }}</span>
+              <Clock class="w-4 h-4 text-gray-700 mt-0.5 flex-shrink-0" />
+              <span class="text-gray-700 leading-relaxed">{{ hoursDisplay }}</span>
             </div>
             <div class="flex items-start gap-2 text-sm">
-              <Phone class="w-4 h-4 text-[#6c757d] mt-0.5 flex-shrink-0" />
-              <span class="text-[#495057] leading-relaxed">{{ phoneDisplay }}</span>
+              <Phone class="w-4 h-4 text-gray-700 mt-0.5 flex-shrink-0" />
+              <span class="text-gray-700 leading-relaxed">{{ phoneDisplay }}</span>
             </div>
             <div class="flex items-start gap-2 text-sm">
-              <Users class="w-4 h-4 text-[#6c757d] mt-0.5 flex-shrink-0" />
-              <span class="text-[#495057] leading-relaxed">{{
+              <Users class="w-4 h-4 text-gray-700 mt-0.5 flex-shrink-0" />
+              <span class="text-gray-700 leading-relaxed">{{
                 capacityDisplay
               }}</span>
             </div>
@@ -568,7 +566,7 @@ watch(detailMapDistanceStepIndex, () => {
               </div>
             </div>
           </div>
-          <p class="text-xs text-[#6c757d] mt-2">{{ addressDisplay }}</p>
+          <p class="text-xs text-gray-700 mt-2">{{ addressDisplay }}</p>
         </div>
 
         <!-- Representative Menus -->
@@ -600,7 +598,7 @@ watch(detailMapDistanceStepIndex, () => {
                   <p class="font-semibold text-[#1e3a5f] mb-1">{{ item.name }}</p>
                   <p
                     v-if="item.description"
-                    class="text-xs text-[#6c757d] leading-relaxed mb-2"
+                    class="text-xs text-gray-700 leading-relaxed mb-2"
                   >
                     {{ item.description }}
                   </p>
@@ -658,13 +656,13 @@ watch(detailMapDistanceStepIndex, () => {
                       </div>
                       <span
                         v-if="!review.isBlinded && review.visitCount"
-                        class="text-xs text-[#6c757d] mt-0.5"
+                        class="text-xs text-gray-700 mt-0.5"
                       >
                         {{ review.visitCount }}번째 방문
                       </span>
                     </div>
                   </div>
-                  <span class="text-xs text-[#6c757d]">{{ review.date }}</span>
+                  <span class="text-xs text-gray-700">{{ review.date }}</span>
                 </div>
 
                 <!-- 리뷰 이미지 갤러리 (스크롤 방식) -->
@@ -709,7 +707,7 @@ watch(detailMapDistanceStepIndex, () => {
 
                 <!-- 리뷰 내용 -->
                 <div v-if="!review.isBlinded">
-                  <p class="text-sm text-[#495057] leading-relaxed mb-2">
+                  <p class="text-sm text-gray-700 leading-relaxed mb-2">
                     {{ truncateText(review.content, review.isExpanded) }}
                   </p>
 
@@ -717,7 +715,7 @@ watch(detailMapDistanceStepIndex, () => {
                   <button
                     v-if="shouldShowExpandButton(review.content)"
                     @click.prevent="toggleReviewExpand(review)"
-                    class="text-xs text-[#6c757d] hover:text-[#ff6b4a] font-medium mb-3 transition-colors"
+                    class="text-xs text-gray-700 hover:text-[#ff6b4a] font-medium mb-3 transition-colors"
                   >
                     {{ review.isExpanded ? '접기' : '더보기' }}
                   </button>
@@ -742,7 +740,7 @@ watch(detailMapDistanceStepIndex, () => {
                   </RouterLink>
                 </div>
                 <div v-else>
-                  <p class="text-sm text-[#495057] leading-relaxed mb-2">
+                  <p class="text-sm text-gray-700 leading-relaxed mb-2">
                     {{ review.content }}
                   </p>
                   <span
@@ -754,7 +752,7 @@ watch(detailMapDistanceStepIndex, () => {
               </Card>
             </div>
           </div>
-          <div v-else class="text-center py-8 text-sm text-[#6c757d]">
+          <div v-else class="text-center py-8 text-sm text-gray-700">
             <p>작성된 리뷰가 없습니다.</p>
           </div>
         </div>
@@ -764,7 +762,7 @@ watch(detailMapDistanceStepIndex, () => {
           <h3 class="text-base font-semibold text-[#1e3a5f] mb-3">
             예약 안내
           </h3>
-          <div class="space-y-2 text-sm text-[#495057] leading-relaxed">
+          <div class="space-y-2 text-sm text-gray-700 leading-relaxed">
             <p>• 예약은 최소 1일 전까지 가능합니다.</p>
             <p>
               • 예약 취소는 1일 전까지 무료이며, 당일 취소 시 위약금이 발생할 수

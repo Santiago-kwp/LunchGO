@@ -44,4 +44,6 @@ public interface MemberService {
     List<StaffInfo> getStaffs(Long ownerId);
 
     void updateLastLoginAt(String userType, Long memberId);
+
+    List<OwnerInfo> getOwners();
 }

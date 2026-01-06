@@ -1,8 +1,10 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import AdminSidebar from '@/components/ui/AdminSideBar.vue';
 import AdminHeader from '@/components/ui/AdminHeader.vue';
 import Pagination from '@/components/ui/Pagination.vue';
+import httpRequest from '@/router/httpRequest';
+import { useAccountStore } from '@/stores/account';
 
 // 검색 및 필터 상태
 const searchQuery = ref('');
@@ -41,20 +43,58 @@ const getStatusLabel = (status) => {
   return labels[status] || status;
 };
 
-// Mock 데이터 생성
-const allOwners = ref(
-  Array.from({ length: 45 }, (_, i) => {
-    const isPending = i % 5 === 0 || i % 7 === 0; 
-    return {
-      id: i + 1,
-      name: ['김철수', '이영희', '박민수', '정다은', '최지훈'][i % 5],
-      businessNumber: `123-${String(i).padStart(2, '0')}-4567${i % 9}`,
-      openingDate: `2024-${String((i % 12) + 1).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')}`,
-      username: `owner_user_${i + 1}`,
-      status: isPending ? 'pending' : 'approval',
-    };
-  })
-);
+const accountStore = useAccountStore();
+
+const getStoredMember = () => {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem('member');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+};
+
+const member = computed(() => accountStore.member || getStoredMember());
+const adminDisplayName = computed(() => {
+  const data = member.value || {};
+  return data.name || data.loginId || data.email || 'Unknown';
+});
+
+const allOwners = ref([]);
+
+const loadOwners = async () => {
+  try {
+    const response = await httpRequest.get('/api/admin/list/owner');
+    if (!Array.isArray(response.data)) return alert("정보 불러오는 중 오류가 발생했습니다.");
+
+    allOwners.value = response.data.map((row, index) => {
+      const rawStatus = row.status || '';
+      const normalized = typeof rawStatus === 'string' ? rawStatus.toUpperCase() : rawStatus;
+      const statusMap = {
+        PENDING: 'pending',
+        ACTIVE: 'approval',
+        WITHDRAWAL: 'rejected',
+      };
+
+      return {
+        id: index + 1,
+        name: row.name ?? '',
+        businessNumber: row.businessNum ?? '',
+        openingDate: row.startAt ?? '',
+        username: row.loginId ?? '',
+        status: statusMap[normalized],
+      };
+    });
+  } catch (error) {
+    console.error('Owner list load failed:', error);
+  }
+};
+
+onMounted(() => {
+  loadOwners();
+});
 
 // 통계 데이터 계산 (rejected 추가)
 const stats = computed(() => {

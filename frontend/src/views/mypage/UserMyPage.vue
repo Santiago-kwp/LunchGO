@@ -665,7 +665,7 @@ const handleWithdraw = () => {
       >
         <RouterLink
           to="/"
-          class="p-2 -ml-2 text-[#495057] hover:text-[#1E3A5F]"
+          class="p-2 -ml-2 text-[#1E3A5F] hover:text-[#1E3A5F]"
         >
           <ArrowLeft class="w-6 h-6" />
         </RouterLink>
@@ -698,7 +698,7 @@ const handleWithdraw = () => {
             @click="triggerFileInput"
             class="absolute -bottom-2 -right-2 bg-white border border-[#E9ECEF] p-2 rounded-xl shadow-md hover:bg-[#F8F9FA] transition-all active:scale-90"
           >
-            <Camera class="w-4 h-4 text-[#495057]" />
+            <Camera class="w-4 h-4 text-[#1E3A5F]" />
           </button>
         </div>
         <p class="mt-4 text-base font-bold text-[#1E3A5F]">{{ name }} 님</p>
@@ -754,7 +754,7 @@ const handleWithdraw = () => {
                   :class="[
                     'input-field flex-1 text-sm',
                     isEmailVerified
-                      ? 'bg-[#F8F9FA] text-[#6C757D]'
+                      ? 'bg-[#F8F9FA] text-[#1E3A5F]'
                       : 'bg-white',
                   ]"
                 />
@@ -829,7 +829,7 @@ const handleWithdraw = () => {
                   :class="[
                     'input-field flex-1 transition-colors',
                     !isPhoneEditable
-                      ? 'bg-[#F8F9FA] text-[#6C757D]'
+                      ? 'bg-[#F8F9FA] text-[#1E3A5F]'
                       : 'bg-white',
                   ]"
                 />
@@ -890,7 +890,7 @@ const handleWithdraw = () => {
               />
               <label
                 v-if="isEmailVerified"
-                class="flex items-center gap-2 text-xs text-[#6C757D] cursor-pointer"
+                class="flex items-center gap-2 text-xs text-[#1E3A5F] cursor-pointer"
               >
                 <input
                   v-model="hideCompanyName"
@@ -944,7 +944,7 @@ const handleWithdraw = () => {
         <div class="info-card info-card--overflow">
   <div class="card-title">기타</div>
 
-  <p class="px-6 pt-4 text-xs text-[#868E96] leading-relaxed">
+  <p class="px-6 pt-4 text-xs text-[#1E3A5F] leading-relaxed">
     팀원의 특이사항도 입력해보세요! 함께 반영됩니다.
   </p>
 
@@ -966,12 +966,12 @@ const handleWithdraw = () => {
               <span
                 :class="[
                   'truncate',
-                  interestId ? 'text-[#1e3a5f]' : 'text-[#adb5bd]',
+                  interestId ? 'text-[#1e3a5f]' : 'text-[#1e3a5f]',
                 ]"
               >
                 {{ getSelectedLabel(index) }}
               </span>
-              <ChevronDown class="w-4 h-4 text-[#6c757d]" />
+              <ChevronDown class="w-4 h-4 text-[#1E3A5F]" />
             </button>
 
             <div
@@ -990,18 +990,18 @@ const handleWithdraw = () => {
             </div>
           </div>
 
-          <button
-            @click="removeInterest(index)"
-            class="p-2 text-[#ADB5BD] hover:text-[#FF6B4A] transition-colors rounded-lg hover:bg-[#FFF9F8] border border-transparent hover:border-[#ffece9]"
-            title="삭제"
-          >
-            <X class="w-5 h-5" />
-          </button>
+            <button
+              @click="removeInterest(index)"
+              class="p-2 text-[#1E3A5F] hover:text-[#FF6B4A] transition-colors rounded-lg hover:bg-[#FFF9F8] border border-transparent hover:border-[#ffece9]"
+              title="삭제"
+            >
+              <X class="w-5 h-5" />
+            </button>
         </div>
 
         <button
           @click="addInterestField"
-          class="w-full h-10 border-2 border-dashed border-[#E9ECEF] rounded-lg text-[#ADB5BD] hover:bg-[#F8F9FA] transition-colors flex items-center justify-center gap-1 font-medium text-sm"
+          class="w-full h-10 border-2 border-dashed border-[#E9ECEF] rounded-lg text-[#1E3A5F] hover:bg-[#F8F9FA] transition-colors flex items-center justify-center gap-1 font-medium text-sm"
         >
           <span>+</span> 추가하기
         </button>
@@ -1024,7 +1024,7 @@ const handleWithdraw = () => {
         <div class="flex justify-center mt-4 pb-4">
           <button
             @click="handleWithdraw"
-            class="text-[#ADB5BD] text-xs underline underline-offset-4 hover:text-[#868E96] transition-colors"
+            class="text-[#1E3A5F] text-xs underline underline-offset-4 hover:text-[#1E3A5F] transition-colors"
           >
             회원 탈퇴
           </button>
@@ -1087,7 +1087,7 @@ const handleWithdraw = () => {
   padding: 14px 0;
   font-size: 13px;
   font-weight: 600;
-  color: #adb5bd;
+  color: #1e3a5f;
   transition: all 0.2s;
   background: white;
   border: none;
@@ -1101,7 +1101,7 @@ const handleWithdraw = () => {
 }
 
 .nav-item:hover:not(.active) {
-  color: #6c757d;
+  color: #1e3a5f;
   background: #fafafa;
 }
 
@@ -1139,7 +1139,7 @@ const handleWithdraw = () => {
   display: block;
   font-size: 12px;
   font-weight: 600;
-  color: #6c757d;
+  color: #1e3a5f;
   margin-bottom: 6px;
   padding-left: 2px;
 }
@@ -1167,7 +1167,7 @@ const handleWithdraw = () => {
   padding: 0 16px;
   font-size: 13px;
   font-weight: 600;
-  color: #495057;
+  color: #1e3a5f;
   background: white;
   border: 1.5px solid #e9ecef;
   border-radius: 10px;
@@ -1179,7 +1179,7 @@ const handleWithdraw = () => {
   padding: 0 16px;
   font-size: 13px;
   font-weight: 600;
-  color: #adb5bd;
+  color: #1e3a5f;
   background: #e9ecef;
   border: 1.5px solid #e9ecef;
   border-radius: 10px;

@@ -73,4 +73,11 @@ public class MemberController {
 
         return new ResponseEntity<>(staffs, HttpStatus.OK);
     }
+    
+    @GetMapping("/admin/list/owner")
+    public ResponseEntity<?> getOwners() {
+        List<OwnerInfo> owners = memberService.getOwners(); //전체 사업자 조회
+        
+        return new ResponseEntity<>(owners, HttpStatus.OK);
+    }
 }

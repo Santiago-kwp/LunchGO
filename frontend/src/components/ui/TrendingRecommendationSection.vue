@@ -22,11 +22,11 @@ defineProps({
   },
   favoriteRestaurantIds: {
     type: Array,
-    required: true,
+    default: () => [],
   },
   onToggleFavorite: {
     type: Function,
-    required: true,
+    default: () => {},
   },
   onClear: {
     type: Function,
@@ -39,7 +39,7 @@ defineProps({
   <section v-if="isActive" class="space-y-3">
     <div class="flex items-center justify-between">
       <h4 class="text-base font-semibold text-[#1e3a5f]">
-        트렌딩 인기순 추천
+        이달의 회식 맛집 추천
       </h4>
       <div class="flex items-center gap-2">
         <span v-if="isLoading" class="text-xs text-[#6c757d]">
@@ -62,8 +62,6 @@ defineProps({
     <RestaurantCardList
       v-if="!isLoading && cards.length"
       :restaurants="cards"
-      :favoriteRestaurantIds="favoriteRestaurantIds"
-      :onToggleFavorite="onToggleFavorite"
     />
   </section>
 </template>

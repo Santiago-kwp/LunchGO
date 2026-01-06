@@ -19,6 +19,7 @@ import {
   SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
+  Search,
   Home,
 } from "lucide-vue-next"; // Import Lucide icons for Vue
 import Button from "@/components/ui/Button.vue"; // Import our custom Button component
@@ -35,7 +36,9 @@ import TrendingRecommendationSection from "@/components/ui/TrendingRecommendatio
 import { useTrendingRestaurants } from "@/composables/useTrendingRestaurants";
 import { useBudgetRecommendation, extractPriceValue } from "@/composables/useBudgetRecommendation";
 import { useTagMappingRecommendation } from "@/composables/useTagMappingRecommendation";
+import { useHomeRecommendations } from "@/composables/useHomeRecommendations";
 import { useAccountStore } from "@/stores/account";
+import { useFavorites } from "@/composables/useFavorites";
 import axios from "axios";
 import httpRequest from "@/router/httpRequest.js";
 
@@ -43,7 +46,26 @@ const accountStore = useAccountStore();
 const isLoggedIn = computed(() =>
     Boolean(accountStore.accessToken || localStorage.getItem("accessToken"))
 );
-const DEFAULT_USER_ID = 2;
+const { fetchFavorites, clearFavorites, userId } = useFavorites();
+
+const getStoredMember = () => {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem("member");
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+};
+
+const member = computed(() => accountStore.member || getStoredMember());
+const memberId = computed(() => {
+  const rawId = member.value?.id ?? member.value?.userId ?? member.value?.memberId;
+  if (rawId === null || rawId === undefined) return null;
+  const parsed = Number(rawId);
+  return Number.isNaN(parsed) ? null : parsed;
+});
 
 // State management (React's useState -> Vue's ref)
 const isFilterOpen = ref(false);
@@ -70,7 +92,7 @@ const {
   openCafeteriaModal,
   openCafeteriaModalWithExisting,
   requestCafeteriaRecommendations,
-} = useCafeteriaRecommendation({ userId: DEFAULT_USER_ID });
+} = useCafeteriaRecommendation({ userId: memberId });
 const cafeteriaImageUrl = computed(() => cafeteriaImageUrlRef.value);
 const homeListStateStorageKey = "homeListState";
 const searchQuery = ref("");
@@ -152,23 +174,8 @@ const fetchSearchTags = async () => {
   }
 };
 
-const getStoredMember = () => {
-  const raw = localStorage.getItem("member");
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-};
-
-const resolveMemberId = () => {
-  const member = accountStore.member || getStoredMember();
-  return member?.id ?? member?.userId ?? member?.memberId ?? null;
-};
-
 const fetchUserAddress = async () => {
-  const userId = resolveMemberId();
+  const userId = memberId.value;
   if (!userId) return null;
   try {
     const response = await httpRequest.get(`/api/info/user/${userId}`);
@@ -230,10 +237,11 @@ const selectedDistanceKm = computed(() => {
   return null;
 });
 
-const RECOMMEND_CAFETERIA = "\uAD6C\uB0B4\uC2DD\uB2F9 \uB300\uCCB4 \uCD94\uCC9C";
-const RECOMMEND_BUDGET = "\uC608\uC0B0 \uB9DE\uCDA4";
-const RECOMMEND_TASTE = "\uCDE8\uD5A5 \uB9DE\uCDA4";
-const RECOMMEND_TRENDING = "\uC778\uAE30\uC21C";
+const RECOMMEND_CAFETERIA = "\uAD6C\uB0B4\uC2DD\uB2F9 \uB300\uCCB4 \uD83C\uDF71";
+const RECOMMEND_BUDGET = "\uC608\uC0B0 \uB9DE\uCDA4 \uD83D\uDCB0";
+const RECOMMEND_TASTE = "\uCDE8\uD5A5 \uB9DE\uCDA4 \uD83D\uDE0B";
+const RECOMMEND_TRENDING = "\uC778\uAE30\uC21C \uD83D\uDD25";
+const RECOMMEND_WEATHER = "\uB0A0\uC528 \uCD94\uCC9C \u2600\uFE0F";
 const TAG_MESSAGE_LOGIN = "\uB85C\uADF8\uC778\uC774 \uD544\uC694\uD569\uB2C8\uB2E4";
 const TAG_MESSAGE_SPECIALITY = "\uD2B9\uC774\uC0AC\uD56D \uD0DC\uADF8\uB97C \uBA3C\uC800 \uCD94\uAC00\uD574\uC8FC\uC138\uC694";
 const TAG_MESSAGE_LOADING = "\uCD94\uCC9C \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4";
@@ -512,7 +520,6 @@ const isCalendarOpen = ref(false);
 const calendarMonth = ref(new Date());
 const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
 const selectedMapRestaurant = ref(null);
-const favoriteRestaurantIds = ref([]);
 
 const formattedSearchDate = computed(() => {
   if (!searchDate.value) {
@@ -1036,7 +1043,12 @@ onMounted(async () => {
         clearBudgetRecommendations();
       }
       if (selectedRecommendation.value === RECOMMEND_TASTE) {
-        fetchTagMappingRecommendations();
+        if (!isLoggedIn.value) {
+          selectedRecommendation.value = null;
+          persistHomeListState();
+        } else {
+          fetchTagMappingRecommendations();
+        }
       }
       nextTick(() => {
         if (Number.isFinite(parsed.scrollY)) {
@@ -1106,8 +1118,15 @@ const recommendationOptions = [
   RECOMMEND_BUDGET,
   RECOMMEND_TASTE,
   RECOMMEND_TRENDING,
-  "\uAC80\uC0C9 \uCD94\uCC9C",
+  RECOMMEND_WEATHER,
 ];
+const recommendationButtons = computed(() => [
+  { value: RECOMMEND_CAFETERIA, label: "\uAD6C\uB0B4\uC2DD\uB2F9 \uB300\uCCB4", emoji: "\uD83C\uDF71" },
+  { value: RECOMMEND_BUDGET, label: "\uC608\uC0B0", emoji: "\uD83D\uDCB0" },
+  { value: RECOMMEND_TASTE, label: "\uCDE8\uD5A5", emoji: "\uD83D\uDE0B" },
+  { value: RECOMMEND_TRENDING, label: "\uC778\uAE30", emoji: "\uD83D\uDD25" },
+  { value: RECOMMEND_WEATHER, label: "\uB0A0\uC528", emoji: "\u2600\uFE0F" },
+]);
 const distances = ["1km 이내", "2km 이내", "3km 이내"];
 const sortOptions = [DEFAULT_SORT, "추천순", "거리순", "평점순", "낮은 가격순"];
 
@@ -1197,18 +1216,20 @@ const toggleFilterPriceRange = (range) => {
   filterForm.priceRange = range;
 };
 
-const isRestaurantFavorite = (restaurantId) => {
-  return favoriteRestaurantIds.value.includes(restaurantId);
+const openSearchModal = () => {
+  isSearchOpen.value = true;
 };
-
-const toggleRestaurantFavorite = (restaurantId) => {
-  const index = favoriteRestaurantIds.value.indexOf(restaurantId);
-  if (index > -1) {
-    favoriteRestaurantIds.value.splice(index, 1);
-  } else {
-    favoriteRestaurantIds.value.push(restaurantId);
-  }
-};
+watch(
+  () => userId.value,
+  (nextUserId) => {
+    if (!nextUserId) {
+      clearFavorites();
+      return;
+    }
+    fetchFavorites(nextUserId);
+  },
+  { immediate: true }
+);
 
 const resetFilters = () => {
   filterForm.sort = sortOptions[0];
@@ -1218,25 +1239,6 @@ const resetFilters = () => {
   filterPartySize.value = 4;
   clearBudgetRecommendations();
   clearTagMappingRecommendations();
-};
-
-const applyFilters = () => {
-  selectedSort.value = filterForm.sort || sortOptions[0];
-  selectedPriceRange.value = filterForm.priceRange || null;
-  selectedRecommendation.value = filterForm.recommendation || null;
-  if (selectedRecommendation.value === RECOMMEND_BUDGET) {
-    fetchBudgetRecommendations(filterPerPersonBudget.value);
-  } else {
-    clearBudgetRecommendations();
-  }
-  if (selectedRecommendation.value === RECOMMEND_TASTE) {
-    fetchTagMappingRecommendations();
-  } else {
-    clearTagMappingRecommendations();
-  }
-  currentPage.value = 1;
-  isFilterOpen.value = false;
-  persistHomeListState();
 };
 
 const closeFilterModal = () => {
@@ -1249,26 +1251,6 @@ const closeFilterModal = () => {
   currentPage.value = 1;
   isFilterOpen.value = false;
   persistHomeListState();
-};
-
-const clearTrendingRecommendation = () => {
-  selectedRecommendation.value = null;
-  filterForm.recommendation = null;
-  clearTrendingRestaurants();
-  currentPage.value = 1;
-  persistHomeListState();
-};
-
-const toggleRecommendationOption = (option) => {
-  if (option === RECOMMEND_CAFETERIA) {
-    filterForm.recommendation = option;
-    const baseDate = resolveCafeteriaBaseDate();
-    checkCafeteriaMenuStatus(baseDate);
-    return;
-  }
-
-  filterForm.recommendation =
-      filterForm.recommendation === option ? null : option;
 };
 
 const handleCafeteriaMenuEdit = () => {
@@ -1362,7 +1344,7 @@ onMounted(() => {
       selectedRecommendation.value =
           parsed.selectedRecommendation ?? selectedRecommendation.value;
       currentPage.value = parsed.currentPage ?? currentPage.value;
-      if (selectedRecommendation.value === "예산 맞춤") {
+      if (selectedRecommendation.value === RECOMMEND_BUDGET) {
         selectedRecommendation.value = null;
         clearBudgetRecommendations();
       }
@@ -1399,6 +1381,47 @@ const persistHomeListState = () => {
   );
 };
 
+const handleClearCafeteriaRecommendations = () => {
+  clearCafeteriaRecommendations();
+  if (selectedRecommendation.value === RECOMMEND_CAFETERIA) {
+    selectedRecommendation.value = null;
+    filterForm.recommendation = null;
+    persistHomeListState();
+  }
+};
+
+const {
+  applyFilters,
+  clearTrendingRecommendation,
+  clearBudgetRecommendation,
+  toggleRecommendationOption,
+  handleRecommendationQuickSelect,
+} = useHomeRecommendations({
+  selectedSort,
+  selectedPriceRange,
+  selectedRecommendation,
+  filterForm,
+  sortOptions,
+  filterPerPersonBudget,
+  fetchBudgetRecommendations,
+  clearBudgetRecommendations,
+  fetchTagMappingRecommendations,
+  clearTagMappingRecommendations,
+  clearTrendingRestaurants,
+  cafeteriaRecommendations,
+  clearCafeteriaRecommendations,
+  resolveCafeteriaBaseDate,
+  checkCafeteriaMenuStatus,
+  requestCafeteriaRecommendations,
+  hasConfirmedMenus,
+  currentPage,
+  isFilterOpen,
+  persistHomeListState,
+  RECOMMEND_CAFETERIA,
+  RECOMMEND_BUDGET,
+  RECOMMEND_TASTE,
+});
+
 watch([selectedSort, selectedPriceRange, selectedRecommendation], () => {
   persistHomeListState();
 });
@@ -1427,7 +1450,7 @@ onBeforeUnmount(() => {
         v-if="isGeocodeExportMode"
         class="bg-white border-b border-[#e9ecef]"
     >
-      <div class="max-w-[500px] mx-auto px-4 py-3 text-xs text-[#495057]">
+      <div class="max-w-[500px] mx-auto px-4 py-3 text-xs text-gray-700">
         <p class="font-semibold text-[#1e3a5f]">주소 좌표 생성 모드</p>
         <p v-if="isGeocodeExporting">
           진행 중: {{ geocodeExportProgress.done }} /
@@ -1448,7 +1471,7 @@ onBeforeUnmount(() => {
             <h2 class="text-base font-semibold text-[#1e3a5f]">
               {{ currentLocation }}
             </h2>
-            <p class="text-xs text-[#6c757d]">현재 위치 기준</p>
+            <p class="text-xs text-gray-700">현재 위치 기준</p>
           </div>
         </div>
       </div>
@@ -1496,13 +1519,63 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="px-4 py-5">
-        <div v-if="isLoggedIn">
+        <div
+            v-if="!isLoggedIn"
+            class="mb-3 rounded-2xl border border-[#e9ecef] bg-white py-2 px-4 text-[13px] text-gray-700 whitespace-nowrap text-center"
+        >
+          로그인하면 취향/예산/구내식당 등 다양한 추천을 받을 수 있어요.
+        </div>
+
+        <div v-if="isLoggedIn" class="mb-3">
+          <div class="flex items-center gap-2">
+            <button
+              v-for="option in recommendationButtons"
+              :key="option.value"
+              type="button"
+              @click="handleRecommendationQuickSelect(option.value)"
+              :class="`px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap transition-colors ${
+                selectedRecommendation === option.value
+                  ? 'gradient-primary text-white border border-transparent'
+                  : 'bg-white text-gray-700 border border-[#dee2e6] hover:bg-[#f8f9fa]'
+              }`"
+            >
+              <span class="inline-flex items-center gap-1">
+                <span v-if="option.emoji">{{ option.emoji }}</span>
+                <span>{{ option.label }}</span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 mb-2">
+          <button
+              @click="openFilterModal"
+              class="flex items-center gap-1.5 text-sm text-gray-700 hover:text-[#ff6b4a] transition-colors"
+          >
+            <SlidersHorizontal class="w-4 h-4" />
+            <span>필터</span>
+          </button>
+          <Button
+              variant="outline"
+              size="sm"
+              class="ml-auto h-8 px-3 text-xs border-[#dee2e6] text-gray-700 bg-white hover:bg-[#f8f9fa] hover:text-[#1e3a5f] rounded-lg flex items-center gap-1"
+              @click="openSearchModal"
+          >
+            <Search class="w-3.5 h-3.5" />
+            검색
+          </Button>
+        </div>
+
+        <div class="space-y-4">
           <CafeteriaRecommendationSection
+              v-if="isLoggedIn"
               :recommendations="cafeteriaRecommendations"
-              :favoriteRestaurantIds="favoriteRestaurantIds"
-              :onToggleFavorite="toggleRestaurantFavorite"
+              :recommendation-buttons="recommendationButtons"
+              :active-recommendation="selectedRecommendation"
+              :onSelectRecommendation="handleRecommendationQuickSelect"
+              :show-buttons="false"
               :onOpenSearch="() => (isSearchOpen = true)"
-              :onClearRecommendations="clearCafeteriaRecommendations"
+              :onClearRecommendations="handleClearCafeteriaRecommendations"
               :isModalOpen="isCafeteriaModalOpen"
               :isProcessing="isCafeteriaOcrLoading"
               :ocrResult="cafeteriaOcrResult"
@@ -1514,56 +1587,52 @@ onBeforeUnmount(() => {
               :onRunOcr="() => handleCafeteriaOcr(resolveCafeteriaBaseDate())"
               :onConfirm="handleCafeteriaConfirmAndClose"
           />
-        </div>
-        <div
-            v-else
-            class="mb-6 rounded-2xl border border-[#e9ecef] bg-white p-4 text-sm text-[#6c757d]"
-        >
-          로그인하면 구내식당 대체 추천을 받을 수 있어요.
-        </div>
-
-        <div
-            v-if="!cafeteriaRecommendations.length"
-            class="flex items-center gap-2 mb-4"
-        >
-          <button
-              @click="openFilterModal"
-              class="flex items-center gap-1.5 text-sm text-[#6c757d] hover:text-[#ff6b4a] transition-colors"
-          >
-            <SlidersHorizontal class="w-4 h-4" />
-            <span>필터</span>
-          </button>
-        </div>
-
-        <div v-if="!cafeteriaRecommendations.length" class="space-y-6">
           <div
-              v-if="tagMappingNotice"
-              class="rounded-2xl border border-[#e9ecef] bg-white px-4 py-3 text-sm text-[#6c757d]"
+              v-if="!cafeteriaRecommendations.length && tagMappingNotice"
+              class="rounded-2xl border border-[#e9ecef] bg-white px-4 py-3 text-sm text-gray-700"
           >
             {{ tagMappingNotice }}
           </div>
 
           <TrendingRecommendationSection
-              :isActive="isTrendingSort"
+              :isActive="!cafeteriaRecommendations.length && isTrendingSort"
               :isLoading="isTrendingLoading"
               :error="trendingError"
               :cards="trendingCards"
-              :favoriteRestaurantIds="favoriteRestaurantIds"
-              :onToggleFavorite="toggleRestaurantFavorite"
               :onClear="clearTrendingRecommendation"
           />
 
           <div
-              v-if="!paginatedRestaurants.length"
-              class="w-full px-4 py-10 text-center text-sm text-[#6c757d]"
+              v-if="!cafeteriaRecommendations.length && selectedRecommendation === RECOMMEND_BUDGET"
+              class="space-y-3"
+          >
+            <div class="flex items-center justify-between">
+              <h4 class="text-base font-semibold text-[#1e3a5f]">
+                예산 맞춤 추천
+                <span class="text-xs text-gray-700 font-normal ml-2">
+                  1인당 {{ filterPerPersonBudgetDisplay }}
+                </span>
+              </h4>
+              <Button
+                  variant="outline"
+                  size="sm"
+                  class="h-8 px-3 text-xs border-[#dee2e6] text-gray-700 bg-white hover:bg-[#f8f9fa] hover:text-[#1e3a5f] rounded-lg"
+                  @click="clearBudgetRecommendation"
+              >
+                추천 해제
+              </Button>
+            </div>
+          </div>
+
+          <div
+              v-if="!cafeteriaRecommendations.length && !paginatedRestaurants.length"
+              class="w-full px-4 py-10 text-center text-sm text-gray-700"
           >
             해당 검색 결과가 없습니다.
           </div>
           <RestaurantCardList
-              v-else
+              v-else-if="!cafeteriaRecommendations.length"
               :restaurants="paginatedRestaurants"
-              :favoriteRestaurantIds="favoriteRestaurantIds"
-              :onToggleFavorite="toggleRestaurantFavorite"
           />
         </div>
 
@@ -1577,7 +1646,7 @@ onBeforeUnmount(() => {
           >
             <button
                 type="button"
-                class="min-w-[56px] h-9 px-4 rounded-2xl border border-[#e9ecef] bg-white text-[#495057] font-medium transition-colors disabled:text-[#c7cdd3] disabled:border-[#f1f3f5] disabled:cursor-not-allowed"
+                class="min-w-[56px] h-9 px-4 rounded-2xl border border-[#e9ecef] bg-white text-gray-700 font-medium transition-colors disabled:text-[#c7cdd3] disabled:border-[#f1f3f5] disabled:cursor-not-allowed"
                 :disabled="!canGoPrevious"
                 @click="goToPreviousPage"
             >
@@ -1594,7 +1663,7 @@ onBeforeUnmount(() => {
                 'min-w-[36px] h-9 px-3 rounded-2xl border font-medium transition-colors',
                 page === currentPage
                   ? 'bg-gradient-to-r from-[#ff6b4a] via-[#ff805f] to-[#ff987d] text-white border-transparent shadow-button-hover'
-                  : 'bg-white text-[#495057] border-[#e9ecef] hover:text-[#ff6b4a] hover:border-[#ff6b4a]',
+                  : 'bg-white text-gray-700 border-[#e9ecef] hover:text-[#ff6b4a] hover:border-[#ff6b4a]',
               ]"
             >
               {{ page }}
@@ -1602,7 +1671,7 @@ onBeforeUnmount(() => {
 
             <button
                 type="button"
-                class="min-w-[56px] h-9 px-4 rounded-2xl border border-[#e9ecef] bg-white text-[#495057] font-medium transition-colors disabled:text-[#c7cdd3] disabled:border-[#f1f3f5] disabled:cursor-not-allowed"
+                class="min-w-[56px] h-9 px-4 rounded-2xl border border-[#e9ecef] bg-white text-gray-700 font-medium transition-colors disabled:text-[#c7cdd3] disabled:border-[#f1f3f5] disabled:cursor-not-allowed"
                 :disabled="!canGoNext"
                 @click="goToNextPage"
             >
@@ -1634,18 +1703,18 @@ onBeforeUnmount(() => {
                     <p class="text-sm font-semibold text-[#1e3a5f]">
                       {{ selectedMapRestaurant.name }}
                     </p>
-                    <p class="text-xs text-[#6c757d] truncate">
+                    <p class="text-xs text-gray-700 truncate">
                       {{ selectedMapRestaurant.address }}
                     </p>
                   </div>
                   <button
                       @click.stop.prevent="closeMapRestaurantModal"
-                      class="text-[#adb5bd] hover:text-[#495057]"
+                      class="text-gray-700 hover:text-gray-700"
                   >
                     <X class="w-4 h-4" />
                   </button>
                 </div>
-                <div class="flex items-center gap-2 text-xs text-[#6c757d]">
+                <div class="flex items-center gap-2 text-xs text-gray-700">
                   <span
                       class="flex items-center gap-1 text-[#1e3a5f] font-semibold"
                   >
@@ -1683,7 +1752,7 @@ onBeforeUnmount(() => {
           <h3 class="text-lg font-semibold text-[#1e3a5f]">필터 및 정렬</h3>
           <button
               @click="closeFilterModal"
-              class="text-[#6c757d] hover:text-[#1e3a5f]"
+              class="text-gray-700 hover:text-[#1e3a5f]"
           >
             <X class="w-6 h-6" />
           </button>
@@ -1701,7 +1770,7 @@ onBeforeUnmount(() => {
                   :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   filterForm.sort === option
                     ? 'gradient-primary text-white'
-                    : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
+                    : 'bg-[#f8f9fa] text-gray-700 hover:bg-[#e9ecef]'
                 }`"
               >
                 {{ option }}
@@ -1722,7 +1791,7 @@ onBeforeUnmount(() => {
                   :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   filterForm.priceRange === range
                     ? 'gradient-primary text-white'
-                    : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
+                    : 'bg-[#f8f9fa] text-gray-700 hover:bg-[#e9ecef]'
                 }`"
               >
                 {{ range }}
@@ -1742,14 +1811,14 @@ onBeforeUnmount(() => {
                   :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   filterForm.recommendation === option
                     ? 'gradient-primary text-white'
-                    : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
+                    : 'bg-[#f8f9fa] text-gray-700 hover:bg-[#e9ecef]'
                 }`"
               >
                 {{ option }}
               </button>
             </div>
             <div
-                v-if="filterForm.recommendation === '예산 맞춤'"
+                v-if="filterForm.recommendation === RECOMMEND_BUDGET"
                 class="mt-4 rounded-xl border border-[#e9ecef] bg-[#f8f9fa] p-4 space-y-4"
             >
               <div class="flex items-center justify-between">
@@ -1770,7 +1839,7 @@ onBeforeUnmount(() => {
                   }"
                     class="w-full h-2 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#ff6b4a] [&::-webkit-slider-thumb]:cursor-pointer"
                 />
-                <div class="flex justify-between text-xs text-[#6c757d]">
+                <div class="flex justify-between text-xs text-gray-700">
                   <span>0원</span>
                   <span>50만원 이상</span>
                 </div>
@@ -1787,21 +1856,21 @@ onBeforeUnmount(() => {
                       v-model.number="filterPartySize"
                       class="w-20 px-3 py-2 rounded-lg border border-[#dee2e6] text-sm text-[#1e3a5f] bg-white focus:outline-none focus:ring-2 focus:ring-[#ff6b4a] focus:border-transparent"
                   />
-                  <span class="text-sm text-[#6c757d]">명</span>
+                  <span class="text-sm text-gray-700">명</span>
                 </div>
               </div>
-              <div class="text-xs text-[#6c757d] text-right">
+              <div class="text-xs text-gray-700 text-right">
                 1인당 {{ filterPerPersonBudgetDisplay }}
               </div>
             </div>
             <div
-                v-if="filterForm.recommendation === '구내식당 대체 추천'"
+                v-if="filterForm.recommendation === RECOMMEND_CAFETERIA"
                 class="mt-3 flex items-center justify-end gap-2"
             >
               <div class="flex items-center gap-2">
                 <button
                     type="button"
-                    class="px-3 py-2 rounded-lg text-xs font-semibold border border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] disabled:opacity-60 disabled:cursor-not-allowed"
+                    class="px-3 py-2 rounded-lg text-xs font-semibold border border-[#dee2e6] text-gray-700 bg-white hover:bg-[#f8f9fa] disabled:opacity-60 disabled:cursor-not-allowed"
                     :disabled="isCheckingMenus"
                     @click="handleCafeteriaMenuEdit"
                 >
@@ -1819,7 +1888,7 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </div>
-          <div v-else class="mt-2 text-xs text-[#6c757d]">
+          <div v-else class="mt-2 text-xs text-gray-700">
             로그인 후 추천 옵션을 사용할 수 있습니다.
           </div>
         </div>
@@ -1830,7 +1899,7 @@ onBeforeUnmount(() => {
           <Button
               @click="resetFilters"
               variant="outline"
-              class="flex-1 h-12 text-[#495057] border-[#dee2e6] hover:bg-[#f8f9fa] rounded-xl bg-transparent"
+              class="flex-1 h-12 text-gray-700 border-[#dee2e6] hover:bg-[#f8f9fa] rounded-xl bg-transparent"
           >
             초기화
           </Button>
@@ -1858,7 +1927,7 @@ onBeforeUnmount(() => {
           <h3 class="text-lg font-semibold text-[#1e3a5f]">검색 필터</h3>
           <button
               @click="isSearchOpen = false"
-              class="text-[#6c757d] hover:text-[#1e3a5f]"
+              class="text-gray-700 hover:text-[#1e3a5f]"
           >
             <X class="w-6 h-6" />
           </button>
@@ -1872,10 +1941,10 @@ onBeforeUnmount(() => {
               <button
                   type="button"
                   @click="toggleCalendar"
-                  class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg text-sm flex items-center justify-between text-left text-[#495057] focus:outline-none focus:ring-2 focus:ring-[#ff6b4a] focus:border-transparent"
+                  class="w-full px-4 py-3 border border-[#dee2e6] rounded-lg text-sm flex items-center justify-between text-left text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#ff6b4a] focus:border-transparent"
               >
                 <span
-                    :class="searchDate ? 'text-[#1e3a5f]' : 'text-[#adb5bd]'"
+                    :class="searchDate ? 'text-[#1e3a5f]' : 'text-gray-700'"
                 >{{ formattedSearchDate }}</span
                 >
                 <Calendar class="w-5 h-5 text-[#ff6b4a]" />
@@ -1892,7 +1961,7 @@ onBeforeUnmount(() => {
                       @click.stop="previousCalendarMonth"
                       class="p-1 rounded-full hover:bg-[#f8f9fa] transition-colors"
                   >
-                    <ChevronLeft class="w-4 h-4 text-[#495057]" />
+                    <ChevronLeft class="w-4 h-4 text-gray-700" />
                   </button>
                   <span class="text-sm font-semibold text-[#1e3a5f]">{{
                       formattedCalendarMonth
@@ -1901,12 +1970,12 @@ onBeforeUnmount(() => {
                       @click.stop="nextCalendarMonth"
                       class="p-1 rounded-full hover:bg-[#f8f9fa] transition-colors"
                   >
-                    <ChevronRight class="w-4 h-4 text-[#495057]" />
+                    <ChevronRight class="w-4 h-4 text-gray-700" />
                   </button>
                 </div>
                 <div class="px-4 py-3">
                   <div
-                      class="grid grid-cols-7 text-center text-xs text-[#6c757d] mb-2"
+                      class="grid grid-cols-7 text-center text-xs text-gray-700 mb-2"
                   >
                     <span
                         v-for="dayName in weekdayLabels"
@@ -1926,7 +1995,7 @@ onBeforeUnmount(() => {
                         !day ? 'cursor-default opacity-0' : '',
                         day && isCalendarSelectedDay(day)
                           ? 'bg-[#ff6b4a] text-white font-semibold'
-                          : 'text-[#495057] hover:bg-[#f1f3f5]',
+                          : 'text-gray-700 hover:bg-[#f1f3f5]',
                       ]"
                     >
                       {{ day }}
@@ -1948,7 +2017,7 @@ onBeforeUnmount(() => {
                   :class="`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                   searchTime === time
                     ? 'gradient-primary text-white'
-                    : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
+                    : 'bg-[#f8f9fa] text-gray-700 hover:bg-[#e9ecef]'
                 }`"
               >
                 {{ time }}
@@ -1967,7 +2036,7 @@ onBeforeUnmount(() => {
                   :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   searchCategories.includes(category)
                     ? 'gradient-primary text-white'
-                    : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
+                    : 'bg-[#f8f9fa] text-gray-700 hover:bg-[#e9ecef]'
                 }`"
               >
                 {{ category }}
@@ -1984,20 +2053,20 @@ onBeforeUnmount(() => {
                   class="w-10 h-10 rounded-lg border border-[#dee2e6] flex items-center justify-center hover:bg-[#f8f9fa] transition-colors disabled:opacity-50"
                   :disabled="searchPartySize <= 4"
               >
-                <Minus class="w-4 h-4 text-[#495057]" />
+                <Minus class="w-4 h-4 text-gray-700" />
               </button>
               <div class="flex-1 text-center">
                 <span class="text-2xl font-semibold text-[#1e3a5f]">{{
                     searchPartySize
                   }}</span>
-                <span class="text-sm text-[#6c757d] ml-1">명</span>
+                <span class="text-sm text-gray-700 ml-1">명</span>
               </div>
               <button
                   @click="searchPartySize = Math.min(12, searchPartySize + 1)"
                   class="w-10 h-10 rounded-lg border border-[#dee2e6] flex items-center justify-center hover:bg-[#f8f9fa] transition-colors disabled:opacity-50"
                   :disabled="searchPartySize >= 12"
               >
-                <Plus class="w-4 h-4 text-[#495057]" />
+                <Plus class="w-4 h-4 text-gray-700" />
               </button>
             </div>
           </div>
@@ -2013,7 +2082,7 @@ onBeforeUnmount(() => {
                   :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   searchDistance === distance
                     ? 'gradient-primary text-white'
-                    : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
+                    : 'bg-[#f8f9fa] text-gray-700 hover:bg-[#e9ecef]'
                 }`"
               >
                 {{ distance }}
@@ -2032,7 +2101,7 @@ onBeforeUnmount(() => {
                   :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   searchTags.includes(tag)
                     ? 'gradient-primary text-white'
-                    : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
+                    : 'bg-[#f8f9fa] text-gray-700 hover:bg-[#e9ecef]'
                 }`"
               >
                 {{ tag }}
@@ -2051,7 +2120,7 @@ onBeforeUnmount(() => {
                   :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   avoidIngredients.includes(ingredient)
                     ? 'bg-red-500 text-white'
-                    : 'bg-[#f8f9fa] text-[#495057] hover:bg-[#e9ecef]'
+                    : 'bg-[#f8f9fa] text-gray-700 hover:bg-[#e9ecef]'
                 }`"
               >
                 {{ ingredient }}
@@ -2066,7 +2135,7 @@ onBeforeUnmount(() => {
           <Button
               @click="resetSearch"
               variant="outline"
-              class="flex-1 h-12 text-[#495057] border-[#dee2e6] hover:bg-[#f8f9fa] rounded-xl bg-transparent"
+              class="flex-1 h-12 text-gray-700 border-[#dee2e6] hover:bg-[#f8f9fa] rounded-xl bg-transparent"
           >
             초기화
           </Button>

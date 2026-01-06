@@ -280,4 +280,17 @@ public class BaseMemberService implements MemberService {
             }
         }
     }
+
+    @Override
+    public List<OwnerInfo> getOwners() {
+        List<Owner> owners = ownerRepository.findAll();
+
+        return owners.stream().map(o -> OwnerInfo.builder()
+                .name(o.getName()).businessNum(o.getBusinessNum())
+                .startAt(o.getStartAt())
+                .loginId(o.getLoginId())
+                .status(o.getStatus())
+                .build()
+        ).collect(Collectors.toList());
+    }
 }

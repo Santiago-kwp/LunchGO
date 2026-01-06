@@ -2,7 +2,7 @@
 
 ## 📋 프로젝트 개요
 
-런치고는 **법인카드 기반 팀 점심 예약 및 추천 서비스**입니다.
+런치고는 **직장인 맞춤형 팀 점심 예약 및 추천 서비스**입니다.
 복잡한 팀 점심 예약 과정을 간소화하고, 개인화된 식당 추천을 통해 직장인들의 점심시간을 효율적으로 관리할 수 있는 웹 애플리케이션입니다.
 
 **프로젝트 성격**: Spring Boot + Vue.js 부트캠프 최종 프로젝트
@@ -262,8 +262,15 @@
 ├── docs/                  # 기술 문서
 ├── scripts/               # 유틸리티 스크립트
 ├── gradle/                # Gradle 빌드 설정
+├── scouter/               # 성능 모니터링 관련 설정/에이전트
+├── api_specification.csv  # API 스펙 문서
+├── Dockerfile             # 컨테이너 빌드 설정
+├── gradlew                # Gradle wrapper
+├── gradlew.bat            # Gradle wrapper (Windows)
+├── commitlint.config.js   # 커밋 메시지 규칙
 ├── README.md              # 프로젝트 문서
 ├── package.json           # 루트 패키지 (commitlint, husky)
+├── package-lock.json      # 루트 패키지 잠금 파일
 ├── build.gradle           # Gradle 빌드 파일
 └── settings.gradle        # Gradle 설정
 ```
@@ -291,6 +298,7 @@ frontend/
 │   │   └── ui/                   # UI 재사용 컴포넌트
 │   │
 │   ├── composables/              # Vue composables
+│   ├── content/                  # 정적 콘텐츠 (약관/정책 등)
 │   ├── data/                     # 더미 데이터
 │   ├── router/                   # Vue Router 설정
 │   ├── stores/                   # Pinia 상태관리
@@ -314,6 +322,7 @@ src/
 ├── main/
 │   ├── java/com/example/LunchGo/
 │   │   ├── account/              # 로그인/JWT/계정 보조
+│   │   ├── algorithm/            # 추천/태그 매핑 알고리즘
 │   │   ├── block/                # 차단 관련 로직
 │   │   ├── bookmark/             # 즐겨찾기/공유
 │   │   ├── cafeteria/            # 구내식당 메뉴/추천
@@ -332,7 +341,9 @@ src/
 │       ├── sql/                  # 테이블/마이그레이션/시드 SQL
 │       ├── templates/            # 메일 템플릿
 │       ├── application.yml
-│       └── application.properties
+│       ├── application.properties
+│       ├── application-prod.properties
+│       └── application-secret.properties
 └── test/
     └── java/com/example/LunchGo/ # 테스트 코드
 ```
@@ -412,14 +423,15 @@ src/
 | 모듈 | 컨트롤러 | 설명 |
 | ---- | -------- | ---- |
 | account | AccountController | 로그인/토큰/계정 보조 기능 |
+| algorithm | AlgorithmController | 태그 매핑/추천 관련 기능 |
 | bookmark | BookmarkController, BookmarkLinkController | 즐겨찾기 CRUD, 즐겨찾기 공유/링크 |
 | cafeteria | CafeteriaMenuController | 구내식당 메뉴 조회/추천 |
 | email | EmailController | 이메일 인증/프로모션 발송 |
 | image | ImageUploadController | 이미지 업로드/프리사인 URL |
 | member | MemberController | 회원/사업자/직원 관리 |
-| reservation | ReservationController, ReservationPaymentController, PaymentController | 예약/결제 생성 및 웹훅 처리 |
-| restaurant | BusinessRestaurantController, MenuController, RestaurantTrendController, BusinessRestaurantImageController, BusinessMenuImageController | 식당/메뉴 관리, 트렌딩 조회, 이미지 관리 |
-| review | ReviewController, ReviewCommentController, ReviewBlindController, AdminReviewController, OcrController | 리뷰/댓글/블라인드/관리자 처리, OCR |
+| reservation | ReservationController, ReservationPaymentController, PaymentController, AdminReservationController, BusinessReservationController | 예약/결제 생성 및 웹훅/관리자/사업자 처리 |
+| restaurant | BusinessRestaurantController, PublicRestaurantController, MenuController, RestaurantTrendController, BusinessRestaurantImageController, BusinessMenuImageController | 식당/메뉴 관리, 트렌딩 조회, 이미지 관리 |
+| review | ReviewController, ReviewCommentController, ReviewBlindController, ReviewTagController, MyReviewController, AdminReviewController, ForbiddenWordAdminController, OcrController | 리뷰/댓글/태그/블라인드/금칙어/관리자 처리, OCR |
 | sms | SmsController | SMS 인증 |
 | tag | SearchTagController | 검색 태그 조회 |
 

@@ -1,21 +1,28 @@
 <script setup>
 import Button from "@/components/ui/Button.vue";
 import CafeteriaMenuUploadModal from "@/components/ui/CafeteriaMenuUploadModal.vue";
-import CafeteriaRecommendationList from "@/components/ui/CafeteriaRecommendationList.vue";
-import { Search } from "lucide-vue-next";
+import RestaurantCardList from "@/components/ui/RestaurantCardList.vue";
 
 defineProps({
   recommendations: {
     type: Array,
     required: true,
   },
-  favoriteRestaurantIds: {
+  recommendationButtons: {
     type: Array,
-    required: true,
+    default: () => [],
   },
-  onToggleFavorite: {
+  activeRecommendation: {
+    type: String,
+    default: null,
+  },
+  onSelectRecommendation: {
     type: Function,
-    required: true,
+    default: null,
+  },
+  showButtons: {
+    type: Boolean,
+    default: true,
   },
   onOpenSearch: {
     type: Function,
@@ -70,38 +77,66 @@ defineProps({
 
 <template>
   <div>
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="text-lg font-semibold text-[#1e3a5f]">
-        {{ recommendations.length ? "구내식당 대체 추천" : "오늘의 추천 회식 맛집" }}
-      </h3>
-      <Button
-        v-if="!recommendations.length"
-        @click="onOpenSearch"
-        variant="outline"
-        size="sm"
-        class="h-8 px-3 text-xs border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] hover:text-[#1e3a5f] rounded-lg flex items-center gap-1"
-      >
-        <Search class="w-3.5 h-3.5" />
-        검색
-      </Button>
-      <Button
-        v-else
-        @click="onClearRecommendations"
-        variant="outline"
-        size="sm"
-        class="h-8 px-3 text-xs border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] hover:text-[#1e3a5f] rounded-lg flex items-center gap-1"
-      >
-        추천 해제
-      </Button>
+    <div v-if="recommendations.length || showButtons" class="flex items-center justify-between mb-3">
+      <template v-if="recommendations.length">
+        <h3 class="text-base font-semibold text-[#1e3a5f]">
+          구내식당 대체 추천
+        </h3>
+        <Button
+          @click="onClearRecommendations"
+          variant="outline"
+          size="sm"
+          class="h-8 px-3 text-xs border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] hover:text-[#1e3a5f] rounded-lg flex items-center gap-1"
+        >
+          추천 해제
+        </Button>
+      </template>
+      <template v-else-if="showButtons">
+        <div class="flex items-center gap-2">
+          <button
+            v-for="option in recommendationButtons"
+            :key="option.value"
+            type="button"
+            @click="onSelectRecommendation && onSelectRecommendation(option.value)"
+            :class="`px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors ${
+              activeRecommendation === option.value
+                ? 'gradient-primary text-white border border-transparent'
+                : 'bg-white text-[#495057] border border-[#dee2e6] hover:bg-[#f8f9fa]'
+            }`"
+          >
+            <span class="inline-flex items-center gap-1">
+              <span v-if="option.emoji">{{ option.emoji }}</span>
+              <span>{{ option.label }}</span>
+            </span>
+          </button>
+        </div>
+      </template>
     </div>
 
-    <CafeteriaRecommendationList
-      v-if="recommendations.length"
-      :recommendations="recommendations"
-      :favoriteRestaurantIds="favoriteRestaurantIds"
-      :onToggleFavorite="onToggleFavorite"
-      class="mb-6"
-    />
+    <div v-if="recommendations.length" class="space-y-5">
+      <div
+        v-for="day in recommendations"
+        :key="`${day.day}-${day.date}`"
+        class="space-y-3"
+      >
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-semibold text-[#1e3a5f]">
+              {{ day.day }} · {{ day.date }}
+            </p>
+            <p class="text-xs text-[#6c757d]">
+              기피 메뉴: {{ day.avoidMenu || "없음" }}
+            </p>
+          </div>
+          <span
+            class="text-xs font-semibold px-2 py-1 rounded-full bg-[#f8f9fa] text-[#495057]"
+          >
+            팀 선호 반영
+          </span>
+        </div>
+        <RestaurantCardList :restaurants="day.restaurants || []" />
+      </div>
+    </div>
 
     <CafeteriaMenuUploadModal
       v-if="isModalOpen"
