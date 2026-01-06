@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpRequest;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
@@ -54,6 +55,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/join/**", "/api/auth/**", "/api/sms/**", "/api/login").permitAll()
                         .requestMatchers("/api/refresh").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/search/email").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/search/loginId").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/search/pwd").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/api/auth/pwd").permitAll()
 
                         .requestMatchers(HttpMethod.GET,
                                 "/api/restaurants/{id}",
