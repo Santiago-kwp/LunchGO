@@ -9,6 +9,18 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  pageKey: {
+    type: [String, Number],
+    default: null,
+  },
+  favoriteRestaurantIds: {
+    type: Array,
+    default: () => [],
+  },
+  onToggleFavorite: {
+    type: Function,
+    default: () => {},
+  },
 });
 
 const normalizeTag = (tag) => {
@@ -59,9 +71,9 @@ const formatRating = (rating) => {
 <template>
   <div class="space-y-3">
     <RouterLink
-      v-for="restaurant in restaurants"
-      :key="restaurant.id"
-      :to="`/restaurant/${restaurant.id}`"
+      v-for="(restaurant, index) in restaurants"
+      :key="`${props.pageKey ?? 'list'}-${restaurant.id ?? restaurant.restaurantId ?? 'row'}-${index}`"
+      :to="`/restaurant/${restaurant.id ?? restaurant.restaurantId}`"
     >
       <Card
         class="relative overflow-hidden border-[#e9ecef] rounded-xl bg-white shadow-card hover:shadow-lg transition-shadow cursor-pointer"

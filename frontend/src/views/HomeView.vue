@@ -69,7 +69,8 @@ const memberId = computed(() => {
 
 // State management (React's useState -> Vue's ref)
 const isFilterOpen = ref(false);
-const selectedSort = ref("추천순");
+const DEFAULT_SORT = "가나다순";
+const selectedSort = ref(DEFAULT_SORT);
 const selectedPriceRange = ref(null);
 const selectedRecommendation = ref(null);
 const {
@@ -355,13 +356,16 @@ const processedRestaurants = computed(() => {
       haversineDistance(restaurant.coords, center);
 
   const sorters = {
+    가나다순: (a, b) => {
+      const nameA = String(a?.name || "");
+      const nameB = String(b?.name || "");
+      const nameDiff = nameA.localeCompare(nameB, "ko");
+      if (nameDiff !== 0) return nameDiff;
+      return getSortId(a) - getSortId(b);
+    },
     추천순: (a, b) => {
       const scoreDiff = getSortRecommendScore(b) - getSortRecommendScore(a);
       if (scoreDiff !== 0) return scoreDiff;
-      const ratingDiff = getSortRating(b) - getSortRating(a);
-      if (ratingDiff !== 0) return ratingDiff;
-      const reviewDiff = getSortReviewCount(b) - getSortReviewCount(a);
-      if (reviewDiff !== 0) return reviewDiff;
       return getSortId(a) - getSortId(b);
     },
     거리순: (a, b) => {
@@ -1028,7 +1032,7 @@ onMounted(async () => {
   if (storedHomeState) {
     try {
       const parsed = JSON.parse(storedHomeState);
-      selectedSort.value = parsed.selectedSort ?? selectedSort.value;
+      selectedSort.value = DEFAULT_SORT;
       selectedPriceRange.value =
           parsed.selectedPriceRange ?? selectedPriceRange.value;
       selectedRecommendation.value =
@@ -1124,7 +1128,7 @@ const recommendationButtons = computed(() => [
   { value: RECOMMEND_WEATHER, label: "\uB0A0\uC528", emoji: "\u2600\uFE0F" },
 ]);
 const distances = ["1km 이내", "2km 이내", "3km 이내"];
-const sortOptions = ["추천순", "거리순", "평점순", "낮은 가격순"];
+const sortOptions = [DEFAULT_SORT, "추천순", "거리순", "평점순", "낮은 가격순"];
 
 
 const resolveRestaurantPriceValue = (restaurant) => {
@@ -1334,7 +1338,7 @@ onMounted(() => {
   if (storedHomeState) {
     try {
       const parsed = JSON.parse(storedHomeState);
-      selectedSort.value = parsed.selectedSort ?? selectedSort.value;
+      selectedSort.value = DEFAULT_SORT;
       selectedPriceRange.value =
           parsed.selectedPriceRange ?? selectedPriceRange.value;
       selectedRecommendation.value =
