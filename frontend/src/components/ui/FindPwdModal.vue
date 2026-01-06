@@ -332,7 +332,6 @@ const modalTitle = computed(() => {
                   v-model="email"
                   type="text"
                   placeholder="아이디를 입력하세요."
-                  minlength="7"
                   maxlength="15"
                   required
                 />

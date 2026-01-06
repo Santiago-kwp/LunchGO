@@ -1704,8 +1704,8 @@ onBeforeUnmount(() => {
                 <div class="flex items-center gap-2">
                   <input
                       type="number"
-                      min="1"
-                      max="20"
+                      min="4"
+                      max="12"
                       v-model.number="filterPartySize"
                       class="w-20 px-3 py-2 rounded-lg border border-[#dee2e6] text-sm text-[#1e3a5f] bg-white focus:outline-none focus:ring-2 focus:ring-[#ff6b4a] focus:border-transparent"
                   />
