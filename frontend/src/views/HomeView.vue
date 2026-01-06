@@ -173,23 +173,8 @@ const fetchSearchTags = async () => {
   }
 };
 
-const getStoredMember = () => {
-  const raw = localStorage.getItem("member");
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-};
-
-const resolveMemberId = () => {
-  const member = accountStore.member || getStoredMember();
-  return member?.id ?? member?.userId ?? member?.memberId ?? null;
-};
-
 const fetchUserAddress = async () => {
-  const userId = resolveMemberId();
+  const userId = memberId.value;
   if (!userId) return null;
   try {
     const response = await httpRequest.get(`/api/info/user/${userId}`);
