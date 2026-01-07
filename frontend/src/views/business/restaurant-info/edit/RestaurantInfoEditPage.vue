@@ -2,7 +2,6 @@
 import {computed, onMounted, reactive, ref, watch} from 'vue';
 import {Upload, X} from 'lucide-vue-next';
 import {RouterLink, useRoute, useRouter} from 'vue-router';
-import axios from 'axios';
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 import Pagination from '@/components/ui/Pagination.vue';
@@ -281,6 +280,75 @@ onMounted(async () => {
   }
 });
 
+const uploadRestaurantImage = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await httpRequest.post(
+    '/api/v1/images/upload/restaurants',
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  const data = response.data?.data ?? response.data;
+  return data?.fileUrl || data?.key || null;
+};
+
+const fetchRestaurantImages = async (restaurantId) => {
+  const response = await httpRequest.get(
+    `/api/business/restaurants/${restaurantId}/images`
+  );
+  return response.data ?? [];
+};
+
+const deleteRestaurantImages = async (restaurantId, images) => {
+  if (!images.length) return;
+  await Promise.all(
+    images.map((image) =>
+      httpRequest.delete(
+        `/api/business/restaurants/${restaurantId}/images/${image.restaurantImageId}`
+      )
+    )
+  );
+};
+
+const saveRestaurantImage = async (restaurantId, imageUrl) => {
+  await httpRequest.post(
+    `/api/business/restaurants/${restaurantId}/images`,
+    { imageUrl }
+  );
+};
+
+const syncRestaurantImage = async (restaurantId, { isNewRestaurant } = {}) => {
+  const imageFile = restaurantImageFile.value;
+  const hasNewImageFile = Boolean(imageFile && imageFile.size > 0);
+  const hasImageUrl = Boolean(restaurantImageUrl.value);
+
+  if (!hasNewImageFile && !hasImageUrl) {
+    if (!isNewRestaurant) {
+      const existingImages = await fetchRestaurantImages(restaurantId);
+      await deleteRestaurantImages(restaurantId, existingImages);
+    }
+    return;
+  }
+
+  if (!hasNewImageFile) {
+    return;
+  }
+
+  const uploadedUrl = await uploadRestaurantImage(imageFile);
+  if (!uploadedUrl) {
+    throw new Error('이미지 업로드 실패');
+  }
+
+  if (!isNewRestaurant) {
+    const existingImages = await fetchRestaurantImages(restaurantId);
+    await deleteRestaurantImages(restaurantId, existingImages);
+  }
+
+  await saveRestaurantImage(restaurantId, uploadedUrl);
+  store.setDraftImageUrl(uploadedUrl);
+  restaurantImageFile.value = new File([], 'mock-restaurant-image.png');
+};
+
 const saveRestaurant = async () => {
   // 1. Reset previous errors
   for (const key in validationErrors) {
@@ -367,20 +435,32 @@ const saveRestaurant = async () => {
   try {
     const apiUrl = '/api/business/restaurants';
     let response;
+    let restaurantId;
 
     if (isEditMode.value) {
       // 수정 모드일 경우: PUT 요청
       response = await httpRequest.put(`${apiUrl}/${route.params.id}`, dataToSubmit);
-      alert('식당 정보가 성공적으로 수정되었습니다.');
-      // 수정 후 상세 페이지로 이동
-      router.push(`/business/restaurant-info/${route.params.id}`);
+      restaurantId = Number(route.params.id);
     } else {
       // 등록 모드일 경우: POST 요청
       response = await httpRequest.post(apiUrl, dataToSubmit);
-      const newRestaurantId = response.data; // 백엔드에서 생성된 ID를 응답으로 받음
+      restaurantId = response.data; // 백엔드에서 생성된 ID를 응답으로 받음
+    }
+
+    try {
+      await syncRestaurantImage(restaurantId, { isNewRestaurant: !isEditMode.value });
+    } catch (error) {
+      console.error('이미지 저장 실패:', error);
+      alert('이미지 저장에 실패했습니다.');
+      return;
+    }
+
+    if (isEditMode.value) {
+      alert('식당 정보가 성공적으로 수정되었습니다.');
+      router.push(`/business/restaurant-info/${restaurantId}`);
+    } else {
       alert('식당 정보가 성공적으로 등록되었습니다.');
-      // 등록 후 새로운 식당의 상세 페이지로 이동
-      router.push(`/business/restaurant-info/${newRestaurantId}`);
+      router.push(`/business/restaurant-info/${restaurantId}`);
     }
   } catch (error) {
     console.error('저장 실패:', error);

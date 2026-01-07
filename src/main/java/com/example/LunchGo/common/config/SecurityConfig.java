@@ -79,7 +79,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/restaurants/*/reviews/*").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.DELETE, "/api/restaurants/*/reviews/*").hasAuthority("ROLE_USER")
 
-                        .requestMatchers(HttpMethod.POST, "/api/v1/images/upload/*").hasAuthority("ROLE_USER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/images/upload/*")
+                        .hasAnyAuthority("ROLE_USER", "ROLE_OWNER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/images/presign").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.POST, "/api/ocr/receipt").hasAuthority("ROLE_USER")
 

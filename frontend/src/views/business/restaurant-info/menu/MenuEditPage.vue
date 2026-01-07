@@ -76,6 +76,68 @@ const isTagSelected = (tag) => {
   return menuData.tags.some((t) => t.tagId === tag.tagId);
 };
 
+const uploadMenuImage = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await httpRequest.post(
+    '/api/v1/images/upload/menus',
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  const data = response.data?.data ?? response.data;
+  return data?.fileUrl || data?.key || null;
+};
+
+const fetchMenuImages = async (restaurantId, menuId) => {
+  const response = await httpRequest.get(
+    `/api/business/restaurants/${restaurantId}/menus/${menuId}/images`
+  );
+  return response.data ?? [];
+};
+
+const deleteMenuImages = async (restaurantId, menuId, images) => {
+  if (!images.length) return;
+  await Promise.all(
+    images.map((image) =>
+      httpRequest.delete(
+        `/api/business/restaurants/${restaurantId}/menus/${menuId}/images/${image.menuImageId}`
+      )
+    )
+  );
+};
+
+const saveMenuImage = async (restaurantId, menuId, imageUrl) => {
+  await httpRequest.post(
+    `/api/business/restaurants/${restaurantId}/menus/${menuId}/images`,
+    { imageUrl }
+  );
+};
+
+const syncMenuImage = async (restaurantId, menuId) => {
+  const hasNewImageFile = Boolean(imageFile.value && imageFile.value.size > 0);
+  const hasImageUrl = Boolean(menuData.imageUrl);
+
+  if (!hasNewImageFile && !hasImageUrl) {
+    const existingImages = await fetchMenuImages(restaurantId, menuId);
+    await deleteMenuImages(restaurantId, menuId, existingImages);
+    return null;
+  }
+
+  if (!hasNewImageFile) {
+    return menuData.imageUrl || null;
+  }
+
+  const uploadedUrl = await uploadMenuImage(imageFile.value);
+  if (!uploadedUrl) {
+    throw new Error('이미지 업로드 실패');
+  }
+
+  const existingImages = await fetchMenuImages(restaurantId, menuId);
+  await deleteMenuImages(restaurantId, menuId, existingImages);
+  await saveMenuImage(restaurantId, menuId, uploadedUrl);
+  return uploadedUrl;
+};
+
 // 6. 라이프사이클 훅
 const fetchIngredientTags = async () => {
   try {
@@ -178,8 +240,9 @@ const saveMenu = async () => {
 
   try {
     if (restaurantId) {
+      let savedMenu = null;
       if (isEditMode.value) {
-        await store.updateMenuForRestaurant(
+        savedMenu = await store.updateMenuForRestaurant(
           restaurantId,
           menuData.id,
           menuToSave
@@ -187,8 +250,19 @@ const saveMenu = async () => {
         alert('메뉴가 수정되었습니다.');
       } else {
         menuToSave.id = null;
-        await store.createMenuForRestaurant(restaurantId, menuToSave);
+        savedMenu = await store.createMenuForRestaurant(restaurantId, menuToSave);
         alert('메뉴가 추가되었습니다.');
+      }
+      const menuId = savedMenu?.id ?? menuData.id;
+      const shouldSyncImage = Boolean(
+        menuId && (imageFile.value || (isEditMode.value && !menuData.imageUrl))
+      );
+      if (shouldSyncImage) {
+        const syncedImageUrl = await syncMenuImage(restaurantId, menuId);
+        menuData.imageUrl = syncedImageUrl || '';
+        if (savedMenu) {
+          store.updateMenu({ ...savedMenu, imageUrl: menuData.imageUrl });
+        }
       }
     } else {
       if (isEditMode.value) {
