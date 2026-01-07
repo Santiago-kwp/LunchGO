@@ -36,6 +36,7 @@ import TrendingRecommendationSection from "@/components/ui/TrendingRecommendatio
 import { useTrendingRestaurants } from "@/composables/useTrendingRestaurants";
 import { useBudgetRecommendation, extractPriceValue } from "@/composables/useBudgetRecommendation";
 import { useTagMappingRecommendation } from "@/composables/useTagMappingRecommendation";
+import { useWeatherRecommendation } from "@/composables/useWeatherRecommendation";
 import { useHomeRecommendations } from "@/composables/useHomeRecommendations";
 import { useAccountStore } from "@/stores/account";
 import { useFavorites } from "@/composables/useFavorites";
@@ -225,6 +226,14 @@ const {
   fetchTagMappingRecommendations,
   clearTagMappingRecommendations,
 } = useTagMappingRecommendation();
+const {
+  isWeatherLoading,
+  weatherRecommendations,
+  weatherError,
+  weatherSummary,
+  fetchWeatherRecommendations,
+  clearWeatherRecommendations,
+} = useWeatherRecommendation();
 const isGeocodeExportMode = ref(false);
 const isGeocodeExporting = ref(false);
 const geocodeExportProgress = ref({ done: 0, total: 0 });
@@ -253,6 +262,9 @@ const restaurants = restaurantData;
 const baseRestaurants = computed(() => {
   if (selectedRecommendation.value === RECOMMEND_BUDGET) {
     return budgetRecommendations.value;
+  }
+  if (selectedRecommendation.value === RECOMMEND_WEATHER) {
+    return weatherRecommendations.value;
   }
   if (selectedRecommendation.value === RECOMMEND_TASTE) {
     return tagMappingRecommendations.value;
@@ -1238,6 +1250,7 @@ const resetFilters = () => {
   filterBudget.value = 60000;
   filterPartySize.value = 4;
   clearBudgetRecommendations();
+  clearWeatherRecommendations();
   clearTagMappingRecommendations();
 };
 
@@ -1248,6 +1261,7 @@ const closeFilterModal = () => {
   selectedRecommendation.value = null;
   clearTrendingRestaurants();
   clearTagMappingRecommendations();
+  clearWeatherRecommendations();
   currentPage.value = 1;
   isFilterOpen.value = false;
   persistHomeListState();
@@ -1348,6 +1362,9 @@ onMounted(() => {
         selectedRecommendation.value = null;
         clearBudgetRecommendations();
       }
+      if (selectedRecommendation.value === RECOMMEND_WEATHER) {
+        fetchWeatherRecommendationsForCenter();
+      }
       nextTick(() => {
         if (Number.isFinite(parsed.scrollY)) {
           window.scrollTo(0, parsed.scrollY);
@@ -1390,6 +1407,9 @@ const handleClearCafeteriaRecommendations = () => {
   }
 };
 
+const fetchWeatherRecommendationsForCenter = () =>
+    fetchWeatherRecommendations(mapCenter.value);
+
 const {
   applyFilters,
   clearTrendingRecommendation,
@@ -1405,6 +1425,8 @@ const {
   filterPerPersonBudget,
   fetchBudgetRecommendations,
   clearBudgetRecommendations,
+  fetchWeatherRecommendations: fetchWeatherRecommendationsForCenter,
+  clearWeatherRecommendations,
   fetchTagMappingRecommendations,
   clearTagMappingRecommendations,
   clearTrendingRestaurants,
@@ -1420,6 +1442,7 @@ const {
   RECOMMEND_CAFETERIA,
   RECOMMEND_BUDGET,
   RECOMMEND_TASTE,
+  RECOMMEND_WEATHER,
 });
 
 watch([selectedSort, selectedPriceRange, selectedRecommendation], () => {

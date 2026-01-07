@@ -7,6 +7,8 @@ export const useHomeRecommendations = ({
   filterPerPersonBudget,
   fetchBudgetRecommendations,
   clearBudgetRecommendations,
+  fetchWeatherRecommendations,
+  clearWeatherRecommendations,
   fetchTagMappingRecommendations,
   clearTagMappingRecommendations,
   clearTrendingRestaurants,
@@ -22,6 +24,7 @@ export const useHomeRecommendations = ({
   RECOMMEND_CAFETERIA,
   RECOMMEND_BUDGET,
   RECOMMEND_TASTE,
+  RECOMMEND_WEATHER,
 }) => {
   const applyFilters = () => {
     selectedSort.value = filterForm.sort || sortOptions[0];
@@ -31,6 +34,11 @@ export const useHomeRecommendations = ({
       fetchBudgetRecommendations(filterPerPersonBudget.value);
     } else {
       clearBudgetRecommendations();
+    }
+    if (selectedRecommendation.value === RECOMMEND_WEATHER) {
+      fetchWeatherRecommendations();
+    } else {
+      clearWeatherRecommendations();
     }
     if (selectedRecommendation.value === RECOMMEND_TASTE) {
       fetchTagMappingRecommendations();
