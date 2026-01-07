@@ -26,6 +26,14 @@ frontend/.env.*
 .env
 .apm-local.env
 
+## Menu image sync artifacts
+/menu_images/
+/menu_real_images/
+/menu_images_upload.csv
+/menu_unique_names.csv
+/ncloud-menu-image-sync.skill
+/menu_images_ids.csv
+
 ## Scouter APM artifacts
 scouter-all-*.tar.gz
 scouter/agent.java/scouter.agent.jar
