@@ -1,41 +1,18 @@
-﻿<script setup lang="ts">
-import { ref, computed } from 'vue';
+<script setup lang="ts">
+import { ref } from 'vue';
 import { RouterLink, useRouter, useRoute } from 'vue-router';
 import httpRequest from '@/router/httpRequest';
 import { ArrowLeft } from 'lucide-vue-next';
-import FindIdModal from '@/components/ui/FindIdModal.vue';
-import FindEmailModal from '@/components/ui/FindEmailModal.vue';
-import FindPwdModal from '@/components/ui/FindPwdModal.vue';
-import UserDormantModal from '@/components/ui/UserDormantModal.vue';
 import { useAccountStore } from '@/stores/account';
 
 const router = useRouter();
 const route = useRoute();
 const accountStore = useAccountStore();
 
-type UserType = 'user' | 'staff' | 'owner';
-
-const showFindIdModal = ref(false);
-const showFindEmailModal = ref(false);
-const showFindPwdModal = ref(false);
-const showDormantModal = ref(false);
-
-const currentTab = ref<UserType>('user');
-const email = ref('');
 const username = ref('');
 const password = ref('');
 const isLoading = ref(false);
 const errorMessage = ref('');
-
-const tabs = [
-  { id: 'user', label: '사용자' },
-  { id: 'staff', label: '임직원' },
-  { id: 'owner', label: '사업자' },
-] as const;
-
-const isEmailLogin = computed(() => {
-  return currentTab.value === 'user' || currentTab.value === 'staff';
-});
 
 const clearError = () => {
   if (errorMessage.value) {
@@ -43,61 +20,30 @@ const clearError = () => {
   }
 };
 
-const checkLoginElement = () => {
-  if (isEmailLogin.value) {
-    if (!email.value) return (errorMessage.value = '이메일은 필수 입력입니다.');
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.value))
-      return (errorMessage.value = '이메일 형식이 맞지 않습니다.');
-  } else {
-    if (!username.value)
-      return (errorMessage.value = '아이디는 필수 입력입니다.');
-  }
-
-  if (!password.value)
-    return (errorMessage.value = '비밀번호는 필수 입력입니다.');
-
-  return null;
-};
-
-const selectTab = (tabId: UserType) => {
-  currentTab.value = tabId;
-  clearError();
-};
-
-const openFindModal = () => {
-  if (isEmailLogin.value) {
-    showFindEmailModal.value = true;
-  } else {
-    showFindIdModal.value = true;
-  }
-};
-
 const handleLogin = async () => {
   isLoading.value = true;
   errorMessage.value = '';
 
-  if (checkLoginElement() !== null) {
+  if (!username.value) {
+    errorMessage.value = '아이디는 필수 입력입니다.';
+    isLoading.value = false;
+    return;
+  }
+
+  if (!password.value) {
+    errorMessage.value = '비밀번호는 필수 입력입니다.';
     isLoading.value = false;
     return;
   }
 
   try {
-    const userTypeMap: Record<UserType, string> = {
-      user: 'USER',
-      staff: 'STAFF',
-      owner: 'OWNER',
-    };
-
     const payload = {
-      email: isEmailLogin.value ? email.value : username.value,
+      email: username.value,
       password: password.value,
-      userType: userTypeMap[currentTab.value],
+      userType: 'MANAGER',
     };
 
     const response = await httpRequest.post('/api/login', payload, { skipAuth: true });
-
     const { accessToken } = response.data || {};
     if (!accessToken) {
       throw new Error('accessToken not found');
@@ -117,21 +63,7 @@ const handleLogin = async () => {
       return;
     }
 
-    const targetPath = (() => {
-      switch (response.data?.role) {
-        case 'ROLE_OWNER':
-          return '/business/dashboard';
-        case 'ROLE_ADMIN':
-          return '/admin/dashboard';
-        case 'ROLE_STAFF':
-          return '/staff/list';
-        case 'ROLE_USER':
-        default:
-          return '/';
-      }
-    })();
-
-    router.push(targetPath);
+    router.push('/admin/dashboard');
   } catch (error) {
     const statusCode = error?.response?.status;
     password.value = '';
@@ -145,11 +77,6 @@ const handleLogin = async () => {
   } finally {
     isLoading.value = false;
   }
-};
-
-const handleDormantUnlocked = () => {
-  password.value = '';
-  errorMessage.value = '';
 };
 </script>
 
@@ -175,42 +102,16 @@ const handleDormantUnlocked = () => {
           height="80"
           class="w-20 h-20 mb-4 object-contain"
         />
-        <h1 class="text-2xl font-bold text-[#1E3A5F] mb-2">로그인</h1>
+        <h1 class="text-2xl font-bold text-[#1E3A5F] mb-2">관리자 로그인</h1>
         <p class="text-sm text-[#6C757D]">
-          런치고에 오신 것을 환영합니다.
+          관리자 전용 로그인 페이지입니다.
         </p>
       </div>
       <div class="login-card">
-        <div class="tabs-nav">
-          <button
-            v-for="tab in tabs"
-            :key="tab.id"
-            type="button"
-            class="tab-btn"
-            :class="{ active: currentTab === tab.id }"
-            @click="selectTab(tab.id)"
-          >
-            {{ tab.label }}
-            <div class="active-bar" v-if="currentTab === tab.id"></div>
-          </button>
-        </div>
         <form @submit.prevent="handleLogin" class="login-form">
           <div class="input-group">
-            <label :for="isEmailLogin ? 'email' : 'username'">
-              {{ isEmailLogin ? '이메일' : '아이디' }}
-            </label>
+            <label for="username">아이디</label>
             <input
-              v-if="isEmailLogin"
-              id="email"
-              v-model="email"
-              type="email"
-              class="input-field"
-              placeholder="이메일을 입력하세요"
-              @input="clearError"
-              required
-            />
-            <input
-              v-else
               id="username"
               v-model="username"
               type="text"
@@ -238,55 +139,9 @@ const handleDormantUnlocked = () => {
             <span v-if="isLoading" class="spinner"></span>
             <span v-else>로그인</span>
           </button>
-          <div class="find-links-container">
-            <a href="#" class="find-link" @click.prevent="openFindModal">
-              {{ isEmailLogin ? '이메일 찾기' : '아이디 찾기' }}
-            </a>
-            <span class="separator">|</span>
-            <a
-              href="#"
-              class="find-link"
-              @click.prevent="showFindPwdModal = true"
-            >
-              비밀번호 찾기
-            </a>
-          </div>
         </form>
       </div>
-      <div class="mt-6 text-center">
-        <p class="text-sm text-[#6C757D]">
-          아직 회원이 아니신가요?
-          <RouterLink
-            to="/signup"
-            class="text-[#FF6B4A] font-semibold hover:underline ml-1"
-          >
-            회원가입
-          </RouterLink>
-        </p>
-      </div>
     </main>
-    <FindIdModal
-      :is-visible="showFindIdModal"
-      :user-type="currentTab"
-      @close="showFindIdModal = false"
-    />
-    <FindEmailModal
-      :is-visible="showFindEmailModal"
-      :user-type="currentTab"
-      @close="showFindEmailModal = false"
-    />
-    <FindPwdModal
-      :is-visible="showFindPwdModal"
-      :user-type="currentTab"
-      @close="showFindPwdModal = false"
-    />
-
-    <UserDormantModal
-      :is-visible="showDormantModal"
-      @close="showDormantModal = false"
-      :user-email="email"
-      @unlocked="handleDormantUnlocked"
-    />
   </div>
 </template>
 
@@ -301,40 +156,6 @@ const handleDormantUnlocked = () => {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   border: 1px solid #e9ecef;
   overflow: hidden;
-}
-.tabs-nav {
-  display: flex;
-  border-bottom: 1px solid #e9ecef;
-  background-color: #fff;
-}
-.tab-btn {
-  flex: 1;
-  padding: 16px 0;
-  border: none;
-  background: transparent;
-  font-size: 14px;
-  font-weight: 600;
-  color: #adb5bd;
-  cursor: pointer;
-  position: relative;
-  transition: all 0.2s;
-}
-.tab-btn:hover {
-  color: #495057;
-  background-color: #fafafa;
-}
-.tab-btn.active {
-  color: #ff6b4a;
-  font-weight: 700;
-}
-.active-bar {
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  width: 100%;
-  height: 3px;
-  background-color: #ff6b4a;
-  border-radius: 3px 3px 0 0;
 }
 .login-form {
   padding: 24px;
@@ -407,28 +228,6 @@ const handleDormantUnlocked = () => {
   background-color: #ced4da;
   cursor: not-allowed;
   box-shadow: none;
-}
-.find-links-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-top: 20px;
-  font-size: 13px;
-  color: #adb5bd;
-}
-.find-link {
-  color: #6c757d;
-  text-decoration: none;
-  transition: color 0.2s;
-}
-.find-link:hover {
-  color: #ff6b4a;
-  text-decoration: underline;
-}
-.separator {
-  margin: 0 12px;
-  color: #e9ecef;
-  font-size: 12px;
 }
 .spinner {
   width: 20px;

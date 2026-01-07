@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed, onUnmounted } from 'vue';
-import axios from 'axios';
+import httpRequest from '@/router/httpRequest';
 
 const props = defineProps<{
   isVisible: boolean;
@@ -114,7 +114,7 @@ const handleSendVerifyCode = async () => {
 
   alert(`인증번호를 발송했습니다: ${phone.value}`);
   try {
-    await axios.post('/api/sms/send', {phone: phone.value});
+    await httpRequest.post('/api/sms/send', {phone: phone.value});
 
     isCodeSent.value = true;
     startTimer(); 
@@ -132,7 +132,7 @@ const handleVerifyCode = async () => {
   if (isTimeout.value) return alert('입력 시간이 초과되었습니다. 재발송해주세요.');
 
   try {
-    const response = await axios.post('/api/sms/verify', {
+    const response = await httpRequest.post('/api/sms/verify', {
       phone: phone.value,
       verifyCode: verificationCode.value
     });
@@ -167,7 +167,7 @@ const handleFindEmail = async () => {
   if(!isPhoneVerified.value) return alert("인증번호 확인은 필수입니다.");
 
   try {
-    const response = await axios.post('api/auth/search/email',{
+    const response = await httpRequest.post('/api/auth/search/email',{
       name: name.value,
       phone: phone.value
     });

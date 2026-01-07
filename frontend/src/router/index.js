@@ -189,6 +189,11 @@ const router = createRouter({
       component: () => import('../views/login/LoginPage.vue'),
     },
     {
+      path: '/admin/login',
+      name: 'admin-login',
+      component: () => import('../views/login/AdminLoginPage.vue'),
+    },
+    {
       path: '/my-reservations',
       name: 'my-reservations',
       component: () =>

@@ -12,7 +12,21 @@ import { marked } from 'marked';
 const router = useRouter();
 
 const name = ref('');
-const email = ref('');
+const emailLocal = ref('');
+const emailDomain = ref('');
+const emailDomains = [
+  'gmail.com',
+  'naver.com',
+  'daum.net',
+  'kakao.com',
+  'outlook.com',
+  'hotmail.com',
+  'yahoo.com',
+];
+const email = computed(() => {
+  if (!emailLocal.value || !emailDomain.value) return '';
+  return `${emailLocal.value}@${emailDomain.value}`;
+});
 const isEmailUnique = ref(false);
 const phone = ref('');
 const verificationCode = ref(''); //사용자가 입력한 인증번호
@@ -43,6 +57,10 @@ const agreeMarketing = ref(false);
 
 // 전체 동의 체크박스 상태 (Computed 처럼 동작하게 하거나 watch로 제어)
 const agreeAll = ref(false);
+
+watch([emailLocal, emailDomain], () => {
+  isEmailUnique.value = false;
+});
 
 //도로명주소 api
 const loadDaumPostcodeScript = () => {
@@ -176,10 +194,10 @@ onUnmounted(() => {
 });
 
 const checkInputElement = () => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!email.value) return alert('이메일을 입력해주세요.');
-  if (!emailRegex.test(email.value))
-    return alert('이메일 양식에 맞지 않습니다.');
+  if(!emailLocal.value || !emailDomain.value) return alert('이메일을 입력해주세요.');
+  if (emailLocal.value.length < 5)
+    return alert('이메일 아이디는 5자 이상이어야 합니다.');
+
   if (!isEmailUnique.value) return alert('이메일 중복확인이 필요합니다.');
   if (!password.value) return alert('비밀번호를 입력해주세요.');
 
@@ -258,7 +276,7 @@ const modalContent = ref('');
 const modalContentHtml = computed(() => marked.parse(modalContent.value, { breaks: true }));
 
 const handleEmailDuplicateCheck = async () => {
-  if (!email.value) return alert('이메일을 먼저 입력해주세요.');
+  if(!emailLocal.value || !emailDomain.value) return alert('이메일을 입력해주세요.');
 
   //백엔드 연동해서 이메일 unique한지 check
   try{
@@ -277,7 +295,8 @@ const handleEmailDuplicateCheck = async () => {
         break;
       case 409:
         alert("이미 사용중인 이메일입니다.");
-        email.value = '';
+        emailLocal.value = '';
+        emailDomain.value = '';
         break;
       default:
         alert(`오류가 발생했습니다. (Code: ${status})`);
@@ -391,14 +410,27 @@ const handleSignup = async () => {
               >이메일</label
             >
             <div class="flex gap-2">
-              <Input
-                id="email"
-                type="email"
-                placeholder="example@email.com"
-                v-model="email"
-                :readonly="isEmailUnique"
-                class="flex-1 h-12 px-4 border-[#dee2e6] rounded-lg focus:border-[#ff6b4a] focus:ring-1 focus:ring-[#ff6b4a] text-[#1e3a5f]"
-              />
+              <div class="flex flex-1 items-center gap-2">
+                <Input
+                  id="email"
+                  type="text"
+                  placeholder="아이디"
+                  minlength="5"
+                  v-model="emailLocal"
+                  :readonly="isEmailUnique"
+                  class="flex-1 h-12 px-4 border-[#dee2e6] rounded-lg focus:border-[#ff6b4a] focus:ring-1 focus:ring-[#ff6b4a] text-[#1e3a5f]"
+                />
+                <span class="text-[#6c757d]">@</span>
+                <select
+                  v-model="emailDomain"
+                  :disabled="isEmailUnique"
+                  class="h-12 px-3 border border-[#dee2e6] rounded-lg bg-white text-[#1e3a5f] focus:border-[#ff6b4a] focus:ring-1 focus:ring-[#ff6b4a]"
+                >
+                  <option v-for="domain in emailDomains" :key="domain" :value="domain">
+                    {{ domain }}
+                  </option>
+                </select>
+              </div>
               <Button
                 type="button"
                 @click="handleEmailDuplicateCheck"
