@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed, onUnmounted } from 'vue';
-import axios from 'axios';
+import httpRequest from '@/router/httpRequest';
 
 const props = defineProps<{
   isVisible: boolean;
@@ -124,7 +124,7 @@ const handleSendVerifyCode = async () => {
 
   alert(`인증번호를 발송했습니다: ${phone.value}`);
   try {
-    await axios.post('/api/sms/send', {phone: phone.value});
+    await httpRequest.post('/api/sms/send', {phone: phone.value});
 
     isCodeSent.value = true;
     startTimer(); 
@@ -142,7 +142,7 @@ const handleVerifyCode = async () => {
   if (isTimeout.value) return alert('입력 시간이 초과되었습니다. 재발송해주세요.');
 
   try {
-    const response = await axios.post('/api/sms/verify', {
+    const response = await httpRequest.post('/api/sms/verify', {
       phone: phone.value,
       verifyCode: verifyCode.value
     });
@@ -215,7 +215,7 @@ const handleVerifyUser = async () => {
   }
 
   try{
-    const response = await axios.post('/api/auth/search/pwd', body);
+    const response = await httpRequest.post('/api/auth/search/pwd', body);
 
     step.value = 2;
     // 타이머 정지
@@ -276,7 +276,7 @@ const handleResetPassword = async () => {
   }
 
   try{
-    await axios.put('/api/auth/pwd', body);
+    await httpRequest.put('/api/auth/pwd', body);
 
     alert('비밀번호가 성공적으로 변경되었습니다.');
     emit('close');
