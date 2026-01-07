@@ -7,7 +7,8 @@ import org.springframework.context.annotation.Configuration;
 @MapperScan(basePackages = {
         "com.example.LunchGo.review.mapper",
         "com.example.LunchGo.member.mapper",
-        "com.example.LunchGo.reservation.mapper"
+        "com.example.LunchGo.reservation.mapper",
+        "com.example.LunchGo.restaurant.mapper"
 })
 public class MyBatisMapperConfig {
 }

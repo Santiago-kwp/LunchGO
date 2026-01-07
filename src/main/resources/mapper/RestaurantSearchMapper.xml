@@ -3,43 +3,33 @@
 <mapper namespace="com.example.LunchGo.restaurant.mapper.RestaurantSearchMapper">
 
     <select id="findAvailableRestaurantIds" parameterType="com.example.LunchGo.restaurant.dto.RestaurantSearchParameter" resultType="long">
-        SELECT DISTINCT r.id
+        SELECT DISTINCT r.restaurant_id
         FROM restaurants r
-
-        <!-- 날짜/시간 검색이 있을 경우에만 예약 가능 여부 판별을 위해 JOIN -->
-        <if test="date != null and time != null and time != ''">
-            LEFT JOIN restaurant_reservation_slots rrs
-            ON r.id = rrs.restaurant_id
-            AND rrs.slot_date = #{date}
-            AND rrs.slot_time = #{time}
-        </if>
-
-        <!-- TODO: 태그 검색 기능 추가 시, 여기에 INNER JOIN 구문 추가 -->
-
-
-        <where>
-            <!-- TODO: 태그 검색 기능 추가 시, 여기에 AND 조건으로 태그 필터링 구문 추가 -->
-
-
-            <!-- 날짜/시간/인원수에 따른 예약 가능 여부 필터링 조건 -->
-            <if test="date != null and time != null and time != ''">
-                AND (
-                    -- 1. 식당의 일반적인 운영 시간 확인
-                    (#{time} BETWEEN r.open_time AND r.close_time)
-                    AND
-                    -- 시나리오 1: 해당 날짜/시간에 예약 슬롯이 아예 없는 경우
-                    (rrs.slot_id IS NULL OR
-                        -- 시나리오 2: 해당 날짜/시간에 예약 슬롯이 있지만 잔여석이 충분한 경우
-                        (rrs.slot_id IS NOT NULL AND r.reservation_limit >= (
-                            -- `sumPartySizeBySlotId`의 로직을 서브쿼리로 구현
-                            SELECT COALESCE(SUM(res.party_size), 0)
-                            FROM reservations res
-                            WHERE res.slot_id = rrs.slot_id
-                            AND res.status IN ('TEMPORARY', 'CONFIRMED', 'PREPAID_CONFIRM')
-                        ) + #{partySize})
-                    )
-                )
+        -- 지정한 날짜, 시간대, 식당ID로 생성된 예약 슬롯들을 확인(없으면 null)
+        LEFT JOIN restaurant_reservation_slots s
+            ON r.restaurant_id = s.restaurant_id
+            <if test="date != null">
+                AND s.slot_date = #{date}
             </if>
+            <if test="time != null">
+                AND s.slot_time = #{time}
+            </if>
+        -- 지정한 날짜, 시간대, 식당ID로 생성된 예약 슬롯들을 확인(없으면 null)
+        LEFT JOIN (
+            -- 지정한 날짜, 시간대에 특정 식당을 예약한 인원수 총합 계산
+            SELECT slot_id, COALESCE(SUM(party_size), 0) as total_party_size
+            FROM reservations
+            WHERE status IN ('TEMPORARY', 'CONFIRMED', 'PREPAID_CONFIRM')
+            GROUP BY slot_id
+        ) res ON s.slot_id = res.slot_id
+        <where>
+            AND (
+                -- Case 1: 특정 식당에 관한 예약 슬롯이 추가된 적이 없음
+                s.slot_id IS NULL
+                OR
+                -- Case 2: 예약 슬롯이 존재하지만 잔여석이 충분함
+                s.max_capacity >= (IFNULL(res.total_party_size, 0) + #{partySize})
+            )
         </where>
     </select>
 

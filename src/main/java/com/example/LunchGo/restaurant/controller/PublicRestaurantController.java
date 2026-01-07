@@ -1,15 +1,20 @@
 package com.example.LunchGo.restaurant.controller;
 
 import com.example.LunchGo.restaurant.dto.RestaurantDetailResponse;
+import com.example.LunchGo.restaurant.dto.RestaurantSearchParameter;
 import com.example.LunchGo.restaurant.service.PublicRestaurantService;
+import com.example.LunchGo.restaurant.service.RestaurantSearchService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/restaurants")
@@ -17,6 +22,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class PublicRestaurantController {
 
     private final PublicRestaurantService publicRestaurantService;
+    private final RestaurantSearchService restaurantSearchService;
+
+    @GetMapping("/search")
+    public ResponseEntity<List<Long>> searchRestaurants(
+            @ModelAttribute RestaurantSearchParameter params
+    ) {
+        List<Long> restaurantIds = restaurantSearchService.searchRestaurants(params);
+
+        if (restaurantIds.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        return ResponseEntity.ok(restaurantIds);
+    }
 
     @GetMapping("/{id}")
     public ResponseEntity<RestaurantDetailResponse> getRestaurantDetail(
