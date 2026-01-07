@@ -24,7 +24,6 @@
                     AND s.slot_time IN ('11:00:00', '12:00:00', '13:00:00', '14:00:00')
                 </otherwise>
             </choose>
-        -- 지정한 날짜, 시간대, 식당ID로 생성된 예약 슬롯들을 확인(없으면 null)
         LEFT JOIN (
             -- 지정한 날짜, 시간대에 특정 식당을 예약한 인원수 총합 계산
             SELECT slot_id, COALESCE(SUM(party_size), 0) as total_party_size
@@ -33,6 +32,7 @@
             GROUP BY slot_id
         ) res ON s.slot_id = res.slot_id
         <where>
+            r.status = 'OPENED'
             AND (
                 -- Case 1: 특정 식당에 관한 예약 슬롯이 추가된 적이 없음
                 s.slot_id IS NULL
