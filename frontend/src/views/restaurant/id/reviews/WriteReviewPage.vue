@@ -60,6 +60,9 @@ const rating = ref(0);
 const receiptId = ref(null);
 const selectedTagIds = ref([]);
 const tagIdByName = ref({});
+const isSubmitting = ref(false);
+const canEditReceipt = computed(() => receipt.value.uploaded);
+const hasPrepayMenuItems = computed(() => receipt.value.hasPrepayMenuItems);
 
 // 방문 정보
 const visitInfo = ref({
@@ -73,6 +76,7 @@ const receipt = ref({
   partySize: 0,
   totalAmount: 0,
   uploaded: false, // 영수증 업로드 여부
+  hasPrepayMenuItems: false,
   items: [],
 });
 const receiptDraftItems = ref(
@@ -235,6 +239,7 @@ const applyReservationSummary = (data, shouldApplyReceipt) => {
   receipt.value.partySize = data.booking?.partySize || 0;
   receipt.value.totalAmount = data.totalAmount ?? data.payment?.amount ?? 0;
   const menuItems = Array.isArray(data.menuItems) ? data.menuItems : [];
+  receipt.value.hasPrepayMenuItems = menuItems.length > 0;
   const mappedItems = menuItems.map((item) => ({
     name: item.name,
     quantity: Number(item.quantity) || 0,
@@ -305,6 +310,8 @@ const loadExistingReview = async () => {
         receipt.value.items = mappedItems.map((item) => ({ ...item }));
         receiptDraftItems.value = mappedItems.map((item) => ({ ...item }));
         receipt.value.uploaded = !!data.receiptId;
+        receipt.value.hasPrepayMenuItems =
+          !data.receiptId && mappedItems.length > 0;
         recalculateReceiptTotal(receipt.value.items);
       }
     } catch (error) {
@@ -317,6 +324,7 @@ const loadExistingReview = async () => {
 
         // 영수증 정보 로드
         receipt.value = { ...existingReview.receipt };
+        receipt.value.hasPrepayMenuItems = false;
         receiptDraftItems.value = (receipt.value.items || []).map((item) => ({
           ...item,
         }));
@@ -439,6 +447,10 @@ const goToNextStep = () => {
 
 // 이전 단계로 이동
 const goToPreviousStep = () => {
+  if (isEditMode.value && currentStep.value === 1) {
+    router.push({ path: "/my-reservations", query: { tab: "past" } });
+    return;
+  }
   if (currentStep.value === 2) {
     currentStep.value = 1;
   } else {
@@ -448,10 +460,18 @@ const goToPreviousStep = () => {
 
 const uploadReviewPhotos = async () => {
   const existingUrls = [];
-  const uploadedUrls = [];
+  const uploadTargets = [];
 
   for (const photo of reviewPhotos.value) {
     if (photo.file) {
+      uploadTargets.push(photo);
+    } else if (typeof photo.url === "string" && photo.url.startsWith("http")) {
+      existingUrls.push(photo.url);
+    }
+  }
+
+  const uploadResults = await Promise.all(
+    uploadTargets.map(async (photo) => {
       const formData = new FormData();
       formData.append("file", photo.file);
 
@@ -465,15 +485,14 @@ const uploadReviewPhotos = async () => {
       const data = response.data?.data ?? response.data;
       const url = data?.fileUrl || data?.key;
       if (url) {
-        uploadedUrls.push(url);
         photo.url = url;
         photo.file = null;
       }
-    } else if (typeof photo.url === "string" && photo.url.startsWith("http")) {
-      existingUrls.push(photo.url);
-    }
-  }
+      return url;
+    })
+  );
 
+  const uploadedUrls = uploadResults.filter((url) => url);
   return [...existingUrls, ...uploadedUrls];
 };
 
@@ -489,6 +508,10 @@ watch([reviewText, rating, selectedTags], () => {
 
 // 리뷰 등록 또는 수정
 const submitReview = async () => {
+  if (isSubmitting.value) {
+    return;
+  }
+  isSubmitting.value = true;
   submitError.value = "";
   let imageUrls = [];
   try {
@@ -496,6 +519,7 @@ const submitReview = async () => {
   } catch (error) {
     console.error("이미지 업로드 실패:", error);
     alert("이미지 업로드에 실패했습니다.");
+    isSubmitting.value = false;
     return;
   }
 
@@ -510,11 +534,12 @@ const submitReview = async () => {
   }
   if (selectedTags.value.length > 0 && tagIdsForSubmit.length === 0) {
     alert("리뷰 태그 정보를 불러오지 못했습니다. 다시 시도해주세요.");
+    isSubmitting.value = false;
     return;
   }
 
-  if (isEditMode.value) {
-    try {
+  try {
+    if (isEditMode.value) {
       const response = await httpRequest.put(
         `/api/restaurants/${restaurantId}/reviews/${reviewId}`,
         {
@@ -533,41 +558,79 @@ const submitReview = async () => {
       const updatedId = response.data.reviewId || reviewId;
       submitError.value = "";
       router.replace(`/restaurant/${restaurantId}/reviews/${updatedId}`);
-    } catch (error) {
-      console.error("리뷰 수정 실패:", error);
-      const message =
-        error?.response?.data?.message ||
-        "리뷰 수정에 실패했습니다. 잠시 후 다시 시도해주세요.";
-      submitError.value = message;
-    }
-  } else {
-    try {
+    } else {
       if (!memberId.value) {
         alert("로그인이 필요합니다.");
         return;
       }
+      const payload = {
+        userId: memberId.value,
+        reservationId: reservationId.value,
+        receiptId: receiptId.value,
+        rating: rating.value,
+        content: reviewText.value,
+        tagIds: tagIdsForSubmit,
+        imageUrls: imageUrls,
+      };
+      if (canEditReceipt.value) {
+        payload.receiptItems = receiptDraftItems.value.map((item) => ({
+          name: item.name,
+          quantity: Number(item.quantity) || 0,
+          price: Number(item.price) || 0,
+        }));
+      }
       const response = await httpRequest.post(
         `/api/restaurants/${restaurantId}/reviews`,
-        {
-          userId: memberId.value,
-          reservationId: reservationId.value,
-          receiptId: receiptId.value,
-          rating: rating.value,
-          content: reviewText.value,
-          tagIds: tagIdsForSubmit,
-          imageUrls: imageUrls,
-        }
+        payload
       );
       submittedReviewId.value = response.data.reviewId;
       submitError.value = "";
       isReviewCompleteModalOpen.value = true;
-    } catch (error) {
-      console.error("리뷰 등록 실패:", error);
-      const message =
-        error?.response?.data?.message ||
-        "리뷰 등록에 실패했습니다. 잠시 후 다시 시도해주세요.";
-      submitError.value = message;
     }
+  } catch (error) {
+    console.error(
+      isEditMode.value ? "리뷰 수정 실패:" : "리뷰 등록 실패:",
+      error
+    );
+    if (!isEditMode.value && error?.response?.status === 409) {
+      const conflictReviewId = error?.response?.data?.reviewId;
+      if (conflictReviewId) {
+        router.replace(`/restaurant/${restaurantId}/reviews/${conflictReviewId}`);
+        return;
+      }
+      if (memberId.value && reservationId.value) {
+        try {
+          const response = await httpRequest.get("/api/reviews/my", {
+            userId: memberId.value,
+          });
+          const data = Array.isArray(response.data) ? response.data : [];
+          const matched = data.find(
+            (item) => Number(item.reservationId) === Number(reservationId.value)
+          );
+          const matchedReviewId = matched?.reviewId;
+          const matchedRestaurantId =
+            matched?.restaurant?.id ?? matched?.restaurantId ?? restaurantId;
+          if (matchedReviewId) {
+            router.replace(
+              `/restaurant/${matchedRestaurantId}/reviews/${matchedReviewId}`
+            );
+            return;
+          }
+        } catch (fetchError) {
+          console.error("기존 리뷰 조회 실패:", fetchError);
+        }
+      }
+      submitError.value = "이미 작성한 리뷰가 있어요.";
+      return;
+    }
+    const message =
+      error?.response?.data?.message ||
+      (isEditMode.value
+        ? "리뷰 수정에 실패했습니다. 잠시 후 다시 시도해주세요."
+        : "리뷰 등록에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    submitError.value = message;
+  } finally {
+    isSubmitting.value = false;
   }
 };
 
@@ -651,6 +714,7 @@ const handleReceiptUpload = async (event) => {
     receipt.value.items = mappedItems.map((item) => ({ ...item }));
     receiptDraftItems.value = mappedItems.map((item) => ({ ...item }));
     receipt.value.uploaded = true;
+    receipt.value.hasPrepayMenuItems = false;
 
     closeReceiptModal();
     alert("영수증 인식이 완료되었습니다.");
@@ -672,14 +736,23 @@ const recalculateReceiptTotal = (items) => {
 };
 
 const addReceiptItem = () => {
+  if (!canEditReceipt.value) {
+    return;
+  }
   receiptDraftItems.value.push({ name: "", quantity: 1, price: 0 });
 };
 
 const removeReceiptItem = (index) => {
+  if (!canEditReceipt.value) {
+    return;
+  }
   receiptDraftItems.value.splice(index, 1);
 };
 
 const confirmReceiptEdits = () => {
+  if (!canEditReceipt.value) {
+    return;
+  }
   const confirmed = receiptDraftItems.value.map((item) => ({
     name: item.name?.trim() || "",
     quantity: Number(item.quantity) || 0,
@@ -798,7 +871,7 @@ onMounted(async () => {
               영수증 업로드
             </button>
             <span
-              v-else
+              v-else-if="!hasPrepayMenuItems"
               class="px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 text-xs font-medium whitespace-nowrap"
             >
               영수증 업로드 대기
@@ -808,6 +881,15 @@ onMounted(async () => {
           <!-- 메뉴 상세 내역 -->
           <div class="space-y-2 mb-3">
             <div
+              v-if="hasPrepayMenuItems"
+              class="grid grid-cols-12 gap-2 text-xs font-semibold text-[#6c757d] pb-2 border-b border-[#e9ecef]"
+            >
+              <div class="col-span-6">메뉴이름</div>
+              <div class="col-span-2 text-center">수량</div>
+              <div class="col-span-4 text-right">단가</div>
+            </div>
+            <div
+              v-else
               class="grid grid-cols-12 gap-2 text-xs font-semibold text-[#6c757d] pb-2 border-b border-[#e9ecef]"
             >
               <div class="col-span-6">메뉴이름</div>
@@ -815,63 +897,92 @@ onMounted(async () => {
               <div class="col-span-3 text-right">단가</div>
               <div class="col-span-1 text-right">삭제</div>
             </div>
-            <div
-              v-for="(item, index) in receiptDraftItems"
-              :key="index"
-              class="grid grid-cols-12 gap-2 text-xs text-[#495057] items-center"
-            >
-              <div class="col-span-6">
-                <input
-                  v-model="item.name"
-                  type="text"
-                  placeholder="메뉴명"
-                  class="w-full px-2 py-1 border border-[#dee2e6] rounded-md text-xs focus:outline-none focus:border-purple-300"
-                />
+
+            <template v-if="hasPrepayMenuItems">
+              <div
+                v-for="(item, index) in receiptDraftItems"
+                :key="`prepay-${index}`"
+                class="grid grid-cols-12 gap-2 text-xs text-[#495057] items-center"
+              >
+                <div class="col-span-6">· {{ item.name }}</div>
+                <div class="col-span-2 text-center">{{ item.quantity }}</div>
+                <div class="col-span-4 text-right">
+                  {{ (Number(item.price) || 0).toLocaleString() }}원
+                </div>
               </div>
-              <div class="col-span-2 text-center">
-                <input
-                  v-model.number="item.quantity"
-                  type="number"
-                  min="0"
-                  class="w-full px-2 py-1 border border-[#dee2e6] rounded-md text-xs text-center focus:outline-none focus:border-purple-300"
-                />
+            </template>
+
+            <template v-else>
+              <div
+                v-for="(item, index) in receiptDraftItems"
+                :key="`receipt-${index}`"
+                class="grid grid-cols-12 gap-2 text-xs text-[#495057] items-center"
+              >
+                <div class="col-span-6">
+                  <input
+                    v-model="item.name"
+                    type="text"
+                    placeholder="메뉴명"
+                    :disabled="!canEditReceipt"
+                    class="w-full px-2 py-1 border border-[#dee2e6] rounded-md text-xs focus:outline-none focus:border-purple-300 disabled:bg-gray-100 disabled:text-gray-400"
+                  />
+                </div>
+                <div class="col-span-2 text-center">
+                  <input
+                    v-model.number="item.quantity"
+                    type="number"
+                    min="0"
+                    :disabled="!canEditReceipt"
+                    class="w-full px-2 py-1 border border-[#dee2e6] rounded-md text-xs text-center focus:outline-none focus:border-purple-300 disabled:bg-gray-100 disabled:text-gray-400"
+                  />
+                </div>
+                <div class="col-span-3 text-right">
+                  <input
+                    v-model.number="item.price"
+                    type="number"
+                    min="0"
+                    :disabled="!canEditReceipt"
+                    class="w-full px-2 py-1 border border-[#dee2e6] rounded-md text-xs text-right focus:outline-none focus:border-purple-300 disabled:bg-gray-100 disabled:text-gray-400"
+                  />
+                </div>
+                <div class="col-span-1 text-right">
+                  <button
+                    @click="removeReceiptItem(index)"
+                    :disabled="!canEditReceipt"
+                    class="text-xs text-[#dc3545] hover:underline disabled:text-gray-300 disabled:no-underline"
+                  >
+                    삭제
+                  </button>
+                </div>
               </div>
-              <div class="col-span-3 text-right">
-                <input
-                  v-model.number="item.price"
-                  type="number"
-                  min="0"
-                  class="w-full px-2 py-1 border border-[#dee2e6] rounded-md text-xs text-right focus:outline-none focus:border-purple-300"
-                />
-              </div>
-              <div class="col-span-1 text-right">
-                <button
-                  @click="removeReceiptItem(index)"
-                  class="text-xs text-[#dc3545] hover:underline"
-                >
-                  삭제
-                </button>
-              </div>
-            </div>
+            </template>
           </div>
 
           <button
+            v-if="!hasPrepayMenuItems"
             @click="addReceiptItem"
-            class="w-full mb-3 py-2 border border-dashed border-[#dee2e6] rounded-lg text-xs text-[#6c757d] hover:border-purple-300 hover:bg-purple-50 transition-colors"
+            :disabled="!canEditReceipt"
+            class="w-full mb-3 py-2 border border-dashed border-[#dee2e6] rounded-lg text-xs text-[#6c757d] hover:border-purple-300 hover:bg-purple-50 transition-colors disabled:border-[#e9ecef] disabled:text-gray-300 disabled:hover:bg-white"
           >
             메뉴 추가
           </button>
 
-          <div class="flex items-center justify-between mb-3">
+          <div v-if="!hasPrepayMenuItems" class="flex items-center justify-between mb-3">
             <p class="text-xs text-[#6c757d]">
-              수정한 내용을 확인 후 확정해주세요.
+              {{
+                canEditReceipt
+                  ? "수정한 내용을 확인 후 확정해주세요."
+                  : hasPrepayMenuItems
+                  ? "선결제 메뉴는 수정할 수 없어요."
+                  : "영수증 업로드 후 메뉴를 수정할 수 있어요."
+              }}
             </p>
             <button
               @click="confirmReceiptEdits"
-              :disabled="!hasReceiptEdits"
+              :disabled="!canEditReceipt || !hasReceiptEdits"
               :class="[
                 'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
-                hasReceiptEdits
+                canEditReceipt && hasReceiptEdits
                   ? 'bg-purple-600 text-white hover:bg-purple-700'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed',
               ]"
@@ -892,7 +1003,7 @@ onMounted(async () => {
 
           <!-- 영수증 업로드 버튼 (업로드 안 된 경우만) -->
           <button
-            v-if="!receipt.uploaded"
+            v-if="!receipt.uploaded && !hasPrepayMenuItems"
             @click="openReceiptModal"
             class="w-full mt-3 py-3 border-2 border-[#dee2e6] rounded-xl text-sm font-medium text-[#495057] hover:border-purple-300 hover:bg-purple-50 transition-colors"
           >
@@ -1258,15 +1369,23 @@ onMounted(async () => {
           </button>
           <button
             @click="submitReview"
-            :disabled="rating < 1"
+            :disabled="rating < 1 || isSubmitting"
             :class="[
               'flex-1 h-12 rounded-lg font-medium transition-colors',
-              rating >= 1
+              rating >= 1 && !isSubmitting
                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed',
             ]"
           >
-            {{ isEditMode ? "수정 완료" : "등록" }}
+            {{
+              isSubmitting
+                ? isEditMode
+                  ? "수정 중..."
+                  : "등록 중..."
+                : isEditMode
+                ? "수정 완료"
+                : "등록"
+            }}
           </button>
         </div>
       </div>

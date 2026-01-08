@@ -11,7 +11,7 @@ import {
 } from "lucide-vue-next";
 import Card from "@/components/ui/Card.vue";
 import Button from "@/components/ui/Button.vue";
-import axios from "axios";
+import httpRequest from "@/router/httpRequest";
 
 const route = useRoute();
 const router = useRouter();
@@ -122,6 +122,10 @@ const goToPreviousStep = () => {
     router.replace({ path: "/my-reservations", query: { tab: "past" } });
     return;
   }
+  if (document.referrer.includes("/my-reservations")) {
+    router.replace({ path: "/my-reservations", query: { tab: "past" } });
+    return;
+  }
   router.back();
 };
 
@@ -129,7 +133,7 @@ const goToPreviousStep = () => {
 onMounted(() => {
   const loadReviewDetail = async () => {
     try {
-      const response = await axios.get(
+      const response = await httpRequest.get(
         `/api/restaurants/${restaurantId}/reviews/${reviewId}`
       );
       const data = response.data?.data ?? response.data;

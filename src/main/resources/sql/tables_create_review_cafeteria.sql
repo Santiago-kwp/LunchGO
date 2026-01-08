@@ -9,6 +9,7 @@ CREATE TABLE reviews (
     restaurant_id	bigint	NOT NULL,
     user_id	bigint	NOT NULL,
     receipt_id	bigint	NULL,
+    reservation_id	bigint	NULL COMMENT '예약 ID',
     rating	int	NOT NULL	DEFAULT 5,
     content	text	NULL,
     created_at	datetime	NOT NULL DEFAULT current_timestamp,
@@ -16,7 +17,8 @@ CREATE TABLE reviews (
     status	varchar(20)	NOT NULL	DEFAULT 'PUBLIC' COMMENT 'PUBLIC, BLIND_REQUEST, BLINDED, BLIND_REJECTED',
     blind_request_tag_id	bigint	NULL COMMENT '사업자 신고 태그',
     blind_request_reason	text	NULL COMMENT '사업자 신고 사유',
-    blind_requested_at	datetime	NULL COMMENT '사업자 신고 시각'
+    blind_requested_at	datetime	NULL COMMENT '사업자 신고 시각',
+    UNIQUE KEY uk_reviews_reservation_user (reservation_id, user_id)
 );
 
 # 02. 리뷰 태그 테이블 생성

@@ -94,6 +94,7 @@ Nginx에서 `OPTIONS` 프리플라이트를 처리하면 백엔드 부하를 줄
     }
 
     location /api/ {
+        client_max_body_size 10m;
         # preflight
         if ($request_method = OPTIONS) {
             add_header Access-Control-Allow-Origin $cors_origin always;
@@ -116,6 +117,16 @@ Nginx에서 `OPTIONS` 프리플라이트를 처리하면 백엔드 부하를 줄
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 ```
+
+### 3-2) 이미지 업로드 용량 제한(운영)
+Nginx 기본 `client_max_body_size`가 1m인 경우, 업로드가 413으로 차단되고 브라우저는 CORS 에러로 보일 수 있다.
+
+- Nginx: `client_max_body_size 10m;` (또는 원하는 용량)
+- Spring Boot:
+  - `spring.servlet.multipart.max-file-size=10MB`
+  - `spring.servlet.multipart.max-request-size=10MB`
+- Object Storage:
+  - `ncp.object-storage.max-size-bytes=10485760`
 
 ### 4) 정적 리소스/라우팅 처리
 SPA 라우팅 대응을 위해 Object Storage 에러 문서를 `index.html`로 설정한다.

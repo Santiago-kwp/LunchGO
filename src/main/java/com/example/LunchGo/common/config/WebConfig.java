@@ -9,14 +9,6 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**") // 모든 경로에 대해
-                .allowedOrigins(
-                        "http://localhost:5173",
-                        "http://localhost:3000",
-                        "http://lunchgo-test-bucket.s3-website.kr.object.ncloudstorage.com"
-                ) // Vue 기본 포트 및 Object Storage 정적 호스팅 도메인 허용
-                .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS") // 허용할 HTTP 메서드
-                .allowedHeaders("*") // 모든 헤더 허용
-                .allowCredentials(true); // 쿠키/인증 정보 포함 허용
+        // CORS is handled in SecurityConfig to avoid duplicate headers.
     }
 }

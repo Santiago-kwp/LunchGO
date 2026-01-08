@@ -16,4 +16,13 @@ public class CreateReviewRequest {
     private String content;
     private List<Long> tagIds;
     private List<String> imageUrls;
+    private List<ReceiptItemRequest> receiptItems;
+
+    @Getter
+    @Setter
+    public static class ReceiptItemRequest {
+        private String name;
+        private Integer quantity;
+        private Integer price;
+    }
 }

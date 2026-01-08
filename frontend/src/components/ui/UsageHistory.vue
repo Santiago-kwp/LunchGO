@@ -203,7 +203,10 @@ const handleDeleteReview = (reservation) => {
             </Button>
           </RouterLink>
           <RouterLink
-            :to="`/restaurant/${reservation.restaurant.id}/confirmation`"
+            :to="{
+              path: `/restaurant/${reservation.restaurant.id}/confirmation`,
+              query: { reservationId: reservation.id },
+            }"
             class="flex-1"
           >
             <Button

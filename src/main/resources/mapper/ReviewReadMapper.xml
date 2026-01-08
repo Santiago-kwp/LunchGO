@@ -189,6 +189,7 @@
            AND rus.user_id = r.user_id
         LEFT JOIN review_tags brt ON brt.tag_id = r.blind_request_tag_id
         WHERE r.review_id = #{reviewId}
+          AND (r.reservation_id IS NOT NULL OR r.receipt_id IS NOT NULL)
     </select>
 
     <select id="selectReviewTags" parameterType="long" resultType="com.example.LunchGo.review.dto.TagResponse">
@@ -246,21 +247,27 @@
         SELECT
             slot.slot_date AS date,
             rs.party_size AS partySize,
-            rc.confirmed_amount AS totalAmount,
+            COALESCE(rc.confirmed_amount, rmi.menu_total, rs.total_amount) AS totalAmount,
             rc.image_url AS receiptImageUrl
         FROM reviews r
-        JOIN receipts rc ON rc.receipt_id = r.receipt_id
-        JOIN reservations rs ON rs.reservation_id = rc.reservation_id
-        JOIN restaurant_reservation_slots slot ON slot.slot_id = rs.slot_id
+        LEFT JOIN receipts rc ON rc.receipt_id = r.receipt_id
+        LEFT JOIN reservations rs ON rs.reservation_id = COALESCE(r.reservation_id, rc.reservation_id)
+        LEFT JOIN restaurant_reservation_slots slot ON slot.slot_id = rs.slot_id
+        LEFT JOIN (
+            SELECT reservation_id, SUM(line_amount) AS menu_total
+            FROM reservation_menu_items
+            GROUP BY reservation_id
+        ) rmi ON rmi.reservation_id = rs.reservation_id
         WHERE r.review_id = #{reviewId}
     </select>
 
     <select id="selectReceiptItems" parameterType="long" resultType="com.example.LunchGo.review.dto.ReceiptItemResponse">
         SELECT
-            ri.menu_name AS name,
+            ri.menu_name COLLATE utf8mb4_general_ci AS name,
             ri.qty AS qty,
             ri.unit_price AS unitPrice,
-            ri.total_price AS totalPrice
+            ri.total_price AS totalPrice,
+            ri.receipt_item_id AS sort_order
         FROM receipt_items ri
         WHERE ri.receipt_id = #{receiptId}
         ORDER BY ri.receipt_item_id ASC
@@ -271,12 +278,25 @@
             ri.menu_name AS name,
             ri.qty AS qty,
             ri.unit_price AS unitPrice,
-            ri.total_price AS totalPrice
+            ri.total_price AS totalPrice,
+            ri.receipt_item_id AS sort_order
         FROM reviews r
         JOIN receipts rc ON rc.receipt_id = r.receipt_id
         JOIN receipt_items ri ON ri.receipt_id = rc.receipt_id
         WHERE r.review_id = #{reviewId}
-        ORDER BY ri.receipt_item_id ASC
+        UNION ALL
+        SELECT
+            rmi.menu_name COLLATE utf8mb4_general_ci AS name,
+            rmi.quantity AS qty,
+            rmi.unit_price AS unitPrice,
+            rmi.line_amount AS totalPrice,
+            rmi.reservation_menu_item_id AS sort_order
+        FROM reviews r
+        JOIN reservations rs ON rs.reservation_id = r.reservation_id
+        JOIN reservation_menu_items rmi ON rmi.reservation_id = rs.reservation_id
+        WHERE r.review_id = #{reviewId}
+          AND r.receipt_id IS NULL
+        ORDER BY sort_order ASC
     </select>
 
     <select id="selectReviewTagsByReviewIds" resultType="com.example.LunchGo.review.dto.ReviewTagRow">

@@ -19,6 +19,7 @@ import com.example.LunchGo.review.dto.TagResponse;
 import com.example.LunchGo.review.dto.UpdateReviewRequest;
 import com.example.LunchGo.review.dto.UpdateReviewResponse;
 import com.example.LunchGo.review.dto.VisitInfo;
+import com.example.LunchGo.review.exception.ReviewDuplicateException;
 import com.example.LunchGo.review.forbidden.ForbiddenWordService;
 import com.example.LunchGo.image.service.ObjectStorageService;
 import com.example.LunchGo.review.entity.Receipt;
@@ -40,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,6 +65,16 @@ public class ReviewServiceImpl implements ReviewService {
     public CreateReviewResponse createReview(Long restaurantId, CreateReviewRequest request) {
         validateCreateRequest(restaurantId, request);
 
+        Long reservationId = request.getReservationId();
+        if (reservationId != null) {
+            Review existing = reviewRepository
+                .findTopByReservationIdAndUserIdOrderByCreatedAtDesc(reservationId, request.getUserId())
+                .orElse(null);
+            if (existing != null && restaurantId.equals(existing.getRestaurantId())) {
+                throw new ReviewDuplicateException(existing.getReviewId());
+            }
+        }
+
         Review review = new Review(
             restaurantId,
             request.getUserId(),
@@ -71,7 +83,20 @@ public class ReviewServiceImpl implements ReviewService {
             request.getRating(),
             request.getContent()
         );
-        Review saved = reviewRepository.save(review);
+        Review saved;
+        try {
+            saved = reviewRepository.saveAndFlush(review);
+        } catch (DataIntegrityViolationException ex) {
+            if (reservationId != null) {
+                Review existing = reviewRepository
+                    .findTopByReservationIdAndUserIdOrderByCreatedAtDesc(reservationId, request.getUserId())
+                    .orElse(null);
+                if (existing != null && restaurantId.equals(existing.getRestaurantId())) {
+                    throw new ReviewDuplicateException(existing.getReviewId(), ex);
+                }
+            }
+            throw ex;
+        }
 
         if (request.getTagIds() != null && !request.getTagIds().isEmpty()) {
             List<ReviewTagMap> maps = new ArrayList<>();
@@ -89,6 +114,11 @@ public class ReviewServiceImpl implements ReviewService {
             }
             reviewImageRepository.saveAll(images);
         }
+
+        updateReceiptItems(
+            request.getReceiptId(),
+            mapCreateReceiptItems(request.getReceiptItems())
+        );
 
         return new CreateReviewResponse(saved.getReviewId(), saved.getCreatedAt(), saved.getStatus());
     }
@@ -354,6 +384,27 @@ public class ReviewServiceImpl implements ReviewService {
         }
         receipt.updateConfirmedAmount(totalAmount);
         receiptRepository.save(receipt);
+    }
+
+    private List<UpdateReviewRequest.ReceiptItemRequest> mapCreateReceiptItems(
+        List<CreateReviewRequest.ReceiptItemRequest> items
+    ) {
+        if (items == null) {
+            return null;
+        }
+        List<UpdateReviewRequest.ReceiptItemRequest> mapped = new ArrayList<>();
+        for (CreateReviewRequest.ReceiptItemRequest item : items) {
+            if (item == null) {
+                mapped.add(null);
+                continue;
+            }
+            UpdateReviewRequest.ReceiptItemRequest request = new UpdateReviewRequest.ReceiptItemRequest();
+            request.setName(item.getName());
+            request.setQuantity(item.getQuantity());
+            request.setPrice(item.getPrice());
+            mapped.add(request);
+        }
+        return mapped;
     }
 
     private void applyReceiptImagePresign(VisitInfo visitInfo) {

@@ -52,6 +52,30 @@ VALUES
      NULL, 52000, 52000, 'KRW',
      NULL, NULL, '2025-11-20 12:00:00', '2025-11-20 12:00:00');
 
+-- 리뷰 작성용 지난 예약 (user_id=7211)
+
+INSERT IGNORE INTO restaurant_reservation_slots
+    (slot_id, restaurant_id, slot_date, slot_time, max_capacity)
+VALUES
+    (2001, 100, '2025-11-18', '12:00:00', 20);
+
+Delete from reservations where reservation_id=201;
+INSERT INTO reservations
+    (reservation_id, reservation_code, slot_id, user_id, party_size, reservation_type, status, request_message,
+     deposit_amount, prepay_amount, total_amount, currency,
+     hold_expires_at, payment_deadline_at, created_at, updated_at)
+VALUES
+    (201, 'R20251118-7211', 2001, 7211, 2, 'RESERVATION_DEPOSIT', 'COMPLETED', NULL,
+     10000, NULL, 50000, 'KRW',
+     NULL, NULL, '2025-11-18 11:30:00', '2025-11-18 11:30:00');
+
+-- 이용 완료 횟수 통계 (user_id=7211)
+delete from restaurant_user_stats where restaurant_id=1;
+INSERT INTO restaurant_user_stats
+    (restaurant_id, user_id, visit_cnt, total_spend_amt, last_visit_date)
+VALUES
+    (100, 7211, 1, 50000, '2025-11-18');
+
 -- 선결제 메뉴 샘플 (reservation_id=104)
 INSERT INTO reservation_menu_items
     (reservation_menu_item_id, reservation_id, menu_id, menu_name, unit_price, quantity, line_amount, created_at)
@@ -65,3 +89,72 @@ INSERT INTO restaurant_user_stats
     (restaurant_id, user_id, visit_cnt, total_spend_amt, last_visit_date)
 VALUES
     (1, 11, 2, 137000, '2025-11-20');
+
+-- 리뷰 비교용 예약 (user_id=7211, restaurant_id 4~125)
+INSERT IGNORE INTO restaurant_reservation_slots
+    (slot_id, restaurant_id, slot_date, slot_time, max_capacity)
+VALUES
+    (3001, 4, '2025-11-22', '12:00:00', 20),
+    (3002, 5, '2025-11-23', '18:00:00', 20);
+
+DELETE FROM reservations WHERE reservation_id IN (301, 302);
+INSERT INTO reservations
+    (reservation_id, reservation_code, slot_id, user_id, party_size, reservation_type, status, request_message,
+     deposit_amount, prepay_amount, total_amount, currency,
+     hold_expires_at, payment_deadline_at, created_at, updated_at)
+VALUES
+    (301, 'R20251122-7211', 3001, 7211, 2, 'RESERVATION_DEPOSIT', 'COMPLETED', NULL,
+     10000, NULL, 10000, 'KRW',
+     NULL, NULL, '2025-11-22 11:30:00', '2025-11-22 11:30:00'),
+    (302, 'R20251123-7211', 3002, 7211, 3, 'PREORDER_PREPAY', 'COMPLETED', NULL,
+     NULL, NULL, NULL, 'KRW',
+     NULL, NULL, '2025-11-23 17:30:00', '2025-11-23 17:30:00');
+
+DELETE FROM reservation_menu_items WHERE reservation_id = 302;
+INSERT INTO reservation_menu_items
+    (reservation_id, menu_id, menu_name, unit_price, quantity, line_amount, created_at)
+SELECT
+    302,
+    m.menu_id,
+    m.name,
+    m.price,
+    CASE WHEN m.menu_id % 3 = 0 THEN 2 ELSE 1 END AS quantity,
+    m.price * (CASE WHEN m.menu_id % 3 = 0 THEN 2 ELSE 1 END) AS line_amount,
+    '2025-11-23 17:30:00'
+FROM menus m
+WHERE m.restaurant_id = 5
+ORDER BY m.menu_id
+LIMIT 3;
+
+UPDATE reservations
+SET prepay_amount = (
+        SELECT SUM(line_amount)
+        FROM reservation_menu_items
+        WHERE reservation_id = 302
+    ),
+    total_amount = (
+        SELECT SUM(line_amount)
+        FROM reservation_menu_items
+        WHERE reservation_id = 302
+    )
+WHERE reservation_id = 302;
+
+DELETE FROM payments WHERE reservation_id = 302;
+INSERT INTO payments
+    (reservation_id, payment_type, status, method, card_type, amount, currency, pg_provider,
+     merchant_uid, imp_uid, requested_at, approved_at, created_at, updated_at)
+VALUES
+    (302, 'PREPAID_FOOD', 'PAID', 'CARD', 'PERSONAL', 50000, 'KRW', 'PORTONE',
+     'M20251123-302', 'IMP20251123-302', '2025-11-23 17:30:00', '2025-11-23 17:31:00',
+     '2025-11-23 17:30:00', '2025-11-23 17:31:00');
+
+DELETE FROM payments WHERE reservation_id = 301;
+INSERT INTO payments
+    (reservation_id, payment_type, status, method, card_type, amount, currency, pg_provider,
+     merchant_uid, imp_uid, requested_at, approved_at, created_at, updated_at)
+VALUES
+    (301, 'DEPOSIT', 'PAID', 'CARD', 'PERSONAL', 10000, 'KRW', 'PORTONE',
+     'M20251122-301', 'IMP20251122-301', '2025-11-22 11:00:00', '2025-11-22 11:01:00',
+     '2025-11-22 11:00:00', '2025-11-22 11:01:00');
+
+
