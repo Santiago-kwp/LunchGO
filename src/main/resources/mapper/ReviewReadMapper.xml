@@ -68,7 +68,10 @@
     <select id="selectReviewItems" parameterType="com.example.LunchGo.review.dto.ReviewListQuery" resultType="com.example.LunchGo.review.dto.ReviewItemResponse">
         SELECT DISTINCT
             r.review_id AS reviewId,
-            CONCAT(LEFT(u.name, 1), '**') AS author,
+            CASE
+                WHEN u.nickname IS NOT NULL AND u.nickname != '' THEN u.nickname
+                ELSE CONCAT(LEFT(u.name, 1), '**')
+            END AS author,
             u.company_name AS company,
             rus.visit_cnt AS visitCount,
             r.rating AS rating,
@@ -170,7 +173,10 @@
     <select id="selectReviewItemsByIds" resultType="com.example.LunchGo.review.dto.ReviewItemResponse">
         SELECT
             r.review_id AS reviewId,
-            CONCAT(LEFT(u.name, 1), '**') AS author,
+            CASE
+                WHEN u.nickname IS NOT NULL AND u.nickname != '' THEN u.nickname
+                ELSE CONCAT(LEFT(u.name, 1), '**')
+            END AS author,
             u.company_name AS company,
             rus.visit_cnt AS visitCount,
             r.rating AS rating,
@@ -204,7 +210,10 @@
     <select id="selectReviewDetail" resultType="com.example.LunchGo.review.dto.ReviewDetailResponse">
         SELECT
             r.review_id AS reviewId,
-            CONCAT(LEFT(u.name, 1), '**') AS author,
+            CASE
+                WHEN u.nickname IS NOT NULL AND u.nickname != '' THEN u.nickname
+                ELSE CONCAT(LEFT(u.name, 1), '**')
+            END AS author,
             u.company_name AS company,
             rus.visit_cnt AS visitCount,
             r.rating AS rating,
