@@ -45,6 +45,9 @@
                     s.max_capacity >= (IFNULL(res.total_party_size, 0) + #{partySize})
                 )
             </if>
+            <if test="preorderAvailable == true">
+                AND r.preorder_available = true
+            </if>
             <!--
                 TODO: 태그 검색 기능 확장
             -->
