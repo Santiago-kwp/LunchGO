@@ -26,6 +26,8 @@ public interface ReviewReadMapper {
 
     List<ReviewItemResponse> selectReviewItems(ReviewListQuery query);
 
+    List<ReviewItemResponse> selectReviewItemsPage(ReviewListQuery query);
+
     List<Long> selectReviewPageIds(ReviewListQuery query);
 
     List<ReviewItemResponse> selectReviewItemsByIds(@Param("reviewIds") List<Long> reviewIds);

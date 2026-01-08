@@ -18,6 +18,7 @@ public class ReviewAdminService {
 
     private final ReviewRepository reviewRepository;
     private final ReviewTagRepository reviewTagRepository;
+    private final ReviewSummaryCache reviewSummaryCache;
 
     public AdminBlindDecisionResponse decideBlind(Long reviewId, AdminBlindDecisionRequest request) {
         if (reviewId == null) {
@@ -50,6 +51,7 @@ public class ReviewAdminService {
         boolean approve = "APPROVE".equalsIgnoreCase(request.getDecision());
         review.decideBlind(approve);
         Review saved = reviewRepository.save(review);
+        reviewSummaryCache.invalidateRestaurant(saved.getRestaurantId());
         return new AdminBlindDecisionResponse(saved.getReviewId(), saved.getStatus());
     }
 
@@ -78,6 +80,7 @@ public class ReviewAdminService {
         }
 
         Review saved = reviewRepository.save(review);
+        reviewSummaryCache.invalidateRestaurant(saved.getRestaurantId());
         return new AdminReviewHideResponse(saved.getReviewId(), saved.getStatus());
     }
 }

@@ -54,6 +54,26 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             ssh -i /home/ncp-user/lunchgo.pem root@10.0.2.6 "
+              if [ ! -f /opt/scouter/scouter/agent.host/conf/scouter.conf ]; then
+                echo 'scouter.host scouter.conf missing: /opt/scouter/scouter/agent.host/conf/scouter.conf'
+                exit 1
+              fi
+              if ! docker ps --format '{{.Names}}' | grep -q '^scouter-host$'; then
+                docker rm -f scouter-host || true
+                docker run -d --name scouter-host --restart=always \
+                  --pid=host --net=host \
+                  -v /proc:/host/proc:ro \
+                  -v /sys:/host/sys:ro \
+                  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+                  -v /opt/scouter/scouter/agent.host:/scouter/agent.host \
+                  eclipse-temurin:11-jre \
+                  java -Xms128m -Xmx128m \
+                    -Dscouter.config=/scouter/agent.host/conf/scouter.conf \
+                    -Dscouter.host.proc.dir=/host/proc \
+                    -Dscouter.host.sys.dir=/host/sys \
+                    -cp /scouter/agent.host/scouter.host.jar \
+                    scouter.boot.Boot
+              fi
               docker rm -f lunchgo-backend || true
               docker pull pgw10243/lunchgo-backend:dev
               docker run --env-file /opt/lunchgo/.env \
