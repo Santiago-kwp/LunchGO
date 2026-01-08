@@ -80,6 +80,12 @@ const completePaymentFromRedirect = async () => {
   if (completionAttempted.value) return;
   completionAttempted.value = true;
 
+  console.info("[PortOne] confirmation route.query", { ...route.query });
+  const isRedirectFlow =
+    route.query.redirected === "1" || route.query.redirected === 1;
+  if (!isRedirectFlow) {
+    return;
+  }
   const merchantUid =
     route.query.paymentId ||
     route.query.merchantUid ||
@@ -94,6 +100,11 @@ const completePaymentFromRedirect = async () => {
     null;
 
   if (!merchantUid || !Number.isFinite(paidAmount) || paidAmount <= 0) {
+    console.warn("[PortOne] redirect params missing/invalid", {
+      merchantUid,
+      paidAmount,
+      impUid,
+    });
     return;
   }
 
@@ -103,9 +114,14 @@ const completePaymentFromRedirect = async () => {
       impUid: impUid ? String(impUid) : null,
       paidAmount,
     });
+    console.info("[PortOne] complete from redirect success", {
+      merchantUid,
+      paidAmount,
+    });
   } catch (error) {
     errorMessage.value =
       error?.message || '결제 완료 처리에 실패했습니다. 다시 확인해 주세요.';
+    console.error("[PortOne] complete from redirect failed", error);
   }
 };
 

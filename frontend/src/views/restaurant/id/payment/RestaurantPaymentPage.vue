@@ -271,9 +271,35 @@ const canProceed = computed(
 );
 
 const PAYMENT_TIMEOUT_MS = 7 * 60 * 1000;
+const PAYMENT_CONFIRMATION_POLL_MS = 2000;
+const PAYMENT_CONFIRMATION_TIMEOUT_MS = 60 * 1000;
 const PORTONE_STORE_ID = import.meta.env.VITE_PORTONE_STORE_ID || "";
 const PORTONE_CHANNEL_KEY = import.meta.env.VITE_PORTONE_CHANNEL_KEY || "";
 const PORTONE_OPEN_TYPE = import.meta.env.VITE_PORTONE_OPEN_TYPE || "popup";
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const waitForPaymentConfirmation = async (reservationId, shouldContinue) => {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < PAYMENT_CONFIRMATION_TIMEOUT_MS) {
+    if (typeof shouldContinue === "function" && !shouldContinue()) {
+      return false;
+    }
+    try {
+      const res = await httpRequest.get(
+        `/api/reservations/${reservationId}/confirmation`
+      );
+      const paidAt = res?.data?.payment?.paidAt;
+      if (paidAt) {
+        return true;
+      }
+    } catch (error) {
+      console.warn("[PortOne] confirmation polling failed", error);
+    }
+    await delay(PAYMENT_CONFIRMATION_POLL_MS);
+  }
+  return false;
+};
 
 const createIdempotencyKey = () => {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -337,7 +363,9 @@ const requestPayment = async ({ merchantUid, amount, reservationId }) => {
       return;
     }
     const openTypeValue =
-      PORTONE_OPEN_TYPE === "popup" || PORTONE_OPEN_TYPE === "iframe"
+      PORTONE_OPEN_TYPE === "popup" ||
+      PORTONE_OPEN_TYPE === "iframe" ||
+      PORTONE_OPEN_TYPE === "redirect"
         ? PORTONE_OPEN_TYPE
         : "popup";
     const redirectParams = new URLSearchParams({
@@ -345,10 +373,17 @@ const requestPayment = async ({ merchantUid, amount, reservationId }) => {
       totalAmount: String(amount),
       type: paymentType.value,
       paymentId: merchantUid,
+      redirected: "1",
     });
     const redirectUrl = `${
       window.location.origin
     }/restaurant/${restaurantId}/confirmation?${redirectParams.toString()}`;
+    console.info("[PortOne] requestPayment params", {
+      merchantUid,
+      amount,
+      openType: openTypeValue,
+      redirectUrl,
+    });
     window.PortOne.requestPayment(
       {
         storeId: PORTONE_STORE_ID,
@@ -377,9 +412,29 @@ const handlePayment = async () => {
   if (!canProceed.value) return;
   errorMessage.value = "";
   isProcessing.value = true;
+  let currentReservationId = null;
+  let paymentLaunched = false;
+  let didNavigate = false;
+  let confirmationWatcher = null;
+  const navigateToConfirmation = () => {
+    if (didNavigate || !currentReservationId) return;
+    didNavigate = true;
+    router.push({
+      path: `/restaurant/${restaurantId}/confirmation`,
+      query: {
+        type: paymentType.value,
+        totalAmount: String(totalAmount.value),
+        partySize: String(route.query.partySize ?? ""),
+        requestNote: String(route.query.requestNote ?? ""),
+        dateIndex: String(route.query.dateIndex ?? ""),
+        time: String(route.query.time ?? ""),
+        reservationId: String(currentReservationId),
+      },
+    });
+  };
 
   try {
-    const currentReservationId =
+    currentReservationId =
       reservationId.value || (import.meta.env.DEV ? "7" : null); // 테스트용으로 7을 넣고 하자
     if (!currentReservationId) {
       throw new Error("예약 정보가 없습니다. 다시 예약 과정을 진행해 주세요.");
@@ -409,6 +464,15 @@ const handlePayment = async () => {
       console.warn("결제 요청 시작 기록 실패", requestError);
     }
 
+    paymentLaunched = true;
+    confirmationWatcher = waitForPaymentConfirmation(
+      currentReservationId,
+      () => !didNavigate && isProcessing.value
+    ).then((paid) => {
+      if (paid) {
+        navigateToConfirmation();
+      }
+    });
     const paymentPromise = requestPayment({
       merchantUid,
       amount,
@@ -434,23 +498,18 @@ const handlePayment = async () => {
       paidAmount: amount,
     });
 
-    router.push({
-      path: `/restaurant/${restaurantId}/confirmation`,
-      query: {
-        type: paymentType.value,
-        totalAmount: String(totalAmount.value),
-        partySize: String(route.query.partySize ?? ""),
-        requestNote: String(route.query.requestNote ?? ""),
-        dateIndex: String(route.query.dateIndex ?? ""),
-        time: String(route.query.time ?? ""),
-        reservationId: String(currentReservationId),
-      },
-    });
+    navigateToConfirmation();
   } catch (error) {
     const message = error?.message || "결제 처리 중 오류가 발생했습니다.";
     errorMessage.value = message;
 
     try {
+      if (paymentLaunched) {
+        if (currentReservationId) {
+          await confirmationWatcher;
+          if (didNavigate) return;
+        }
+      }
       if (message.includes("초과")) {
         await httpRequest.post(
           `/api/reservations/${reservationId.value}/payments/expire`
