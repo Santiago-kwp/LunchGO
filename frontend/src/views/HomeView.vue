@@ -601,8 +601,20 @@ const toggleCalendar = () => {
   isCalendarOpen.value = !isCalendarOpen.value;
 };
 
+const isDateDisabled = (day) => {
+  if (!day) return true;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(
+    calendarMonth.value.getFullYear(),
+    calendarMonth.value.getMonth(),
+    day
+  );
+  return target < today;
+};
+
 const selectCalendarDay = (day) => {
-  if (!day) return;
+  if (!day || isDateDisabled(day)) return;
 
   const selected = new Date(
       calendarMonth.value.getFullYear(),
@@ -2036,14 +2048,15 @@ onBeforeUnmount(() => {
                     <button
                         v-for="(day, index) in calendarDays"
                         :key="index"
-                        :disabled="!day"
+                        :disabled="!day || isDateDisabled(day)"
                         @click.stop="selectCalendarDay(day)"
                         :class="[
                         'w-9 h-9 rounded-full text-sm transition-colors',
                         !day ? 'cursor-default opacity-0' : '',
-                        day && isCalendarSelectedDay(day)
+                        day && isDateDisabled(day) ? 'text-[#c7cdd3] cursor-not-allowed' : '',
+                        day && !isDateDisabled(day) && isCalendarSelectedDay(day)
                           ? 'bg-[#ff6b4a] text-white font-semibold'
-                          : 'text-gray-700 hover:bg-[#f1f3f5]',
+                          : day && !isDateDisabled(day) ? 'text-gray-700 hover:bg-[#f1f3f5]' : '',
                       ]"
                     >
                       {{ day }}
