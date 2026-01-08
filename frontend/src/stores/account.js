@@ -34,6 +34,14 @@ export const useAccountStore = defineStore('account', {
                 localStorage.removeItem('accessToken');
             }
         },
+
+        updateMember(partial = null){
+            if(!partial) return;
+            const current = this.member || {};
+            const next = { ...current, ...partial };
+            this.member = next;
+            localStorage.setItem('member', JSON.stringify(next));
+        },
         
         //로그아웃
         clearAccount(){

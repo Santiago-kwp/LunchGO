@@ -381,6 +381,7 @@ const fetchUserInfo = async () => {
 
     if (data.image) {
       profileImage.value = data.image;
+      accountStore.updateMember({ image: data.image });
     }
 
     if (data.specialities && data.specialities.length > 0) {
@@ -619,6 +620,9 @@ const handleSave = async () => {
     isPhoneEditable.value = false;
 
     selectedImageFile.value = null;
+    if (profileImage.value) {
+      accountStore.updateMember({ image: profileImage.value });
+    }
 
     setTimeout(() => (showSuccess.value = false), 3000);
   } catch (error: any) {
