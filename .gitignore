@@ -39,6 +39,7 @@ skills/
 ## Scouter APM artifacts
 scouter-all-*.tar.gz
 scouter/agent.java/scouter.agent.jar
+scouter/*.csv
 
 
 ### STS ###
