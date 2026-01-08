@@ -138,6 +138,7 @@ const filterPerPersonBudgetDisplay = computed(() => {
 });
 
 const isSearchOpen = ref(false);
+const searchResultIds = ref(null);
 const searchDate = ref("");
 const searchTime = ref("");
 const searchCategories = ref([]);
@@ -338,6 +339,12 @@ const processedRestaurants = computed(() => {
   if (selectedRecommendation.value === RECOMMEND_TASTE) {
     result = tagMappingRecommendations.value.slice();
   }
+
+  if (searchResultIds.value !== null) {
+    const validIds = new Set(searchResultIds.value.map(String));
+    result = result.filter((r) => validIds.has(String(r.id)));
+  }
+
   const normalizedQuery = searchQuery.value.trim().toLowerCase();
   if (normalizedQuery) {
     result = result.filter((restaurant) =>
@@ -1326,12 +1333,30 @@ const resetSearch = () => {
   searchDistance.value = "";
   isCalendarOpen.value = false;
   calendarMonth.value = new Date();
+  searchResultIds.value = null;
 };
 
-const applySearch = () => {
+const applySearch = async () => {
+  try {
+    const params = {
+      date: searchDate.value || null,
+      time: searchTime.value || null,
+      partySize: searchPartySize.value,
+      // TODO: 향후 태그, 카테고리 등 추가 검색 필터 파라미터 확장 가능
+    };
+    const response = await httpRequest.get("/api/restaurants/search", params);
+    searchResultIds.value = response.data;
+    console.log(searchResultIds.value);
+  } catch (error) {
+    if (error.response?.status === 404) {
+      searchResultIds.value = [];
+    } else {
+      console.error("식당 검색 실패:", error);
+      alert("검색 중 오류가 발생했습니다.");
+    }
+  }
   isSearchOpen.value = false;
   isCalendarOpen.value = false;
-  // 검색 적용 로직 (Vue version)
 };
 
 const closeMapRestaurantModal = () => {

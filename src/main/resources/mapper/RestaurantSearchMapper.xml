@@ -14,7 +14,7 @@
                         AND s.slot_date = #{date}
                     </when>
                     <otherwise>
-                        AND s.slot_date BETWEEN date_add(curdate(), interval -7 day) and date_add(curdate(), interval 7 day)
+                        AND s.slot_date BETWEEN curdate() and date_add(curdate(), interval 14 day)
                     </otherwise>
                 </choose>
                 <choose>
@@ -35,7 +35,7 @@
             ) res ON s.slot_id = res.slot_id
         </if>
         <where>
-            r.status = 'OPENED'
+            r.status = 'OPEN'
             <if test="date != null or time != null">
                 AND (
                     -- Case 1: 특정 식당에 관한 예약 슬롯이 추가된 적이 없음
