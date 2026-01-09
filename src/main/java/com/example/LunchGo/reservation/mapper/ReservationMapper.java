@@ -72,4 +72,9 @@ public interface ReservationMapper {
             @Param("lineAmount") Integer lineAmount
     );
     List<ReservationMenuItemRow> selectReservationMenuItems(@Param("reservationId") Long reservationId);
+
+    int countActiveReservation(
+            @Param("userId") Long userId,
+            @Param("slotId") Long slotId
+    );
 }

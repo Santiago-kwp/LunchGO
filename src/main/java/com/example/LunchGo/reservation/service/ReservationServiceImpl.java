@@ -42,111 +42,135 @@ public class ReservationServiceImpl implements ReservationService {
     public ReservationCreateResponse create(ReservationCreateRequest request) {
         validate(request);
 
-        // 지정한 날짜+시간대의 예약슬롯을 불러오는 서비스 로직(없으면 신규 생성)
-        ReservationSlot slot = reservationSlotService.getValidatedSlot(
+        // 1. Redis 분산 락 적용 (동시성 제어: 동일 유저 + 동일 시간대 중복 클릭 방지)
+        String lockKey = String.format("lock:res:u%d:r%d:d%s:t%s",
+                request.getUserId(),
                 request.getRestaurantId(),
-                request.getSlotDate(),
-                request.getSlotTime(),
-                request.getPartySize()
-        );
+                request.getSlotDate().toString(),
+                request.getSlotTime().toString());
 
-        // PREORDER_PREPAY면 메뉴 스냅샷(이름/가격) 확정 + 합계 계산
-        List<ReservationCreateRequest.MenuItem> reqMenuItems = request.getMenuItems();
-        List<MenuSnapshot> snapshots = new ArrayList<>();
-        Integer preorderSum = null;
+        // 5초간 락 획득 시도 (값이 없을 때만 true)
+        if (!redisUtil.setIfAbsent(lockKey, "LOCKED", 5000)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 처리 중인 예약 요청입니다.");
+        }
 
-        if (ReservationType.PREORDER_PREPAY.equals(request.getReservationType())) {
-            int sum = 0;
-            for (ReservationCreateRequest.MenuItem mi : reqMenuItems) {
-                if (mi == null || mi.getMenuId() == null) {
-                    throw new IllegalArgumentException("menuId is required");
-                }
-                if (mi.getQuantity() == null || mi.getQuantity() <= 0) {
-                    throw new IllegalArgumentException("quantity must be positive");
-                }
+        try {
+            // 지정한 날짜+시간대의 예약슬롯을 불러오는 서비스 로직(없으면 신규 생성)
+            // 내부적으로 비관적 락(FOR UPDATE)을 사용하여 슬롯 정원(Capacity) 동시성 제어 수행
+            ReservationSlot slot = reservationSlotService.getValidatedSlot(
+                    request.getRestaurantId(),
+                    request.getSlotDate(),
+                    request.getSlotTime(),
+                    request.getPartySize()
+            );
 
-                Menu menu = menuRepository
-                        .findByMenuIdAndRestaurantIdAndIsDeletedFalse(mi.getMenuId(), request.getRestaurantId())
-                        .orElseThrow(() -> new IllegalArgumentException("menu not found: " + mi.getMenuId()));
-
-                int unitPrice = menu.getPrice() == null ? 0 : menu.getPrice();
-                int qty = mi.getQuantity();
-                int lineAmount = unitPrice * qty;
-                sum += lineAmount;
-
-                snapshots.add(new MenuSnapshot(menu.getMenuId(), menu.getName(), unitPrice, qty, lineAmount));
+            // 2. DB 이중 체크 (데이터 정합성: 시간차 중복 예약 방지)
+            // 슬롯 ID가 확정된 후, 해당 유저가 이미 활성 상태(취소 안 됨)의 예약을 가지고 있는지 확인
+            if (reservationMapper.countActiveReservation(request.getUserId(), slot.getSlotId()) > 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 해당 시간대에 예약된 내역이 존재합니다.");
             }
-            preorderSum = sum;
-        }
 
-        Reservation reservation = new Reservation();
-        reservation.setReservationCode("PENDING");
-        reservation.setSlotId(slot.getSlotId());
-        reservation.setUserId(request.getUserId());
-        reservation.setPartySize(request.getPartySize());
-        reservation.setReservationType(request.getReservationType());
-        reservation.setStatus(ReservationStatus.TEMPORARY);
-        reservation.setRequestMessage(trimToNull(request.getRequestMessage()));
-        reservation.setHoldExpiresAt(LocalDateTime.now().plusMinutes(7));
+            // PREORDER_PREPAY면 메뉴 스냅샷(이름/가격) 확정 + 합계 계산
+            List<ReservationCreateRequest.MenuItem> reqMenuItems = request.getMenuItems();
+            List<MenuSnapshot> snapshots = new ArrayList<>();
+            Integer preorderSum = null;
 
-        if (ReservationType.RESERVATION_DEPOSIT.equals(request.getReservationType())) {
-            int perPerson = request.getPartySize() >= DEPOSIT_LARGE_THRESHOLD
-                    ? DEPOSIT_PER_PERSON_LARGE
-                    : DEPOSIT_PER_PERSON_DEFAULT;
-            int depositAmount = perPerson * request.getPartySize();
-            reservation.setDepositAmount(depositAmount);
-            reservation.setTotalAmount(depositAmount);
-        } else if (ReservationType.PREORDER_PREPAY.equals(request.getReservationType())) {
-            // 프론트 totalAmount 대신 "DB 메뉴 합계" 기준으로 저장
-            reservation.setPrepayAmount(preorderSum);
-            reservation.setTotalAmount(preorderSum);
-        }
+            if (ReservationType.PREORDER_PREPAY.equals(request.getReservationType())) {
+                int sum = 0;
+                for (ReservationCreateRequest.MenuItem mi : reqMenuItems) {
+                    if (mi == null || mi.getMenuId() == null) {
+                        throw new IllegalArgumentException("menuId is required");
+                    }
+                    if (mi.getQuantity() == null || mi.getQuantity() <= 0) {
+                        throw new IllegalArgumentException("quantity must be positive");
+                    }
 
-        reservationMapper.insertReservation(reservation);
+                    Menu menu = menuRepository
+                            .findByMenuIdAndRestaurantIdAndIsDeletedFalse(mi.getMenuId(), request.getRestaurantId())
+                            .orElseThrow(() -> new IllegalArgumentException("menu not found: " + mi.getMenuId()));
 
-        // reservation_menu_items 저장 (예약 PK 생긴 다음에)
-        if (ReservationType.PREORDER_PREPAY.equals(request.getReservationType()) && !snapshots.isEmpty()) {
-            for (MenuSnapshot s : snapshots) {
-                reservationMapper.insertReservationMenuItem(
-                        reservation.getReservationId(),
-                        s.menuId,
-                        s.menuName,
-                        s.unitPrice,
-                        s.quantity,
-                        s.lineAmount
-                );
+                    int unitPrice = menu.getPrice() == null ? 0 : menu.getPrice();
+                    int qty = mi.getQuantity();
+                    int lineAmount = unitPrice * qty;
+                    sum += lineAmount;
+
+                    snapshots.add(new MenuSnapshot(menu.getMenuId(), menu.getName(), unitPrice, qty, lineAmount));
+                }
+                preorderSum = sum;
             }
+
+            Reservation reservation = new Reservation();
+            reservation.setReservationCode("PENDING");
+            reservation.setSlotId(slot.getSlotId());
+            reservation.setUserId(request.getUserId());
+            reservation.setPartySize(request.getPartySize());
+            reservation.setReservationType(request.getReservationType());
+            reservation.setStatus(ReservationStatus.TEMPORARY);
+            reservation.setRequestMessage(trimToNull(request.getRequestMessage()));
+            reservation.setHoldExpiresAt(LocalDateTime.now().plusMinutes(7));
+
+            if (ReservationType.RESERVATION_DEPOSIT.equals(request.getReservationType())) {
+                int perPerson = request.getPartySize() >= DEPOSIT_LARGE_THRESHOLD
+                        ? DEPOSIT_PER_PERSON_LARGE
+                        : DEPOSIT_PER_PERSON_DEFAULT;
+                int depositAmount = perPerson * request.getPartySize();
+                reservation.setDepositAmount(depositAmount);
+                reservation.setTotalAmount(depositAmount);
+            } else if (ReservationType.PREORDER_PREPAY.equals(request.getReservationType())) {
+                // 프론트 totalAmount 대신 "DB 메뉴 합계" 기준으로 저장
+                reservation.setPrepayAmount(preorderSum);
+                reservation.setTotalAmount(preorderSum);
+            }
+
+            reservationMapper.insertReservation(reservation);
+
+            // reservation_menu_items 저장 (예약 PK 생긴 다음에)
+            if (ReservationType.PREORDER_PREPAY.equals(request.getReservationType()) && !snapshots.isEmpty()) {
+                for (MenuSnapshot s : snapshots) {
+                    reservationMapper.insertReservationMenuItem(
+                            reservation.getReservationId(),
+                            s.menuId,
+                            s.menuName,
+                            s.unitPrice,
+                            s.quantity,
+                            s.lineAmount
+                    );
+                }
+            }
+
+            String code = generateReservationCode(LocalDate.now(), reservation.getReservationId());
+            reservationMapper.updateReservationCode(reservation.getReservationId(), code);
+
+            ReservationCreateRow row = reservationMapper.selectReservationCreateRow(reservation.getReservationId());
+            if (row == null) {
+                throw new IllegalStateException("created reservation not found");
+            }
+
+            // redis에 응답대기로 방문 확정 관련 상태 넣어놓기
+            LocalDateTime slotDateTime = LocalDateTime.of(request.getSlotDate(), request.getSlotTime());
+            long ttlMillis = Duration.between(LocalDateTime.now(), slotDateTime).toMillis();
+            if (ttlMillis < 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+            }
+            redisUtil.setDataExpire(String.valueOf(reservation.getReservationId()), VisitStatus.PENDING.name(), ttlMillis);
+
+            return new ReservationCreateResponse(
+                    row.getReservationId(),
+                    row.getReservationCode(),
+                    row.getSlotId(),
+                    row.getUserId(),
+                    row.getRestaurantId(),
+                    row.getSlotDate(),
+                    row.getSlotTime(),
+                    row.getPartySize(),
+                    row.getReservationType(),
+                    row.getStatus(),
+                    row.getRequestMessage()
+            );
+        } finally {
+            // 3. 락 해제 (필수)
+            redisUtil.deleteData(lockKey);
         }
-
-        String code = generateReservationCode(LocalDate.now(), reservation.getReservationId());
-        reservationMapper.updateReservationCode(reservation.getReservationId(), code);
-
-        ReservationCreateRow row = reservationMapper.selectReservationCreateRow(reservation.getReservationId());
-        if (row == null) {
-            throw new IllegalStateException("created reservation not found");
-        }
-
-        // redis에 응답대기로 방문 확정 관련 상태 넣어놓기
-        LocalDateTime slotDateTime = LocalDateTime.of(request.getSlotDate(), request.getSlotTime());
-        long ttlMillis = Duration.between(LocalDateTime.now(), slotDateTime).toMillis();
-        if (ttlMillis < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-        }
-        redisUtil.setDataExpire(String.valueOf(reservation.getReservationId()), VisitStatus.PENDING.name(), ttlMillis);
-
-        return new ReservationCreateResponse(
-                row.getReservationId(),
-                row.getReservationCode(),
-                row.getSlotId(),
-                row.getUserId(),
-                row.getRestaurantId(),
-                row.getSlotDate(),
-                row.getSlotTime(),
-                row.getPartySize(),
-                row.getReservationType(),
-                row.getStatus(),
-                row.getRequestMessage()
-        );
     }
 
     private static void validate(ReservationCreateRequest request) {

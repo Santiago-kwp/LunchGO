@@ -193,7 +193,13 @@
         ORDER BY reservation_menu_item_id ASC
     </select>
 
-
+    <select id="countActiveReservation" resultType="int">
+        SELECT COUNT(*)
+        FROM reservations
+        WHERE user_id = #{userId}
+          AND slot_id = #{slotId}
+          AND status NOT IN ('CANCELLED', 'EXPIRED', 'REFUNDED')
+    </select>
 
     <select id="selectAdminReservationList"
             resultType="com.example.LunchGo.reservation.mapper.row.AdminReservationListRow">

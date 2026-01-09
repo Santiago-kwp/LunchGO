@@ -57,4 +57,9 @@ public class RedisUtil {
 
         return true;
     }
+
+    public boolean setIfAbsent(String key, String value, long duration) {
+        Boolean result = template.opsForValue().setIfAbsent(key, value, Duration.ofMillis(duration));
+        return Boolean.TRUE.equals(result);
+    }
 }
