@@ -80,11 +80,11 @@ onMounted(async () => {
   try {
     const res = await httpRequest.get('/api/business/notifications');
     notifications.value = res.data || [];
-  }   } catch (e) {
-    console.error('알림 내역을 불러오는 데 실패했습니다:', e);
-    alert('알림 내역을 불러오는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
-  }
-});
+  } catch (e) {
+      console.error('알림 내역을 불러오는 데 실패했습니다:', e);
+      alert('알림 내역을 불러오는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    }
+  });
 
 onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick));
 
