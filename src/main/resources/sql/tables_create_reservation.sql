@@ -204,3 +204,14 @@ CREATE TABLE `reservation_cancellations` (
                                                  FOREIGN KEY (`reservation_id`) REFERENCES `reservations`(`reservation_id`)
                                                      ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='예약 취소 이력';
+
+
+ALTER TABLE reservations
+    ADD COLUMN visit_status VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT '리마인더 응답 상태(PENDING/CONFIRMED/CANCELLED)' AFTER request_message,
+  ADD COLUMN reminder_token VARCHAR(128) NULL COMMENT '리마인더 링크 토큰(유니크)' AFTER visit_status,
+  ADD COLUMN reminder_sent_at DATETIME NULL COMMENT '리마인더 발송 시각' AFTER reminder_token,
+  ADD COLUMN visit_responded_at DATETIME NULL COMMENT '방문/취소 응답 시각' AFTER reminder_sent_at;
+
+CREATE UNIQUE INDEX uk_reservations_reminder_token ON reservations(reminder_token);
+CREATE INDEX idx_reservations_reminder_sent_at ON reservations(reminder_sent_at);
+CREATE INDEX idx_reservations_visit_status ON reservations(visit_status);

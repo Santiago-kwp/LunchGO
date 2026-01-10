@@ -73,8 +73,26 @@ public interface ReservationMapper {
     );
     List<ReservationMenuItemRow> selectReservationMenuItems(@Param("reservationId") Long reservationId);
 
+<<<<<<< Updated upstream
     int countActiveReservation(
             @Param("userId") Long userId,
             @Param("slotId") Long slotId
     );
+=======
+    // --- reminder ---
+    List<com.example.LunchGo.reservation.mapper.row.ReminderSendRow> selectReminderTargets();
+
+    int tryMarkReminderSent(
+            @Param("reservationId") Long reservationId,
+            @Param("reminderToken") String reminderToken
+    );
+
+    int updateVisitStatusByToken(
+            @Param("token") String token,
+            @Param("visitStatus") String visitStatus
+    );
+
+    List<com.example.LunchGo.reservation.mapper.row.BusinessVisitNotificationRow>
+    selectBusinessVisitNotifications(@Param("restaurantId") Long restaurantId);
+>>>>>>> Stashed changes
 }

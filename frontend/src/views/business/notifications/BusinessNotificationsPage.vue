@@ -59,58 +59,7 @@ const handleWillVisitAction = async (notification) => {
   }
 };
 
-// ---- mock data (나중에 API로 교체) ----
-// responseStatus: pending | will_visit | cancel_visit
-const notifications = ref([
-  {
-    id: 1,
-    reservationId: 1,
-    customerName: '홍길동',
-    phone: '010-1234-5678',
-    reservationDatetime: '2025-12-25 12:00',
-    messageSentAt: '2025-12-25 11:00',
-    responseStatus: 'pending',
-    responseAt: null,
-    responseNote: null,
-    isRead: false,
-  },
-  {
-    id: 2,
-    reservationId: 2,
-    customerName: '김영희',
-    phone: '010-2345-6789',
-    reservationDatetime: '2025-12-25 13:00',
-    messageSentAt: '2025-12-25 12:00',
-    responseStatus: 'will_visit',
-    responseAt: '2025-12-25 12:05',
-    responseNote: '방문 예정',
-    isRead: true,
-  },
-  {
-    id: 3,
-    reservationId: 3,
-    customerName: '박민수',
-    phone: '010-3456-7890',
-    reservationDatetime: '2025-12-25 18:30',
-    messageSentAt: '2025-12-25 17:30',
-    responseStatus: 'cancel_visit',
-    responseAt: '2025-12-25 17:40',
-    responseNote: '방문 취소',
-    isRead: true,
-  },
-  {
-    id: 4,
-    reservationId: 4,
-    customerName: '정수진',
-    phone: '010-5555-0000',
-    reservationDatetime: '2025-12-26 12:30',
-    messageSentAt: '2025-12-26 11:30',
-    responseStatus: 'pending',
-    responseAt: null,
-    responseNote: null,
-    isRead: false,
-  },
-]);
+const notifications = ref([]);
 
 // ---- UI state ----
 const filterOpen = ref(false);
@@ -124,7 +73,18 @@ const handleOutsideClick = (e) => {
     filterOpen.value = false;
   }
 };
-onMounted(() => document.addEventListener('click', handleOutsideClick));
+
+onMounted(async () => {
+  document.addEventListener('click', handleOutsideClick);
+
+  try {
+    const res = await httpRequest.get('/api/business/notifications');
+    notifications.value = res.data || [];
+  } catch (e) {
+    console.log(e);
+  }
+});
+
 onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick));
 
 // ---- computed ----

@@ -14,4 +14,6 @@ public interface SmsService {
     void sendNotificationToOwner(String phone, OwnerReservationNotification notification);
 
     void sendRestaurantRegistrationNotice(List<String> ownerPhones);
+
+    void sendSystemSms(String to, String text);
 }

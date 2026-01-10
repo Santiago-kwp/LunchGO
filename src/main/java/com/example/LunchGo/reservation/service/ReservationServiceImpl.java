@@ -70,10 +70,24 @@ public class ReservationServiceImpl implements ReservationService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 해당 시간대에 예약된 내역이 존재합니다.");
             }
 
+<<<<<<< Updated upstream
             // PREORDER_PREPAY면 메뉴 스냅샷(이름/가격) 확정 + 합계 계산
             List<ReservationCreateRequest.MenuItem> reqMenuItems = request.getMenuItems();
             List<MenuSnapshot> snapshots = new ArrayList<>();
             Integer preorderSum = null;
+=======
+        Reservation reservation = new Reservation();
+        reservation.setReservationCode("PENDING");
+        reservation.setSlotId(slot.getSlotId());
+        reservation.setUserId(request.getUserId());
+        reservation.setPartySize(request.getPartySize());
+        reservation.setReservationType(request.getReservationType());
+        reservation.setStatus(ReservationStatus.TEMPORARY);
+        reservation.setRequestMessage(trimToNull(request.getRequestMessage()));
+        reservation.setHoldExpiresAt(LocalDateTime.now().plusMinutes(7));
+        reservation.setVisitStatus(VisitStatus.PENDING);
+
+>>>>>>> Stashed changes
 
             if (ReservationType.PREORDER_PREPAY.equals(request.getReservationType())) {
                 int sum = 0;

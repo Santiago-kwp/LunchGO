@@ -30,4 +30,9 @@ public class Reservation {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    private VisitStatus visitStatus;
+    private String reminderToken;
+    private LocalDateTime reminderSentAt;
+    private LocalDateTime visitRespondedAt;
 }

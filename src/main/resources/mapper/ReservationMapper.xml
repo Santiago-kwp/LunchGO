@@ -49,10 +49,15 @@
             parameterType="com.example.LunchGo.reservation.domain.Reservation"
             useGeneratedKeys="true" keyProperty="reservationId">
         INSERT INTO reservations
-        (reservation_code, slot_id, user_id, party_size, reservation_type, status, request_message, hold_expires_at, payment_deadline_at, deposit_amount, prepay_amount, total_amount, currency)
+        (reservation_code, slot_id, user_id, party_size, reservation_type, status, request_message,
+         visit_status, reminder_token, reminder_sent_at, visit_responded_at,
+         hold_expires_at, payment_deadline_at, deposit_amount, prepay_amount, total_amount, currency)
         VALUES
-            (#{reservationCode}, #{slotId}, #{userId}, #{partySize}, #{reservationType}, #{status}, #{requestMessage}, #{holdExpiresAt}, #{paymentDeadlineAt}, #{depositAmount}, #{prepayAmount}, #{totalAmount}, 'KRW')
+            (#{reservationCode}, #{slotId}, #{userId}, #{partySize}, #{reservationType}, #{status}, #{requestMessage},
+             #{visitStatus}, #{reminderToken}, #{reminderSentAt}, #{visitRespondedAt},
+             #{holdExpiresAt}, #{paymentDeadlineAt}, #{depositAmount}, #{prepayAmount}, #{totalAmount}, 'KRW')
     </insert>
+
 
     <update id="updateReservationCode">
         UPDATE reservations
@@ -268,6 +273,74 @@
         WHERE res.restaurant_id = #{restaurantId}
           AND s.slot_date = #{slotDate}
         ORDER BY s.slot_time DESC
+    </select>
+
+    <!-- 리마인더 발송 대상 조회 -->
+    <select id="selectReminderTargets" resultType="com.example.LunchGo.reservation.mapper.row.ReminderSendRow">
+      <![CDATA[
+            SELECT
+                r.reservation_id    AS reservationId,
+                r.user_id           AS userId,
+                u.phone             AS userPhone,
+                res.name            AS restaurantName,
+                s.slot_date         AS slotDate,
+                s.slot_time         AS slotTime
+            FROM reservations r
+                     JOIN users u ON u.user_id = r.user_id
+                     JOIN restaurant_reservation_slots s ON s.slot_id = r.slot_id
+                     JOIN restaurants res ON res.restaurant_id = s.restaurant_id
+            WHERE r.status IN ('CONFIRMED', 'PREPAID_CONFIRMED')
+              AND r.reminder_sent_at IS NULL
+              AND r.reminder_token IS NULL
+              -- 예약시간 60분 전 근처(스케줄러 실행 오차 감안: 55~60분 전)
+              AND TIMESTAMPDIFF(MINUTE, NOW(), TIMESTAMP(s.slot_date, s.slot_time)) BETWEEN 55 AND 60
+            ]]>
+    </select>
+
+
+    <!-- 리마인더 발송 마킹(동시성 방어: 아직 안 보냈을 때만 1회 업데이트) -->
+    <update id="tryMarkReminderSent">
+      <![CDATA[
+            UPDATE reservations
+            SET reminder_token = #{reminderToken},
+                reminder_sent_at = NOW()
+            WHERE reservation_id = #{reservationId}
+              AND reminder_sent_at IS NULL
+              AND reminder_token IS NULL
+            ]]>
+    </update>
+
+    <!-- 사용자가 링크 클릭(방문/취소) 응답 -->
+    <update id="updateVisitStatusByToken">
+  <![CDATA[
+        UPDATE reservations
+        SET visit_status = #{visitStatus},
+            visit_responded_at = NOW()
+        WHERE reminder_token = #{token}
+          AND visit_status = 'PENDING'
+        ]]>
+</update>
+
+    <!-- 사업자 알림 내역(방문 확정/취소 응답 목록) -->
+    <select id="selectBusinessVisitNotifications" resultType="com.example.LunchGo.reservation.mapper.row.BusinessVisitNotificationRow">
+      <![CDATA[
+            SELECT
+                r.reservation_id AS id,
+                r.reservation_id AS reservationId,
+                u.name           AS customerName,
+                u.phone          AS phone,
+                CONCAT(DATE_FORMAT(s.slot_date, '%Y-%m-%d'), ' ', DATE_FORMAT(s.slot_time, '%H:%i')) AS reservationDatetime,
+                DATE_FORMAT(r.reminder_sent_at, '%Y-%m-%d %H:%i') AS messageSentAt,
+                r.visit_status   AS responseStatus,
+                DATE_FORMAT(r.visit_responded_at, '%Y-%m-%d %H:%i') AS responseAt
+            FROM reservations r
+                     JOIN users u ON u.user_id = r.user_id
+                     JOIN restaurant_reservation_slots s ON s.slot_id = r.slot_id
+            WHERE s.restaurant_id = #{restaurantId}
+              AND r.reminder_sent_at IS NOT NULL
+              AND r.reminder_token IS NOT NULL
+            ORDER BY r.reminder_sent_at DESC
+            ]]>
     </select>
 
 

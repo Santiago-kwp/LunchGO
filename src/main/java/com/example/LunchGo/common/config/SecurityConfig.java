@@ -56,8 +56,12 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(authorizeRequests -> authorizeRequests
                         //각자 권한 걸어주면 됨니다
+                        .requestMatchers("/reminders/**").permitAll()
+                        .requestMatchers("/api/reminders/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/reminders/**", "/api/reminders/**").permitAll()
                         .requestMatchers("/api/join/**", "/api/auth/**", "/api/sms/**", "/api/login").permitAll()
                         .requestMatchers("/api/refresh").permitAll()
+                        .requestMatchers("/api/reminders/**", "/reminders/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/search/email").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/search/loginId").permitAll()
