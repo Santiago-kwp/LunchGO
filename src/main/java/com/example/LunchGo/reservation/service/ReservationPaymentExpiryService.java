@@ -6,7 +6,9 @@ import com.example.LunchGo.reservation.entity.Reservation;
 import com.example.LunchGo.reservation.repository.PaymentRepository;
 import com.example.LunchGo.reservation.repository.ReservationRepository;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,6 +33,7 @@ public class ReservationPaymentExpiryService {
             return 0;
         }
 
+        Map<Long, Payment> latestPayments = loadLatestPayments(targets);
         int expired = 0;
         for (Reservation reservation : targets) {
             if (reservation == null || reservation.getReservationId() == null) {
@@ -45,11 +48,34 @@ public class ReservationPaymentExpiryService {
                 reservation.getHoldExpiresAt(),
                 reservation.getPaymentDeadlineAt(),
                 now);
-            paymentRepository.findTopByReservationIdOrderByCreatedAtDesc(reservation.getReservationId())
-                .ifPresent(payment -> markPaymentFailed(payment, now));
+            Payment payment = latestPayments.get(reservation.getReservationId());
+            if (payment != null) {
+                markPaymentFailed(payment, now);
+            }
             expired++;
         }
         return expired;
+    }
+
+    private Map<Long, Payment> loadLatestPayments(List<Reservation> reservations) {
+        Map<Long, Payment> latestMap = new HashMap<>();
+        List<Long> reservationIds = reservations.stream()
+            .map(Reservation::getReservationId)
+            .filter(id -> id != null)
+            .toList();
+        if (reservationIds.isEmpty()) {
+            return latestMap;
+        }
+        List<Payment> payments = paymentRepository.findByReservationIdInOrderByReservationIdAscCreatedAtDesc(
+            reservationIds
+        );
+        for (Payment payment : payments) {
+            if (payment == null || payment.getReservationId() == null) {
+                continue;
+            }
+            latestMap.putIfAbsent(payment.getReservationId(), payment);
+        }
+        return latestMap;
     }
 
     private void markPaymentFailed(Payment payment, LocalDateTime now) {
