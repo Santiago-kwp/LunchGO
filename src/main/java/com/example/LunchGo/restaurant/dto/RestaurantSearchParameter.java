@@ -11,6 +11,7 @@ public class RestaurantSearchParameter {
     private LocalTime time;
     private Integer partySize;
     private List<String> menuTypes;
+    private List<String> restaurantTags;
     private Boolean preorderAvailable;
     // TODO: 향후 태그 검색 기능 추가 시, 여기에 필드 추가
 }

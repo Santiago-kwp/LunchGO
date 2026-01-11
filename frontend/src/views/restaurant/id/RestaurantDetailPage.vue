@@ -74,7 +74,6 @@ const taglineDisplay = computed(
 const highlightTags = computed(() => {
   if (!restaurantInfo.value?.tags?.length) return '';
   return restaurantInfo.value.tags
-    .slice(0, 2)
     .map((tag) => tag.content || tag.name)
     .join(', ');
 });

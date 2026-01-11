@@ -3,11 +3,15 @@
 <mapper namespace="com.example.LunchGo.restaurant.mapper.RestaurantSearchMapper">
 
     <select id="findAvailableRestaurantIds" parameterType="com.example.LunchGo.restaurant.dto.RestaurantSearchParameter" resultType="long">
-        SELECT DISTINCT r.restaurant_id
+        SELECT r.restaurant_id
         FROM restaurants r
         <if test="menuTypes != null and menuTypes.size > 0">
-            JOIN restaurant_tag_maps rtm ON r.restaurant_id = rtm.restaurant_id
-            JOIN search_tags st ON st.tag_id = rtm.tag_id
+            JOIN restaurant_tag_maps rtm_menu ON r.restaurant_id = rtm_menu.restaurant_id
+            JOIN search_tags st_menu ON st_menu.tag_id = rtm_menu.tag_id
+        </if>
+        <if test="restaurantTags != null and restaurantTags.size > 0">
+            JOIN restaurant_tag_maps rtm_tag ON r.restaurant_id = rtm_tag.restaurant_id
+            JOIN search_tags st_tag ON st_tag.tag_id = rtm_tag.tag_id
         </if>
         <if test="date != null or time != null">
             -- 지정한 날짜, 시간대, 식당ID로 생성된 예약 슬롯들을 확인(없으면 null)
@@ -50,10 +54,17 @@
                 )
             </if>
             <if test="menuTypes != null and menuTypes.size > 0">
-                AND st.category = 'MENUTYPE'
-                AND st.content IN
+                AND st_menu.category = 'MENUTYPE'
+                AND st_menu.content IN
                 <foreach collection="menuTypes" item="menuType" open="(" separator="," close=")">
                     #{menuType}
+                </foreach>
+            </if>
+            <if test="restaurantTags != null and restaurantTags.size > 0">
+                AND st_tag.category IN ('TABLETYPE', 'ATMOSPHERE', 'FACILITY')
+                AND st_tag.content IN
+                <foreach collection="restaurantTags" item="tag" open="(" separator="," close=")">
+                    #{tag}
                 </foreach>
             </if>
             <if test="preorderAvailable == true">
@@ -63,6 +74,11 @@
                 TODO: 태그 검색 기능 확장
             -->
         </where>
+        GROUP BY r.restaurant_id
+        <if test="restaurantTags != null and restaurantTags.size > 0">
+            <bind name="restaurantTagCount" value="restaurantTags.size" />
+            HAVING COUNT(DISTINCT st_tag.content) = #{restaurantTagCount}
+        </if>
     </select>
 
 </mapper>

@@ -140,6 +140,7 @@ const filterPerPersonBudgetDisplay = computed(() => {
 });
 
 const isSearchOpen = ref(false);
+const searchModalScrollRef = ref(null);
 const searchResultIds = ref(null);
 const searchDate = ref("");
 const searchTime = ref("");
@@ -297,6 +298,57 @@ const tagMappingNotice = computed(() => {
   }
   return "";
 });
+const weatherThemeMap = {
+  hot: {
+    wrapperClass:
+      "bg-gradient-to-br from-[#ffd6a5] via-[#ffb56b] to-[#ff8c5a] border border-[#ff9a76]",
+    accentClass: "text-[#9a3412]",
+    emoji: "🔥",
+    label: "더운 날씨",
+  },
+  cold: {
+    wrapperClass:
+      "bg-gradient-to-br from-[#dbeafe] via-[#c7d2fe] to-[#b8c7ff] border border-[#a5b4fc]",
+    accentClass: "text-[#1e40af]",
+    emoji: "🥶",
+    label: "추운 날씨",
+  },
+  rain: {
+    wrapperClass:
+      "bg-gradient-to-br from-[#dbeafe] via-[#c7d2fe] to-[#b8c7ff] border border-[#a5b4fc]",
+    accentClass: "text-[#1e3a8a]",
+    emoji: "🌧️",
+    label: "비 오는 날씨",
+  },
+  snow: {
+    wrapperClass:
+      "bg-gradient-to-br from-[#eef2ff] via-[#e0f2fe] to-[#cfe7ff] border border-[#c7d2fe]",
+    accentClass: "text-[#1e40af]",
+    emoji: "❄️",
+    label: "눈 오는 날씨",
+  },
+};
+const weatherTheme = computed(() => {
+  if (selectedRecommendation.value !== RECOMMEND_WEATHER) return null;
+  const summary = weatherSummary.value;
+  if (!summary) return null;
+  const condition = String(summary.condition || "").toLowerCase();
+  if (["rain", "drizzle", "thunderstorm"].includes(condition)) return "rain";
+  if (condition === "snow") return "snow";
+  const temp = Number.isFinite(summary.temp)
+    ? summary.temp
+    : summary.feelsLike;
+  if (Number.isFinite(temp) && temp <= 7) return "cold";
+  if (Number.isFinite(temp) && temp >= 28) return "hot";
+  return null;
+});
+const weatherThemeStyle = computed(() => {
+  if (!weatherTheme.value) return null;
+  return weatherThemeMap[weatherTheme.value] || weatherThemeMap.cold;
+});
+const formatTemp = (value) =>
+  Number.isFinite(value) ? `${Math.round(value)}°` : "--°";
+const weatherDisplayLabel = computed(() => weatherThemeStyle.value?.label || "");
 
 const restaurantsPerPage = 10;
 const currentPage = ref(1);
@@ -616,6 +668,11 @@ const toggleCalendar = () => {
         : new Date();
   }
   isCalendarOpen.value = !isCalendarOpen.value;
+};
+const handleSearchModalScroll = () => {
+  if (isCalendarOpen.value) {
+    isCalendarOpen.value = false;
+  }
 };
 
 const isDateDisabled = (day) => {
@@ -1380,7 +1437,9 @@ const buildSearchParams = () => {
   const hasDate = Boolean(searchDate.value);
   const hasTime = Boolean(searchTime.value);
   const hasMenuTypes = searchCategories.value.length > 0;
-  const shouldSearch = hasDate || hasTime || hasMenuTypes;
+  const hasRestaurantTags = searchTags.value.length > 0;
+  const shouldSearch =
+    hasDate || hasTime || hasMenuTypes || hasRestaurantTags || searchPreorder.value;
   const params = new URLSearchParams();
   if (hasDate) params.set("date", searchDate.value);
   if (hasTime) params.set("time", searchTime.value);
@@ -1391,6 +1450,12 @@ const buildSearchParams = () => {
     searchCategories.value.forEach((menuType) =>
       params.append("menuTypes", menuType)
     );
+  }
+  if (hasRestaurantTags) {
+    searchTags.value.forEach((tag) => params.append("restaurantTags", tag));
+  }
+  if (searchPreorder.value) {
+    params.set("preorderAvailable", "true");
   }
   return { shouldSearch, params };
 };
@@ -1744,7 +1809,10 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div class="px-4 py-5">
+      <div
+        class="px-4 py-5 relative overflow-hidden"
+        :class="weatherThemeStyle ? `rounded-3xl ${weatherThemeStyle.wrapperClass}` : ''"
+      >
         <div
             v-if="!isLoggedIn"
             class="mb-3 rounded-2xl border border-[#e9ecef] bg-white py-2 px-4 text-[13px] text-gray-700 whitespace-nowrap text-center"
@@ -1771,6 +1839,39 @@ onBeforeUnmount(() => {
               </span>
             </button>
           </div>
+        </div>
+
+        <div
+          v-if="weatherThemeStyle && selectedRecommendation === RECOMMEND_WEATHER && weatherSummary"
+          class="mb-3 rounded-2xl border border-white/60 bg-white/70 backdrop-blur px-4 py-3"
+        >
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">{{ weatherThemeStyle.emoji }}</span>
+              <div>
+                <p class="text-sm font-semibold" :class="weatherThemeStyle.accentClass">
+                  오늘 날씨
+                </p>
+                <p class="text-xs text-gray-700">
+                  {{ weatherDisplayLabel }}
+                </p>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="text-lg font-semibold text-[#1e3a5f]">
+                {{ formatTemp(weatherSummary.temp) }}
+              </p>
+              <p class="text-xs text-gray-600">
+                체감 {{ formatTemp(weatherSummary.feelsLike) }}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div
+          v-else-if="selectedRecommendation === RECOMMEND_WEATHER && weatherError"
+          class="mb-3 rounded-2xl border border-[#e9ecef] bg-white px-4 py-3 text-sm text-gray-700"
+        >
+          {{ weatherError }}
         </div>
 
         <div class="flex items-center gap-2 mb-2">
@@ -2152,10 +2253,10 @@ onBeforeUnmount(() => {
         class="fixed inset-0 z-[100] bg-black/50 flex items-end"
     >
       <div
-          class="w-full max-w-[500px] mx-auto bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300"
+          class="w-full max-w-[500px] mx-auto bg-white rounded-t-2xl max-h-[85vh] animate-in slide-in-from-bottom duration-300 flex flex-col"
       >
         <div
-            class="sticky top-0 bg-white border-b border-[#e9ecef] px-4 py-4 flex items-center justify-between"
+            class="sticky top-0 z-10 bg-white border-b border-[#e9ecef] px-4 py-4 flex items-center justify-between"
         >
           <h3 class="text-lg font-semibold text-[#1e3a5f]">검색 필터</h3>
           <button
@@ -2166,7 +2267,12 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <div class="p-4 space-y-6">
+        <div
+            ref="searchModalScrollRef"
+            class="flex-1 overflow-y-auto"
+            @scroll="handleSearchModalScroll"
+        >
+          <div class="p-4 space-y-6">
           <!-- Reservation Date -->
           <div>
             <h4 class="text-sm font-semibold text-[#1e3a5f] mb-3">예약 날짜</h4>
@@ -2382,22 +2488,23 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div
-            class="sticky bottom-0 bg-white border-t border-[#e9ecef] p-4 flex gap-3"
-        >
-          <Button
-              @click="resetSearch"
-              variant="outline"
-              class="flex-1 h-12 text-gray-700 border-[#dee2e6] hover:bg-[#f8f9fa] rounded-xl bg-transparent"
+          <div
+              class="sticky bottom-0 bg-white border-t border-[#e9ecef] p-4 flex gap-3"
           >
-            초기화
-          </Button>
-          <Button
-              @click="applySearch"
-              class="flex-1 h-12 gradient-primary text-white rounded-xl"
-          >
-            검색하기
-          </Button>
+            <Button
+                @click="resetSearch"
+                variant="outline"
+                class="flex-1 h-12 text-gray-700 border-[#dee2e6] hover:bg-[#f8f9fa] rounded-xl bg-transparent"
+            >
+              초기화
+            </Button>
+            <Button
+                @click="applySearch"
+                class="flex-1 h-12 gradient-primary text-white rounded-xl"
+            >
+              검색하기
+            </Button>
+          </div>
         </div>
       </div>
     </div>
