@@ -125,18 +125,15 @@ const fetchBookingSummary = async () => {
   }
 };
 
+const nowTick = ref(Date.now());
+let countdownTimer = null;
+
 onMounted(() => {
   if (route.query.paymentError) {
     errorMessage.value = String(route.query.paymentError);
   }
   fetchBookingSummary();
   loadPortOneSdk();
-});
-
-const nowTick = ref(Date.now());
-let countdownTimer = null;
-
-onMounted(() => {
   countdownTimer = setInterval(() => {
     nowTick.value = Date.now();
   }, 1000);
