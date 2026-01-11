@@ -9,6 +9,7 @@ import com.example.LunchGo.reservation.mapper.row.ReservationCreateRow;
 import com.example.LunchGo.restaurant.entity.Menu;
 import com.example.LunchGo.restaurant.repository.MenuRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -104,7 +105,11 @@ public class ReservationServiceImpl implements ReservationService {
             reservation.setTotalAmount(preorderSum);
         }
 
-        reservationMapper.insertReservation(reservation);
+        try {
+            reservationMapper.insertReservation(reservation);
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 처리된 예약 요청입니다.");
+        }
 
         // reservation_menu_items 저장 (예약 PK 생긴 다음에)
         if (ReservationType.PREORDER_PREPAY.equals(request.getReservationType()) && !snapshots.isEmpty()) {

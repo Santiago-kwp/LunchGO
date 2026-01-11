@@ -1,6 +1,6 @@
 # 동시성 제어 - 중복 예약 처리
 
-## 문제: 이미 생성된 중복 예약으로 인한 unique 키 생성 불가
+## 문제 1: 이미 생성된 중복 예약으로 인한 unique 키 생성 불가
 
 ### 증상
 
@@ -123,3 +123,42 @@
   - 예약 생성 과정에서 오류가 발생한 경우에도 DB의 auto increment id값(주로 pk)이 증가하는 등의 부수적인 문제도 발생
 - redis를 사용하면 애플리케이션 레벨에서 일부 중복 예약 요청을 먼저 차단하게 되어 DB의 부담이 감소
   - 중복 예약 처리와는 별개로, redis는 예약 프로세스 만료시간을 설정할 때도 활용될 수 있음
+
+---
+
+## 문제 3: SQLIntegrityConstraintViolationException 예외 처리
+
+### 증상
+
+- 현재 로그인한 사용자가 같은 식당을 대상으로 중복된 예약 요청을 보내면 SQLIntegrityConstraintViolationException 예외가 발생하면서 강제 로그아웃되는 문제 발생
+
+
+### 원인
+
+- 중복된 예약 요청 자체가 reservations 테이블을 대상으로 이전에 설정했던 unique 제약조건을 충족하지 못하면서 SQLIntegrityConstraintViolationException이 발생
+- 그러나, 발생한 SQLIntegrityConstraintViolationException에 관한 예외 처리를 수행하지 않아 강제 로그아웃되는 문제 발생
+
+### 해결
+
+- ReservationServiceImpl.java의 `create` 메서드에서 예약 생성용 insert문 쿼리를 실행 중 SQLIntegrityConstraintViolationException 발생 시 409 상태코드를 반환하도록 예외 처리
+
+```java
+try {
+    reservationMapper.insertReservation(reservation);
+} catch (DataIntegrityViolationException e) {
+    throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 처리된 예약 요청입니다.");
+}
+```
+
+- RestaurantBookingPage.vue 파일의 handleProceed 함수에서 409 상태코드를 처리하도록 catch 블록 내부를 아래와 같이 수정 
+  - 409 상태코드를 반환받을 시, 에러 메시지를 띄운 후 메인 페이지로 이동
+  - 그 외에는 이전처럼 에러 처리
+
+```javascript
+if (e.response?.status === 409) {
+  alert('이미 처리된 예약입니다. 예약 내역을 확인해 주세요.');
+  router.push('/');
+} else {
+  createErrorMessage.value = e.response?.data?.message || e?.message || '예약 생성 중 오류가 발생했습니다.';
+}
+```
