@@ -182,10 +182,7 @@ public class ReservationPaymentService {
             return;
         }
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime deadline = reservation.getPaymentDeadlineAt();
-        if (deadline == null) {
-            deadline = reservation.getHoldExpiresAt();
-        }
+        LocalDateTime deadline = resolvePaymentDeadline(reservation);
         if (deadline != null && now.isBefore(deadline)) {
             log.info("결제 만료 스킵: deadline 미도달 (reservationId={}, deadline={}, now={})",
                 reservationId, deadline, now);
@@ -604,13 +601,21 @@ public class ReservationPaymentService {
         if (reservation == null) {
             return false;
         }
-        LocalDateTime deadline = reservation.getPaymentDeadlineAt();
-        if (deadline == null) {
-            deadline = reservation.getHoldExpiresAt();
-        }
+        LocalDateTime deadline = resolvePaymentDeadline(reservation);
         if (deadline == null) {
             return false;
         }
         return !LocalDateTime.now().isBefore(deadline);
+    }
+
+    private LocalDateTime resolvePaymentDeadline(Reservation reservation) {
+        if (reservation == null) {
+            return null;
+        }
+        LocalDateTime deadline = reservation.getPaymentDeadlineAt();
+        if (deadline == null) {
+            deadline = reservation.getHoldExpiresAt();
+        }
+        return deadline;
     }
 }

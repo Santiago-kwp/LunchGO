@@ -69,7 +69,7 @@ public class PortoneVerificationService {
                 if (retryBackoffMs > 0) {
                     try {
                         Thread.sleep(retryBackoffMs);
-                    } catch (InterruptedException ignored) {
+                    } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         break;
                     }
