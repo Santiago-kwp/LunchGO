@@ -44,6 +44,13 @@ public class ReservationServiceImpl implements ReservationService {
     public ReservationCreateResponse create(ReservationCreateRequest request) {
         validate(request);
 
+        // Redis 락을 사용하여 짧은 시간(5초 이내) 동안 중복해서 전달되는 예약 요청을 처리
+        // (이 코드가 있어야 애플리케이션 레벨에서 중복 예약 요청이 들어오는 것을 방어 가능 - 결제 만료 시간과는 별개의 역할)
+        String lockKey = "reservation_lock:" + request.getUserId() + ":" + request.getRestaurantId() + ":" + request.getSlotDate() + ":" + request.getSlotTime();
+        if (!redisUtil.setIfAbsent(lockKey, "processing", 5000)) {
+            throw new DuplicateReservationException("이미 처리 중인 예약 요청입니다. 잠시 후 다시 시도해주세요.");
+        }
+
         // 지정한 날짜+시간대의 예약슬롯을 불러오는 서비스 로직(없으면 신규 생성)
         ReservationSlot slot = reservationSlotService.getValidatedSlot(
                 request.getRestaurantId(),
@@ -109,6 +116,7 @@ public class ReservationServiceImpl implements ReservationService {
         try {
             reservationMapper.insertReservation(reservation);
         } catch (DataIntegrityViolationException e) {
+            // 결제 대기 시간 만료 전, 약간의 텀을 두고 중복된 예약 요청이 발생했을 때의 중복 예약 방지
             throw new DuplicateReservationException("이미 결제 대기 중인 예약 요청입니다.");
         }
 
