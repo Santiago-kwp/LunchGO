@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue';
-import axios from 'axios';
+import { useAccountStore } from '@/stores/account';
+import httpRequest from '@/router/httpRequest';
 
 // 부모 컴포넌트에서 전달받은 email
 const props = defineProps<{
@@ -8,6 +9,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits(['close', 'verified']);
+
+const accountStore = useAccountStore();
 
 // 상태 관리
 const verificationCode = ref(''); // 입력한 인증코드
@@ -55,14 +58,18 @@ onUnmounted(() => {
 const handleSendEmailCode = async () => {
   alert(`'${props.email}'로 인증번호를 발송했습니다.\n메일함을 확인해주세요.`);
 
+  if (!accountStore.accessToken) {
+    return alert('로그인이 필요합니다.');
+  }
+
   try{
-    await axios.post('/api/email/send', {mail: props.email});
+    await httpRequest.post('/api/email/send', { mail: props.email });
 
     isCodeSent.value = true;
     verificationCode.value = ''; // 코드 입력 초기화
     startTimer();
   }catch(error){
-    const status = error.response.status;
+    const status = error.response?.status;
 
     switch(status){
        case 400:
@@ -72,7 +79,7 @@ const handleSendEmailCode = async () => {
         alert("[404 Not Found] 해당 이메일은 존재하지 않습니다.");
         break;
       default:
-        alert(`오류가 발생했습니다. (Code: ${status})`);
+        alert(`오류가 발생했습니다. (Code: ${status ?? 'unknown'})`);
     }
   }
 };
@@ -86,8 +93,15 @@ const handleVerify = async () => {
 
   isLoading.value = true;
 
+  if (!accountStore.accessToken) {
+    return alert('로그인이 필요합니다.');
+  }
+
   try {
-    const response = await axios.post('/api/email/verify', {mail: props.email, verifyCode: verificationCode.value});
+    const response = await httpRequest.post(
+      '/api/email/verify',
+      { mail: props.email, verifyCode: verificationCode.value }
+    );
 
     if(response.data === true){
       alert('인증이 완료되었습니다.');
@@ -101,8 +115,9 @@ const handleVerify = async () => {
       alert("인증번호가 일치하지 않습니다. 다시 확인해주세요.");
     }    
   } catch (error) {
-    if(error.response.status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
-    else alert(`오류가 발생했습니다. (Code: ${error.reponse.status})`);
+    const status = error.response?.status;
+    if(status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else alert(`오류가 발생했습니다. (Code: ${status ?? 'unknown'})`);
   } finally {
     isLoading.value = false;
   }
