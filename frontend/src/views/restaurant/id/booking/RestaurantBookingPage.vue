@@ -156,7 +156,7 @@ const handleProceed = async () => {
     });
   } catch (e) {
     if (e.response?.status === 409) {
-      alert('이미 예약 처리 중인 식당입니다. 예약 내역을 확인해 주세요.');
+      alert(e.response?.data?.message || '이미 처리된 예약이거나 잔여석이 부족합니다.');
       router.push('/');
     } else {
       createErrorMessage.value = e.response?.data?.message || e?.message || '예약 생성 중 오류가 발생했습니다.';

@@ -149,8 +149,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/api/admin/reviews/*/blind-requests").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/admin/reviews/*/hide").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/admin/list/owner").hasAuthority("ROLE_ADMIN")
-                        // 예외 발생 시 스프링 부트가 내부적으로 /error로 포워딩할 때 인증에 막히지 않도록 허용 (409 등 비즈니스 예외 응답 보장)
-                        .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()
                 )
 

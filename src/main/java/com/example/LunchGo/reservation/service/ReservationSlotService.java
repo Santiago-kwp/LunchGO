@@ -53,7 +53,7 @@ public class ReservationSlotService {
         // 4. 잔여석 검증: 이미 해당 시간대에 예약한 사람이 있거나, 사용자가 지정한 인원수가 잔여석 개수를 초과할 경우 예약 불가
         if (currentTotal + requestedPartySize > slot.getMaxCapacity()) {
             log.info("잔여석이 부족합니다.");
-            throw new IllegalStateException("잔여석이 부족합니다. (남은 좌석: " + (slot.getMaxCapacity() - currentTotal) + ")");
+            throw new com.example.LunchGo.reservation.exception.SlotCapacityExceededException("잔여석이 부족합니다. (남은 좌석: " + (slot.getMaxCapacity() - currentTotal) + ")");
         }
         log.info("선택한 인원수: {}명, 현재 잔여석: {}석", requestedPartySize, slot.getMaxCapacity() - (currentTotal+requestedPartySize));
 

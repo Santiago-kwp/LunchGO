@@ -4,6 +4,7 @@ import com.example.LunchGo.common.util.RedisUtil;
 import com.example.LunchGo.reservation.domain.*;
 import com.example.LunchGo.reservation.dto.ReservationCreateRequest;
 import com.example.LunchGo.reservation.dto.ReservationCreateResponse;
+import com.example.LunchGo.reservation.exception.DuplicateReservationException;
 import com.example.LunchGo.reservation.mapper.ReservationMapper;
 import com.example.LunchGo.reservation.mapper.row.ReservationCreateRow;
 import com.example.LunchGo.restaurant.entity.Menu;
@@ -107,8 +108,8 @@ public class ReservationServiceImpl implements ReservationService {
 
         try {
             reservationMapper.insertReservation(reservation);
-        } catch (DataIntegrityViolationException e) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 처리된 예약 요청입니다.");
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new DuplicateReservationException("이미 결제 대기 중인 예약 요청입니다.");
         }
 
         // reservation_menu_items 저장 (예약 PK 생긴 다음에)
