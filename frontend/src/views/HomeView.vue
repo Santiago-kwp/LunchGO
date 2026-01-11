@@ -1438,8 +1438,14 @@ const buildSearchParams = () => {
   const hasTime = Boolean(searchTime.value);
   const hasMenuTypes = searchCategories.value.length > 0;
   const hasRestaurantTags = searchTags.value.length > 0;
+  const hasAvoidIngredients = avoidIngredients.value.length > 0;
   const shouldSearch =
-    hasDate || hasTime || hasMenuTypes || hasRestaurantTags || searchPreorder.value;
+    hasDate ||
+    hasTime ||
+    hasMenuTypes ||
+    hasRestaurantTags ||
+    hasAvoidIngredients ||
+    searchPreorder.value;
   const params = new URLSearchParams();
   if (hasDate) params.set("date", searchDate.value);
   if (hasTime) params.set("time", searchTime.value);
@@ -1453,6 +1459,11 @@ const buildSearchParams = () => {
   }
   if (hasRestaurantTags) {
     searchTags.value.forEach((tag) => params.append("restaurantTags", tag));
+  }
+  if (hasAvoidIngredients) {
+    avoidIngredients.value.forEach((ingredient) =>
+      params.append("avoidIngredients", ingredient)
+    );
   }
   if (searchPreorder.value) {
     params.set("preorderAvailable", "true");
