@@ -108,7 +108,7 @@ public class ReservationServiceImpl implements ReservationService {
 
         try {
             reservationMapper.insertReservation(reservation);
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException e) {
             throw new DuplicateReservationException("이미 결제 대기 중인 예약 요청입니다.");
         }
 
