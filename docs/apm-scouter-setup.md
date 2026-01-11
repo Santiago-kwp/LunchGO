@@ -189,6 +189,33 @@ curl http://localhost:6188/scouter/v1/info/server
 curl -I http://localhost:6180/extweb/
 ```
 
+## Java Agent XLog 강화 옵션
+아래 옵션은 XLog에서 SQL/Redis 오류 정보를 더 자세히 보이도록 하는 최소 설정이다.
+로그/메모리 사용량 증가가 큰 옵션은 제외했다.
+
+```properties
+# SQL/Redis 오류 시 스택 수집
+profile_fullstack_sql_error_enabled=true
+profile_fullstack_sql_commit_enabled=true
+profile_fullstack_redis_error_enabled=true
+
+# SQL 파라미터 표시 범위
+trace_sql_parameter_max_length=100
+_trace_sql_parameter_max_count=256
+
+# 느린 SQL 기준(에러 마킹 기준)
+xlog_error_sql_time_max_ms=3000
+```
+
+| 옵션 | 역할 |
+| --- | --- |
+| `profile_fullstack_sql_error_enabled` | SQL 실행 오류가 발생했을 때 스택을 XLog에 남긴다. |
+| `profile_fullstack_sql_commit_enabled` | 커밋 오류가 발생했을 때 스택을 XLog에 남긴다. |
+| `profile_fullstack_redis_error_enabled` | Redis 오류가 발생했을 때 스택을 XLog에 남긴다. |
+| `trace_sql_parameter_max_length` | 바인딩 파라미터 문자열 최대 길이 제한. |
+| `_trace_sql_parameter_max_count` | XLog에 표시할 SQL 파라미터 최대 개수. |
+| `xlog_error_sql_time_max_ms` | 이 시간 이상인 쿼리를 XLog 에러로 마킹한다. |
+
 ## 환경 변수/플래그 정리
 `SCOUTER_OBJ_NAME` 및 `-Dscouter.obj_name`은 사용하지 않으며, 현재는 `scouter.conf`의 `obj_name`이 최종 적용된다.
 | 구분 | 이름 | 예시 값 | 설명 |
