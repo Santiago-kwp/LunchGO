@@ -92,8 +92,16 @@ const avgMainPrice = computed(() => {
   if (mainMenus.length === 0) {
     return 0;
   }
-  const totalPrice = mainMenus.reduce((sum, menu) => sum + menu.price, 0);
-  return Math.round(totalPrice / mainMenus.length);
+  if (mainMenus.length < 3) {
+    const totalPrice = mainMenus.reduce((sum, menu) => sum + menu.price, 0);
+    return Math.round(totalPrice / mainMenus.length);
+  }
+  const prices = mainMenus.map((menu) => menu.price);
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+  const totalPrice = prices.reduce((sum, price) => sum + price, 0);
+  const adjustedTotal = totalPrice - minPrice - maxPrice;
+  return Math.round(adjustedTotal / (prices.length - 2));
 });
 
 const formData = reactive({

@@ -31,6 +31,7 @@ import { restaurants as restaurantData } from "@/data/restaurants";
 import AppHeader from "@/components/ui/AppHeader.vue";
 import CafeteriaRecommendationSection from "@/components/ui/CafeteriaRecommendationSection.vue";
 import RestaurantCardList from "@/components/ui/RestaurantCardList.vue";
+import RestaurantCardSkeletonList from "@/components/ui/RestaurantCardSkeletonList.vue";
 import { useCafeteriaRecommendation } from "@/composables/useCafeteriaRecommendation";
 import TrendingRecommendationSection from "@/components/ui/TrendingRecommendationSection.vue";
 import { useTrendingRestaurants } from "@/composables/useTrendingRestaurants";
@@ -1850,7 +1851,14 @@ onBeforeUnmount(() => {
           </div>
 
           <div
-              v-if="!cafeteriaRecommendations.length && !paginatedRestaurants.length"
+              v-if="!cafeteriaRecommendations.length && selectedRecommendation === RECOMMEND_WEATHER && isWeatherLoading"
+              class="px-4"
+          >
+            <RestaurantCardSkeletonList :count="3" />
+          </div>
+
+          <div
+              v-else-if="!cafeteriaRecommendations.length && !paginatedRestaurants.length"
               class="w-full px-4 py-10 text-center text-sm text-gray-700"
           >
             해당 검색 결과가 없습니다.
