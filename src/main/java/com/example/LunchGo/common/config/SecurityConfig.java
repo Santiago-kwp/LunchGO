@@ -86,6 +86,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/restaurants/*/reviews/*/edit").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.PUT, "/api/restaurants/*/reviews/*").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.DELETE, "/api/restaurants/*/reviews/*").hasAuthority("ROLE_USER")
+                        .requestMatchers(HttpMethod.GET, "/api/restaurants/mapping/**").hasAuthority("ROLE_USER")
 
                         .requestMatchers(HttpMethod.POST, "/api/v1/images/upload/*")
                         .hasAnyAuthority("ROLE_USER", "ROLE_OWNER")
@@ -113,10 +114,14 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/bookmark-links/search").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.GET, "/api/bookmark-links/search/list").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.DELETE, "/api/bookmark-links").hasAuthority("ROLE_USER")
+                        .requestMatchers(HttpMethod.POST, "/api/bookmark").hasAuthority("ROLE_USER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/bookmark").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.PATCH, "/api/bookmark/visibility").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.PATCH, "/api/bookmark/promotion").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.GET, "/api/bookmark/shared").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.GET, "/api/bookmark/list").hasAuthority("ROLE_USER")
+                        .requestMatchers(HttpMethod.GET, "/api/info/user/*").hasAuthority("ROLE_USER")
+                        .requestMatchers(HttpMethod.PUT, "/api/info/user/*").hasAuthority("ROLE_USER")
 
                         .requestMatchers(HttpMethod.POST, "/api/owners/restaurants/*/reviews/*/comments").hasAnyAuthority("ROLE_OWNER", "ROLE_STAFF")
                         .requestMatchers(HttpMethod.DELETE, "/api/owners/restaurants/*/reviews/*/comments/*").hasAnyAuthority("ROLE_OWNER", "ROLE_STAFF")
@@ -129,8 +134,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/business/reservations/**").hasAuthority("ROLE_OWNER")
                         .requestMatchers(HttpMethod.PATCH, "/api/business/reservations/**").hasAuthority("ROLE_OWNER")
 
-                        .requestMatchers(HttpMethod.POST, "/api/business/staff/*").hasAuthority("ROLE_OWNER")
+                        .requestMatchers(HttpMethod.POST, "/api/business/staff").hasAuthority("ROLE_OWNER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/business/staff").hasAuthority("ROLE_OWNER")
+                        .requestMatchers(HttpMethod.GET, "/api/business/staff/*").hasAnyAuthority("ROLE_OWNER", "ROLE_STAFF")
                         .requestMatchers(HttpMethod.POST, "/api/business/promotion/*").hasAuthority("ROLE_OWNER")
+                        .requestMatchers(HttpMethod.GET, "/api/info/business/*").hasAuthority("ROLE_OWNER")
+                        .requestMatchers(HttpMethod.PUT, "/api/info/business/*").hasAuthority("ROLE_OWNER")
 
                         .requestMatchers(HttpMethod.GET, "/api/admin/reviews").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/admin/forbidden-words").hasAuthority("ROLE_ADMIN")
