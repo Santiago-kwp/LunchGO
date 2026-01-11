@@ -138,6 +138,8 @@ ngrok http 8080
 - JPA 메서드: `findByReservationIdInOrderByReservationIdAscCreatedAtDesc`
 
 ```java
+import java.util.Objects;
+
 // PaymentRepository: 만료 대상 예약 ID 목록으로 결제 목록을 한 번에 조회
 List<Payment> findByReservationIdInOrderByReservationIdAscCreatedAtDesc(List<Long> reservationIds);
 
@@ -145,8 +147,9 @@ List<Payment> findByReservationIdInOrderByReservationIdAscCreatedAtDesc(List<Lon
 private Map<Long, Payment> loadLatestPayments(List<Reservation> reservations) {
     Map<Long, Payment> latestMap = new HashMap<>();
     List<Long> reservationIds = reservations.stream()
+        .filter(Objects::nonNull)
         .map(Reservation::getReservationId)
-        .filter(id -> id != null)
+        .filter(Objects::nonNull)
         .toList();
     if (reservationIds.isEmpty()) {
         return latestMap;

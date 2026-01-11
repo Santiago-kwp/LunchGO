@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -60,8 +61,9 @@ public class ReservationPaymentExpiryService {
     private Map<Long, Payment> loadLatestPayments(List<Reservation> reservations) {
         Map<Long, Payment> latestMap = new HashMap<>();
         List<Long> reservationIds = reservations.stream()
+            .filter(Objects::nonNull)
             .map(Reservation::getReservationId)
-            .filter(id -> id != null)
+            .filter(Objects::nonNull)
             .toList();
         if (reservationIds.isEmpty()) {
             return latestMap;
