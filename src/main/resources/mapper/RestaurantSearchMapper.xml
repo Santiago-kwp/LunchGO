@@ -70,6 +70,20 @@
             <if test="preorderAvailable == true">
                 AND r.preorder_available = true
             </if>
+            <if test="avoidIngredients != null and avoidIngredients.size > 0">
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM menus m
+                    JOIN menu_tag_maps mt ON m.menu_id = mt.menu_id
+                    JOIN search_tags st_ing ON st_ing.tag_id = mt.tag_id
+                    WHERE m.restaurant_id = r.restaurant_id
+                      AND st_ing.category = 'INGREDIENT'
+                      AND st_ing.content IN
+                      <foreach collection="avoidIngredients" item="ingredient" open="(" separator="," close=")">
+                        #{ingredient}
+                      </foreach>
+                )
+            </if>
             <!--
                 TODO: 태그 검색 기능 확장
             -->
