@@ -79,6 +79,8 @@ jobs:
               mkdir -p /var/log/lunchgo
               docker run --env-file /opt/lunchgo/.env \
                 -e LOG_PATH=/var/log/lunchgo \
+                -e TZ=Asia/Seoul \
+                -e JAVA_TOOL_OPTIONS=-Duser.timezone=Asia/Seoul \
                 -v /opt/scouter/scouter/agent.java:/app/scouter/agent.java:ro \
                 -v /opt/scouter/scouter/agent.java/conf/scouter.conf:/app/scouter/conf/scouter.conf:ro \
                 -v /var/log/lunchgo:/var/log/lunchgo \
