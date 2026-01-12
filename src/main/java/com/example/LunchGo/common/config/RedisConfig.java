@@ -13,10 +13,6 @@ import org.springframework.data.redis.repository.configuration.EnableRedisReposi
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.util.StringUtils;
 
-/**
- * 일반적인 데이터 저장 및 조회(Lettuce)를 위한 설정 클래스입니다.
- * 캐싱, 세션 관리 등 단순한 Redis 작업에 사용됩니다.
- */
 @RequiredArgsConstructor
 @Configuration
 @EnableRedisRepositories
