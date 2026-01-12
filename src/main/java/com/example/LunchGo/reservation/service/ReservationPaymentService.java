@@ -673,7 +673,7 @@ public class ReservationPaymentService {
         // if (now.toLocalDate().isBefore(reservationDate)) return 100;
 
         // [TEST] 예약시간 23시간 전까지(포함): 50%
-        if (!now.isAfter(reservationDateTime.minusHours(18))) return 50;
+        //if (!now.isAfter(reservationDateTime.minusHours(18))) return 50;
 
         return partySize >= 8 ? 10 : 20;
     }
