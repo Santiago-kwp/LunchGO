@@ -240,3 +240,5 @@ if (e.response?.status === 409) {
 - 발생한 예외가 무엇인지를 명확히 표현하기 위해, ReservationServiceImpl 클래스 내부의 예외 생성 로직에서는 기존에 사용했던 예외를 커스텀 예외 클래스로 교체
   - SQLIntegrityConstraintViolationException -> DuplicateReservationException
   - IllegalStateException -> SlotCapacityExceedException
+
+- 이 해결방안을 적용한 후 기존에 SecurityConfig에 추가했던 `.requestMatchers("/error").permitAll()` 설정은 불필요하여 삭제
