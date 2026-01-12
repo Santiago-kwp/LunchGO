@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
+import lombok.extern.log4j.Log4j2;
 import lombok.RequiredArgsConstructor;
 import java.awt.Color;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -33,6 +34,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Log4j2
 public class RestaurantStatsService {
     private final BusinessReservationQueryService businessReservationQueryService;
     private final DailyRestaurantStatsRepository dailyRestaurantStatsRepository;
@@ -62,6 +64,7 @@ public class RestaurantStatsService {
         } catch (ResponseStatusException e) {
             throw e;
         } catch (RuntimeException e) {
+            log.error("AI request failed for restaurantId={}", restaurantId, e);
             String message = e.getMessage() == null ? "" : e.getMessage();
             if (message.contains("RESOURCE_EXHAUSTED") || message.contains("quota")) {
                 throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "ai_quota_exceeded", e);
@@ -74,6 +77,7 @@ public class RestaurantStatsService {
             }
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "ai_error", e);
         } catch (Exception e) {
+            log.error("Weekly stats PDF generation failed for restaurantId={}", restaurantId, e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "stats_pdf_failed", e);
         }
     }

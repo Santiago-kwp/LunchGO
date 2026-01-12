@@ -99,9 +99,6 @@ public class BusinessRestaurantController {
             @PathVariable("id") Long id,
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        if (userDetails == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build(); //권한 없음
-        }
         Optional<Long> restaurantId = businessRestaurantService.findRestaurantIdByOwnerId(userDetails.getId());
         if (restaurantId.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build(); //사용자 찾을 수 없음

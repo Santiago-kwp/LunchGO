@@ -3,6 +3,7 @@ package com.example.LunchGo.common.util;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.ResponseCookie;
 
 public class HttpUtils {
     // 쿠키 입력
@@ -12,7 +13,7 @@ public class HttpUtils {
         cookie.setPath("/");
 
         // 로컬 개발(localhost)에서는 주석 처리하거나 false로 해도 되지만, 배포 시엔 true여야 함
-        //cookie.setSecure(true);
+//        cookie.setSecure(true);
 
         if (expSeconds > 0) {
             cookie.setMaxAge(expSeconds);
