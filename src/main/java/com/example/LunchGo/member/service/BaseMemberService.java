@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.boot.autoconfigure.graphql.GraphQlProperties;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -265,6 +266,7 @@ public class BaseMemberService implements MemberService {
     }
 
     @Override
+    @Async("taskExecutor")
     @Transactional
     public void updateLastLoginAt(String userType, Long memberId) {
         if (!StringUtils.hasText(userType) || memberId == null) {

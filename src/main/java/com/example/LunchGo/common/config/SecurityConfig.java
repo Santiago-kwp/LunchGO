@@ -179,7 +179,7 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return new BCryptPasswordEncoder(8); //cost를 낮춰 속도 개선
     }
 
     @Bean
