@@ -116,7 +116,7 @@ mkdir -p ./mysql-exporter
 cat <<'EOF' > ./mysql-exporter/exporter.cnf
 [client]
 user=exporter
-password=exporter1234!
+password=<YOUR_EXPORTER_PASSWORD>
 host=db
 port=3306
 EOF
