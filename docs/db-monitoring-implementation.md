@@ -143,7 +143,7 @@ EOF
     restart: always
     command:
       - '--redis.addr=redis://redis:6379'
-      - '--redis.password=userredis1234!'
+      - '--redis.password=${REDIS_PASSWORD}'
     ports:
       - "9121:9121"
     depends_on:
