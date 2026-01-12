@@ -57,11 +57,19 @@
 
 - reservations 테이블에 이미 저장된 중복 데이터는 삭제하지 않고, 향후 동일 예약 요청을 중복 처리하는 것을 방지하는 것에 집중
 - 다음의 장점으로 인해, Redis를 활용하면서, 애플리케이션 레벨에서 중복 요청을 처리하는 방향으로 진행
-  - DB의 외래키 관계나 중복된 데이터를 건드리지 않으므로, 데이터 삭제로 인한 위험부담이 없음
-  - 사용자의 예약 요청 시, Redis를 통해 중복된 예약 내역이 누적되는 것을 방지
-  - 기존의 DB 비관적 락과 Redis 락을 모두 적용
+  - 애플리케이션 레벨에서 사용자의 중복된 예약 요청이 DB에 도달하기 전에 미리 방어
+  - 따라서, 기존의 DB 비관적 락과 Redis 락을 모두 활용해야 함
     - DB 비관적 락: 예약 인원이 식당의 최대 수용가능인원을 초과하는 것을 방지(여러 명이 동시에 한 식당을 예약할 때의 동시성 제어 담당)
     - Redis : 짧은 시간 동안 동일한 예약 요청이 중복 발생하는 것을 방지(1명이 식당 한 곳에 중복된 예약 신청을 넣지 않도록 제어)
+- 예약 슬롯 생성 직전 3초 간 Redis 락을 설정 
+  - 1명의 사용자가 짧은 시간 동안 중복된 예약 요청을 보냈을 때, 이미 처리된 예약을 다시 처리하게 되는 것을 방지하는 용도
+  - ReservationServiceImpl의 `create` 메서드 내부에서는 예약 슬롯 생성 직전에 아래의 코드를 실행
+  - ```java
+    String lockKey = String.format(RESERVATION_LOCK_KEY_FORMAT, request.getUserId(), request.getRestaurantId(), request.getSlotDate(), request.getSlotTime());
+    if (!redisUtil.setIfAbsent(lockKey, RESERVATION_LOCK_VALUE, RESERVATION_LOCK_TIMEOUT_MS)) {
+        throw new DuplicateReservationException("이미 처리 중인 예약 요청입니다. 잠시 후 다시 시도해주세요.");
+    }
+    ```
 
 ---
 
@@ -176,10 +184,61 @@ if (e.response?.status === 409) {
 - ReservationServiceImpl에서 중복 예약 발생 시 409 예외를 던졌을 때 스프링 부트가 내부적으로 에러 처리를 수행하기 위해 `/error` 경로로 요청을 포워딩
 - 하지만 SecurityConfig에서는 `/error`를 별도로 인가하지 않았기 때문에 이 요청이 `anyRequest().authenticated()`에 막혀버리는 문제 발생
 
-### 해결
+### 해결방안 1: SecurityConfig 설정 변경
 
 - SecurityConfig 내부에 `.requestMatchers("/error").permitAll()` 설정 추가
   - 이 설정을 추가하는 것은 보안을 해제하는 것이 아닌, 내부 서비스 로직에서 클라이언트에게 전달할 에러 응답이 보안 필터에 가로막히지 않게 한다는 것을 의미
   - 위 설정을 추가하더라도 API 요청이 백엔드로 전달될 때의 보안 검사는 여전히 유효
 - 코드 변경을 최소화한다는 측면에서 위의 방안을 적용
   - 구조적인 측면에서는 `@ControllerAdvice를 도입하는 것이 좋지만, 서비스 계층에서 발생한 모든 예외에 관한 처리 로직을 작성해야 하므로 코드 변경 범위가 큼
+
+### 해결방안 2: 예약 기능 전용 예외 처리 핸들러 추가
+
+- SecurityConfig에 `.requestMatchers("/error").permitAll()`란 설정을 추가하는 방안을 적용했지만 다음의 측면에서 개선의 필요성을 느낌
+  - 서비스 계층 내부에 새로운 예외 처리 코드를 추가할 때마다 서비스 계층의 로직을 수정해야 하는 번거로움
+  - 서비스 계층의 코드 분량이 늘어나면서 가독성이 떨어지고, 예외 처리 코드를 파악하고 관리하는 것이 어려움
+  - SecurityConfig에 `.requestMatchers("/error").permitAll()`이란 설정을 포함시켰을 때, 해당 설정이 가진 의미가 명확하지 않음
+- 이전에는 `@ControllerAdvice` 클래스를 도입할 경우 전역적인 예외 처리 핸들러를 작성하는 것의 부담으로 인해 해당 방안을 사용하지 않았으나, 다음의 절충안을 사용
+  - `@ControllerAdvice` 어노테이션의 `basePackage` 또는 `assignableTypes` 속성값을 사용하여 적용 범위를 줄이는 것이 가능
+    - `basePackage`
+      - `@ControllerAdvice` 또는 `@RestControllerAdvice`가 붙은 핸들러 클래스에서 사용
+      - 예외 처리 핸들러를 적용할 특정 패키지를 지정
+      - 특정 도메인에 관한 여러 개의 컨트롤러에 대해 공통으로 예외 처리 가능 
+    - `assignableTypes`
+      - `@ControllerAdvice` 또는 `@RestControllerAdvice`가 붙은 핸들러 클래스에서 사용
+      - 특정 컨트롤러에서 발생한 예외만 처리하도록 명시적으로 지정
+    - 컨트롤러 내부에서 `@ExceptionHandler` 정의
+      - 별도의 핸들러 클래스 생성 불필요
+      - 예외 처리를 수행할 컨트롤러의 메서드에 사용, 해당 컨트롤러 내부에서 발생한 예외만 처리
+      - 적용 범위가 가장 좁은 방식 -> 다른 컨트롤러에서는 재사용 불가
+- 예약 생성 중 발생한 409 에러에 관한 예외 처리 시 `@RestControllerAdvice`를 사용
+  - 이미 RESTful API 환경에서 기능 구성을 진행하고 있었고, JSON 형식으로 반환된 예외 메시지를 활용하여 409 에러 발생 시 그에 관한 에러 메시지를 화면에 출력해야 했기 때문
+  - 따라서, 아래의 핸들러 클래스를 사용
+  - 현재는 잔여석 부족, 중복 예약 처리 요청으로 인한 예외 발생 시 409 상태코드를 반환하는 예외 처리 핸들러만 추가한 상태
+  ```java
+  import org.springframework.http.HttpStatus;
+  import org.springframework.http.ResponseEntity;
+  import org.springframework.web.bind.annotation.ExceptionHandler;
+  import org.springframework.web.bind.annotation.RestControllerAdvice;
+  
+  import java.util.HashMap;
+  import java.util.Map;
+  
+  @RestControllerAdvice(basePackages = "com.example.LunchGo.reservation")
+  public class ReservationExceptionHandler {
+  
+      @ExceptionHandler({DuplicateReservationException.class, SlotCapacityExceededException.class})
+      public ResponseEntity<Map<String, String>> handleReservationExceptions(RuntimeException e) {
+          Map<String, String> response = new HashMap<>();
+          response.put("message", e.getMessage());
+          
+          return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+      }
+  }
+  ```
+
+- 발생한 예외가 무엇인지를 명확히 표현하기 위해, ReservationServiceImpl 클래스 내부의 예외 생성 로직에서는 기존에 사용했던 예외를 커스텀 예외 클래스로 교체
+  - SQLIntegrityConstraintViolationException -> DuplicateReservationException
+  - IllegalStateException -> SlotCapacityExceedException
+
+- 이 해결방안을 적용한 후 기존에 SecurityConfig에 추가했던 `.requestMatchers("/error").permitAll()` 설정은 불필요하여 삭제

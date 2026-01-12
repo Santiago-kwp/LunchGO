@@ -32,7 +32,7 @@ public class ReservationServiceImpl implements ReservationService {
     // 클래스 레벨에 상수 선언
     private static final String RESERVATION_LOCK_KEY_FORMAT = "reservation_lock:%s:%s:%s:%s";
     private static final String RESERVATION_LOCK_VALUE = "processing";
-    private static final long RESERVATION_LOCK_TIMEOUT_MS = 5000L;
+    private static final long RESERVATION_LOCK_TIMEOUT_MS = 3000L;
 
     private static final DateTimeFormatter CODE_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final int DEPOSIT_PER_PERSON_DEFAULT = 5000;
