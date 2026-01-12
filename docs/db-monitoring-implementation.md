@@ -57,7 +57,7 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin # 초기 비밀번호
+      - GF_SECURITY_ADMIN_PASSWORD=<STRONG_PASSWORD_HERE> # 초기 비밀번호
     restart: always
 
 volumes:
