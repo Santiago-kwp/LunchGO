@@ -23,6 +23,8 @@ const shortConfirmationNumber = (value) => {
 
 const reservation = ref({
   confirmationNumber: '',
+  status: '',
+  cancelledBy: '',
   restaurant: {
     name: '',
     address: '',
@@ -69,6 +71,8 @@ const fetchReservationDetail = async () => {
 
     reservation.value = {
       confirmationNumber: data.reservationCode || reservation.value.confirmationNumber,
+      status: data.status || reservation.value.status,
+      cancelledBy: data.cancelledBy ? String(data.cancelledBy).toUpperCase() : reservation.value.cancelledBy,
       restaurant: {
         name: data.restaurant?.name || reservation.value.restaurant.name,
         address: data.restaurant?.address || reservation.value.restaurant.address,
@@ -198,10 +202,18 @@ onMounted(async () => {
           <CheckCircle2 class="w-10 h-10 text-white" />
         </div>
         <h1 class="text-2xl font-bold text-[#1e3a5f] mb-2">
-          {{ paymentStatus.paid ? "예약이 완료되었습니다" : "결제 대기 중입니다" }}
+          <template v-if="reservation.status === 'CANCELLED'">
+            {{ reservation.cancelledBy === 'OWNER' ? "식당 취소되었습니다" : "예약이 취소되었습니다" }}
+          </template>
+          <template v-else>
+            {{ paymentStatus.paid ? "예약이 완료되었습니다" : "결제 대기 중입니다" }}
+          </template>
         </h1>
         <p class="text-sm text-[#6c757d] leading-relaxed">
-          <template v-if="paymentStatus.paid">
+          <template v-if="reservation.status === 'CANCELLED'">
+            {{ reservation.cancelledBy === 'OWNER' ? "식당 사정으로 취소되었습니다." : "해당 예약은 취소 처리되었습니다." }}
+          </template>
+          <template v-else-if="paymentStatus.paid">
             예약 정보를 확인하시고
             <br />
             방문 전 예약 내역을 확인해 주세요

@@ -20,6 +20,7 @@ public class ReservationHistoryItem {
     private Integer daysSinceLastVisit;
     private PaymentInfo payment;
     private String reservationStatus;
+    private String cancelledBy;
     private ReviewInfo review;
 
     @Getter

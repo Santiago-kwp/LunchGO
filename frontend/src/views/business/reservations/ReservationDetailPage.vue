@@ -28,6 +28,7 @@ const reservationId = computed(() => Number(props.id));
 const cancelModalOpen = ref(false);
 const cancelReason = ref('');
 const cancelError = ref('');
+const cancelling = ref(false);
 
 const MAX_CANCEL_REASON = 50;
 
@@ -47,7 +48,7 @@ const closeCancelModal = () => {
   cancelError.value = '';
 };
 
-const submitCancel = () => {
+const submitCancel = async () => {
   const target = reservation.value;
   if (!target) return;
   if (target.status === 'cancelled') return;
@@ -63,11 +64,23 @@ const submitCancel = () => {
     return;
   }
 
-  target.status = 'cancelled';
-  target.cancelReason = reason;
-  target.cancelledAt = new Date().toISOString();
-  closeCancelModal();
-  window.alert('취소 되었습니다.');
+  try {
+    cancelling.value = true;
+    cancelError.value = '';
+    await httpRequest.post(`/api/business/reservations/${reservationId.value}/cancel`, {
+      reason,
+      detail: '',
+    });
+    target.status = 'cancelled';
+    target.cancelReason = reason;
+    target.cancelledAt = new Date().toISOString();
+    closeCancelModal();
+    window.alert('취소 되었습니다.');
+  } catch (error) {
+    cancelError.value = error?.message || '예약 취소에 실패했습니다.';
+  } finally {
+    cancelling.value = false;
+  }
 };
 
 // // 버튼 노출 조건
@@ -246,7 +259,7 @@ onMounted(() => {
               >
                 닫기
               </button>
-              <button @click="submitCancel" :disabled="cancelReason.trim().length > 50" class="px-4 py-2 rounded-lg text-sm text-white bg-[#dc3545] hover:opacity-90">
+              <button @click="submitCancel" :disabled="cancelReason.trim().length > 50 || cancelling" class="px-4 py-2 rounded-lg text-sm text-white bg-[#dc3545] hover:opacity-90">
                 취소 확정
               </button>
             </div>

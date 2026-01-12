@@ -15,6 +15,7 @@
             slot.slot_time AS slotTime,
             r.party_size AS partySize,
             r.status AS reservationStatus,
+            cxl.cancelled_by AS cancelledBy,
             CASE
                 WHEN r.status = 'COMPLETED' THEN rvs.visit_number
                 ELSE NULL
@@ -44,6 +45,7 @@
             ) r2 ON r2.max_id = r1.receipt_id
         ) rc ON rc.reservation_id = r.reservation_id
         LEFT JOIN reservation_visit_stats rvs ON rvs.reservation_id = r.reservation_id
+        LEFT JOIN reservation_cancellations cxl ON cxl.reservation_id = r.reservation_id
         LEFT JOIN reviews rv ON rv.reservation_id = r.reservation_id
         LEFT JOIN review_tag_maps rtm ON rtm.review_id = rv.review_id
         LEFT JOIN review_tags rt ON rt.tag_id = rtm.tag_id
@@ -71,6 +73,7 @@
             slot.slot_time,
             r.party_size,
             r.status,
+            cxl.cancelled_by,
             rvs.visit_number,
             rvs.days_since_last_visit,
             rc.confirmed_amount,

@@ -8,6 +8,8 @@ import lombok.Getter;
 @Builder
 public class ReservationConfirmationResponse {
     private String reservationCode;
+    private String status;
+    private String cancelledBy;
     private RestaurantInfo restaurant;
     private BookingInfo booking;
     private PaymentInfo payment;

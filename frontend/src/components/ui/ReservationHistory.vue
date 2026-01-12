@@ -22,6 +22,18 @@ const getStatusInfo = (reservationStatus) => {
       textColor: 'text-blue-600',
       borderColor: 'border-blue-200',
     },
+    cancelled: {
+      text: '취소',
+      bgColor: 'bg-gray-50',
+      textColor: 'text-gray-600',
+      borderColor: 'border-gray-200',
+    },
+    restaurant_cancelled: {
+      text: '식당 취소',
+      bgColor: 'bg-gray-50',
+      textColor: 'text-gray-600',
+      borderColor: 'border-gray-200',
+    },
   };
   return statusMap[reservationStatus] || statusMap.confirmed;
 };
