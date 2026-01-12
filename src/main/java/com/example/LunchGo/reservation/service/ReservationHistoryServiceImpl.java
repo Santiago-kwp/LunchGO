@@ -26,10 +26,10 @@ public class ReservationHistoryServiceImpl implements ReservationHistoryService 
         List<String> statuses = null;
         String orderDirection = "DESC";
         if ("past".equals(normalized)) {
-            statuses = Arrays.asList("COMPLETED", "REFUND_PENDING", "REFUNDED");
+            statuses = Arrays.asList("COMPLETED", "REFUND_PENDING", "REFUNDED", "CANCELLED");
             orderDirection = "DESC";
         } else if ("upcoming".equals(normalized)) {
-            statuses = Arrays.asList("TEMPORARY", "CONFIRMED", "PREPAID_CONFIRMED");
+            statuses = Arrays.asList("TEMPORARY", "CONFIRMED", "PREPAID_CONFIRMED", "CANCELLED");
             orderDirection = "ASC";
         } else if ("all".equals(normalized)) {
             statuses = null;
@@ -86,6 +86,7 @@ public class ReservationHistoryServiceImpl implements ReservationHistoryService 
                 row.getDaysSinceLastVisit(),
                 payment,
                 row.getReservationStatus(),
+                row.getCancelledBy(),
                 review
             ));
         }

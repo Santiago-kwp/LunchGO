@@ -12,6 +12,7 @@ import com.example.LunchGo.reservation.entity.ReservationSlot;
 import com.example.LunchGo.reservation.mapper.ReservationSummaryMapper;
 import com.example.LunchGo.reservation.mapper.row.ReservationMenuItemRow;
 import com.example.LunchGo.reservation.repository.PaymentRepository;
+import com.example.LunchGo.reservation.repository.ReservationCancellationRepository;
 import com.example.LunchGo.reservation.repository.ReservationRepository;
 import com.example.LunchGo.reservation.repository.ReservationSlotRepository;
 import com.example.LunchGo.reservation.service.PortoneVerificationService;
@@ -54,6 +55,7 @@ public class ReservationPaymentService {
     private final OwnerRepository ownerRepository;
     private final UserRepository userRepository;
     private final SmsService smsService;
+    private final ReservationCancellationRepository reservationCancellationRepository;
 
     @Transactional
     public CreatePaymentResponse createPayment(Long reservationId, CreatePaymentRequest request) {
@@ -286,6 +288,9 @@ public class ReservationPaymentService {
         Reservation reservation = getReservation(reservationId);
         ReservationSlot slot = getSlot(reservation.getSlotId());
         Restaurant restaurant = getRestaurant(slot.getRestaurantId());
+        String cancelledBy = reservationCancellationRepository.findByReservationId(reservationId)
+            .map(cancellation -> cancellation.getCancelledBy())
+            .orElse(null);
 
         Payment payment = paymentRepository.findTopByReservationIdAndStatusOrderByApprovedAtDesc(
                 reservationId,
@@ -310,6 +315,8 @@ public class ReservationPaymentService {
 
         return ReservationConfirmationResponse.builder()
             .reservationCode(reservation.getReservationCode())
+            .status(reservation.getStatus() != null ? reservation.getStatus().name() : null)
+            .cancelledBy(cancelledBy)
             .restaurant(ReservationConfirmationResponse.RestaurantInfo.builder()
                 .name(restaurant.getName())
                 .address(formatAddress(restaurant))

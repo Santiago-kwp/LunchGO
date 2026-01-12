@@ -28,6 +28,8 @@ public class ReservationHistoryRow {
     private Integer paidAmount;
     private Integer totalAmount;
 
+    private String cancelledBy;
+
     private Long reviewId;
     private Integer reviewRating;
     private String reviewContent;

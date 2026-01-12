@@ -4,8 +4,11 @@ import com.example.LunchGo.account.dto.CustomUserDetails;
 import com.example.LunchGo.member.entity.Staff;
 import com.example.LunchGo.member.repository.StaffRepository;
 
+import com.example.LunchGo.reservation.dto.BusinessCancelReservationRequest;
 import com.example.LunchGo.reservation.dto.BusinessReservationDetailResponse;
 import com.example.LunchGo.reservation.dto.BusinessReservationItemResponse;
+import com.example.LunchGo.reservation.dto.CancelReservationResponse;
+import com.example.LunchGo.reservation.service.BusinessReservationCancelService;
 import com.example.LunchGo.reservation.service.BusinessReservationQueryService;
 import com.example.LunchGo.restaurant.service.BusinessRestaurantService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +27,7 @@ public class BusinessReservationController {
 
 
     private final BusinessReservationQueryService businessReservationQueryService;
+    private final BusinessReservationCancelService businessReservationCancelService;
 
     private final BusinessRestaurantService businessRestaurantService;
     private final StaffRepository staffRepository;
@@ -44,6 +48,17 @@ public class BusinessReservationController {
     @GetMapping("/{reservationId}")
     public ResponseEntity<BusinessReservationDetailResponse> getDetail(@PathVariable Long reservationId) {
         return ResponseEntity.ok(businessReservationQueryService.getDetail(reservationId));
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_OWNER')")
+    @PostMapping("/{reservationId}/cancel")
+    public ResponseEntity<CancelReservationResponse> cancel(
+            @PathVariable Long reservationId,
+            @RequestBody BusinessCancelReservationRequest request
+    ) {
+        Long ownerId = resolveOwnerIdFromToken();
+        businessReservationCancelService.cancel(reservationId, ownerId, request);
+        return ResponseEntity.ok(new CancelReservationResponse(true));
     }
 
     private Long resolveRestaurantIdFromToken() {
@@ -67,5 +82,19 @@ public class BusinessReservationController {
 
         return businessRestaurantService.findRestaurantIdByOwnerId(ownerId)
                 .orElseThrow(() -> new IllegalArgumentException("식당 정보를 찾을 수 없습니다."));
+    }
+
+    private Long resolveOwnerIdFromToken() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Object principal = auth != null ? auth.getPrincipal() : null;
+
+        if (!(principal instanceof CustomUserDetails userDetails)) {
+            throw new IllegalArgumentException("인증 정보가 없습니다.");
+        }
+
+        if ("ROLE_OWNER".equals(userDetails.getRole())) {
+            return userDetails.getId();
+        }
+        throw new IllegalArgumentException("권한이 없습니다.");
     }
 }

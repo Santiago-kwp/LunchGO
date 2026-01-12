@@ -52,6 +52,7 @@ const cancelModalOpen = ref(false);
 const cancelTargetId = ref(null);
 const cancelReason = ref('');
 const cancelError = ref('');
+const cancelling = ref(false);
 const MAX_CANCEL_REASON = 50;
 
 const openCancelModal = (id) => {
@@ -68,7 +69,7 @@ const closeCancelModal = () => {
   cancelError.value = '';
 };
 
-const submitCancel = () => {
+const submitCancel = async () => {
   const reason = cancelReason.value.trim();
   if (!reason) {
     cancelError.value = '취소 사유를 입력해주세요.';
@@ -83,12 +84,23 @@ const submitCancel = () => {
   const target = reservations.value.find((r) => r.id === cancelTargetId.value);
   if (!target) return;
 
-  target.status = 'cancelled';
-  target.cancelReason = reason; // 나중에 백엔드 필드로 그대로 사용
-  target.cancelledAt = new Date().toISOString(); // (선택)
-
-  closeCancelModal();
-  window.alert('취소 되었습니다.');
+  try {
+    cancelling.value = true;
+    cancelError.value = '';
+    await httpRequest.post(`/api/business/reservations/${cancelTargetId.value}/cancel`, {
+      reason,
+      detail: '',
+    });
+    target.status = 'cancelled';
+    target.cancelReason = reason;
+    target.cancelledAt = new Date().toISOString();
+    closeCancelModal();
+    window.alert('취소 되었습니다.');
+  } catch (error) {
+    cancelError.value = error?.message || '예약 취소에 실패했습니다.';
+  } finally {
+    cancelling.value = false;
+  }
 };
 
 const selectedDate = ref(new Date());
@@ -412,7 +424,7 @@ const salesStats = computed(() => {
         </button>
         <button
             @click="submitCancel"
-            :disabled="!cancelReason.trim() || cancelReason.trim().length > 50"
+            :disabled="cancelling || !cancelReason.trim() || cancelReason.trim().length > 50"
             class="px-4 py-2 rounded-lg text-sm text-white bg-[#dc3545] hover:opacity-90"
         >
           취소 확정
