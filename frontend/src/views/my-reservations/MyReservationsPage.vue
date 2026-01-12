@@ -72,7 +72,7 @@ const statusMap = {
   COMPLETED: "completed",
   REFUND_PENDING: "refund_pending",
   REFUNDED: "refunded",
-  CANCELLED: "refunded",
+  CANCELLED: "cancelled",
   NOSHOW: "refunded",
   NO_SHOW: "refunded",
 };
@@ -93,7 +93,11 @@ const formatTime = (value) => {
 };
 
 const mapReservation = (item) => {
-  const reservationStatus = statusMap[item.reservationStatus] || "confirmed";
+  let reservationStatus = statusMap[item.reservationStatus] || "confirmed";
+  const cancelledBy = String(item.cancelledBy || "").toUpperCase();
+  if (item.reservationStatus === "CANCELLED" && cancelledBy === "OWNER") {
+    reservationStatus = "restaurant_cancelled";
+  }
   const fallbackVisitCount = reservationStatus === "completed" ? 1 : 0;
 
   return {
@@ -113,6 +117,7 @@ const mapReservation = (item) => {
     daysSinceLastVisit: item.daysSinceLastVisit ?? null,
     payment: item.payment?.amount ? { amount: item.payment.amount } : null,
     reservationStatus,
+    cancelledBy: item.cancelledBy,
     review: item.review
       ? {
           id: item.review.id,
@@ -277,8 +282,9 @@ watch(
               >
                 <option value="all">전체 상태</option>
                 <option value="completed">이용완료</option>
-                <option value="refund_pending">환불대기</option>
-                <option value="refunded">환불완료</option>
+              <option value="refund_pending">환불대기</option>
+              <option value="refunded">환불완료</option>
+              <option value="cancelled">취소</option>
               </select>
               <select
                 v-model="pastPageSize"

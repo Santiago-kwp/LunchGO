@@ -8,10 +8,8 @@ import com.example.LunchGo.reservation.dto.ReservationCreateResponse;
 import com.example.LunchGo.reservation.dto.ReservationHistoryItem;
 import com.example.LunchGo.reservation.dto.UserReservationDetailResponse;
 import com.example.LunchGo.reservation.dto.UserReservationResponse;
-import com.example.LunchGo.reservation.service.ReservationCompletionService;
-import com.example.LunchGo.reservation.service.ReservationHistoryService;
-import com.example.LunchGo.reservation.service.ReservationService;
-import com.example.LunchGo.reservation.service.UserReservationQueryService;
+import com.example.LunchGo.reservation.service.*;
+
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -20,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
 
 @RestController
 @RequiredArgsConstructor
@@ -30,6 +29,12 @@ public class ReservationController {
     private final UserReservationQueryService userReservationQueryService;
     private final ReservationHistoryService reservationHistoryService;
     private final ReservationCompletionService reservationCompletionService;
+    private final ReservationCancelService reservationCancelService;
+    private final ReservationPaymentService reservationPaymentService;
+    private final ReservationRefundService reservationRefundService;
+
+
+
 
     // 예약 생성
     @PostMapping
@@ -89,7 +94,9 @@ public class ReservationController {
             @PathVariable Long reservationId,
             @RequestBody CancelReservationRequest request
     ) {
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+        String reason = (request != null) ? request.getReason() : null;
+        reservationRefundService.cancelWithRefundPolicy(reservationId, reason);
+        return ResponseEntity.ok(new CancelReservationResponse(true));
     }
 
     /**

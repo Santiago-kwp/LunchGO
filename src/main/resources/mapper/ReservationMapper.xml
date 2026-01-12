@@ -42,7 +42,8 @@
         SELECT COALESCE(SUM(party_size), 0)
         FROM reservations
         WHERE slot_id = #{slotId}
-          AND status IN ('TEMPORARY', 'CONFIRMED', 'PREPAY_CONFIRM', 'REFUND_PENDING')
+          AND status IN ('TEMPORARY', 'CONFIRMED', 'PREPAID_CONFIRMED', 'REFUND_PENDING')
+
     </select>
 
     <insert id="insertReservation"
@@ -203,7 +204,7 @@
         FROM reservations
         WHERE user_id = #{userId}
           AND slot_id = #{slotId}
-          AND status IN ('TEMPORARY', 'CONFIRMED', 'PREPAY_CONFIRM', 'REFUND_PENDING')
+          AND status IN ('TEMPORARY', 'CONFIRMED', 'PREPAID_CONFIRMED', 'REFUND_PENDING')
     </select>
 
     <select id="selectAdminReservationList"

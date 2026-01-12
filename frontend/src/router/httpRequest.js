@@ -86,8 +86,8 @@ const generateConfig = (options = {}) => {
 }
 
 export default {
-    get(url, params) {
-        const config = generateConfig();
+    get(url, params, options = {}) {
+        const config = generateConfig(options);
         config.params = params;
         return instance.get(url, config);
     },

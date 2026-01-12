@@ -133,6 +133,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/business/reservations/**").hasAnyAuthority("ROLE_OWNER", "ROLE_STAFF")
                         .requestMatchers(HttpMethod.POST, "/api/business/reservations/**").hasAuthority("ROLE_OWNER")
                         .requestMatchers(HttpMethod.PATCH, "/api/business/reservations/**").hasAuthority("ROLE_OWNER")
+                        .requestMatchers(HttpMethod.GET, "/api/business/restaurants/*/stats/weekly.pdf").hasAuthority("ROLE_OWNER")
 
                         .requestMatchers(HttpMethod.POST, "/api/business/staff").hasAuthority("ROLE_OWNER")
                         .requestMatchers(HttpMethod.DELETE, "/api/business/staff").hasAuthority("ROLE_OWNER")

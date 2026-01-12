@@ -14,7 +14,6 @@ import com.example.LunchGo.reservation.mapper.row.ReservationMenuItemRow;
 import com.example.LunchGo.reservation.repository.PaymentRepository;
 import com.example.LunchGo.reservation.repository.ReservationRepository;
 import com.example.LunchGo.reservation.repository.ReservationSlotRepository;
-import com.example.LunchGo.reservation.service.PortoneVerificationService;
 import com.example.LunchGo.restaurant.entity.Restaurant;
 import com.example.LunchGo.restaurant.repository.RestaurantRepository;
 import com.example.LunchGo.restaurant.stats.RestaurantStatsEventService;
@@ -54,6 +53,8 @@ public class ReservationPaymentService {
     private final OwnerRepository ownerRepository;
     private final UserRepository userRepository;
     private final SmsService smsService;
+    private final PortoneCancelService portoneCancelService;
+
 
     @Transactional
     public CreatePaymentResponse createPayment(Long reservationId, CreatePaymentRequest request) {
@@ -618,4 +619,65 @@ public class ReservationPaymentService {
         }
         return deadline;
     }
+
+    @Transactional
+    public int refundDepositByPolicy(Long reservationId, String reason) {
+        Reservation reservation = getReservation(reservationId);
+
+        Payment payment = paymentRepository.findByReservationIdAndPaymentType(reservationId, "DEPOSIT")
+                .filter(p -> PAYMENT_STATUS_PAID.equals(p.getStatus()))
+                .orElseThrow(() -> new IllegalStateException("환불할 예약금 결제(PAID) 정보를 찾을 수 없습니다."));
+
+        ReservationSlot slot = reservationSlotRepository.findById(reservation.getSlotId())
+                .orElseThrow(() -> new IllegalArgumentException("예약 슬롯 정보를 찾을 수 없습니다."));
+
+        int paidAmount = payment.getAmount() != null ? payment.getAmount() : 0;
+        int partySize = reservation.getPartySize() != null ? reservation.getPartySize() : 0;
+
+        LocalDateTime reservationDateTime = LocalDateTime.of(slot.getSlotDate(), slot.getSlotTime());
+        LocalDateTime now = LocalDateTime.now();
+
+        int refundPercent = computeRefundPercent(now, reservationDateTime, slot.getSlotDate(), partySize, reservation.getStatus());
+        int refundAmount = (int) Math.floor(paidAmount * (refundPercent / 100.0));
+
+        reservation.setStatus(ReservationStatus.REFUND_PENDING);
+
+        if (refundAmount <= 0) {
+            reservation.setStatus(ReservationStatus.CANCELLED);
+            return 0;
+        }
+
+        String finalReason = (reason == null || reason.isBlank()) ? "예약 취소" : reason;
+        portoneCancelService.cancelPayment(payment.getMerchantUid(), finalReason, refundAmount);
+
+        payment.setStatus("CANCELLED");
+        payment.setCancelledAt(LocalDateTime.now());
+
+        reservation.setStatus(ReservationStatus.CANCELLED);
+
+        return refundAmount;
+    }
+
+
+    private int computeRefundPercent(
+            LocalDateTime now,
+            LocalDateTime reservationDateTime,
+            java.time.LocalDate reservationDate,
+            int partySize,
+            ReservationStatus currentStatus
+    ) {
+        if (currentStatus == ReservationStatus.NO_SHOW) return 0;
+        if (!now.isBefore(reservationDateTime)) return 0;
+
+        // [TEST] 전일 100% 비활성화
+        // if (now.toLocalDate().isBefore(reservationDate)) return 100;
+
+        // [TEST] 예약시간 23시간 전까지(포함): 50%
+        //if (!now.isAfter(reservationDateTime.minusHours(18))) return 50;
+
+        return partySize >= 8 ? 10 : 20;
+    }
+
+
+
 }
