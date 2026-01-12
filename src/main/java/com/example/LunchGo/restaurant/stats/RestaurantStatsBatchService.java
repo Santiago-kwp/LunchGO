@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 public class RestaurantStatsBatchService {
     private final RestaurantStatsRedisRepository redisRepository;
     private final RestaurantStatsKeyFactory keyFactory;
-    private final DailyRestaurantStatsRepository statsRepository;
+    private final DailyRestaurantStatsJdbcRepository statsRepository;
 
     @Value("${stats.flush.chunk-size:500}")
     private int chunkSize;

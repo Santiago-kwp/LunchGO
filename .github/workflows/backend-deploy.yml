@@ -78,6 +78,7 @@ jobs:
               docker pull pgw10243/lunchgo-backend:dev
               mkdir -p /var/log/lunchgo
               docker run --env-file /opt/lunchgo/.env \
+                -v /opt/lunchgo/fonts:/app/fonts:ro \
                 -e LOG_PATH=/var/log/lunchgo \
                 -e TZ=Asia/Seoul \
                 -e JAVA_TOOL_OPTIONS=-Duser.timezone=Asia/Seoul \

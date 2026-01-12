@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 @RequiredArgsConstructor
-public class DailyRestaurantStatsRepository {
+public class DailyRestaurantStatsJdbcRepository {
     private static final String UPSERT_SQL =
             "INSERT INTO daily_restaurant_stats (stat_date, restaurant_id, view_count, confirm_count) " +
             "VALUES (?, ?, ?, ?) " +

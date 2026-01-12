@@ -5,8 +5,11 @@ import com.example.LunchGo.restaurant.dto.RestaurantCreateRequest;
 import com.example.LunchGo.restaurant.dto.RestaurantDetailResponse;
 import com.example.LunchGo.restaurant.dto.RestaurantUpdateRequest;
 import com.example.LunchGo.restaurant.service.BusinessRestaurantService;
+import com.example.LunchGo.restaurant.service.RestaurantStatsService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,6 +24,7 @@ import java.util.Optional;
 public class BusinessRestaurantController {
 
     private final BusinessRestaurantService businessRestaurantService;
+    private final RestaurantStatsService restaurantStatsService;
 
     @PreAuthorize("hasAuthority('ROLE_OWNER')")
     @GetMapping("/owner/restaurant")
@@ -87,5 +91,30 @@ public class BusinessRestaurantController {
         return restaurantId.get().equals(id)
                 ? ResponseEntity.ok(updatedRestaurant)
                 : ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_OWNER')")
+    @GetMapping("/restaurants/{id}/stats/weekly.pdf")
+    public ResponseEntity<byte[]> downloadWeeklyStatsPdf(
+            @PathVariable("id") Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build(); //권한 없음
+        }
+        Optional<Long> restaurantId = businessRestaurantService.findRestaurantIdByOwnerId(userDetails.getId());
+        if (restaurantId.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build(); //사용자 찾을 수 없음
+        }
+        if (!restaurantId.get().equals(id)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build(); //접근 금지
+        }
+
+        byte[] pdf = restaurantStatsService.generateWeeklyStatsPdf(id);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "weekly-stats-" + id + ".pdf");
+        headers.setContentLength(pdf.length);
+        return new ResponseEntity<>(pdf, headers, HttpStatus.OK);
     }
 }

@@ -11,6 +11,7 @@ import { useAccountStore } from '@/stores/account';
 const router = useRouter();
 const route = useRoute();
 const restaurantId = computed(() => Number(route.query.restaurantId || 0));
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
 
 /* ====== (추가) 권한 확인: Pinia 우선, 없으면 localStorage ====== */
 const accountStore = useAccountStore();
@@ -306,6 +307,40 @@ const selectDay = (day) => {
   if (!day) return;
   selectedDate.value = new Date(currentMonth.value.getFullYear(), currentMonth.value.getMonth(), day);
 };
+
+
+const downloadWeeklyReport = async () => {
+  const rid = await ensureRestaurantId();
+  if (!rid) return alert("권한이 없습니다.");
+
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    window.alert('로그인이 필요합니다.');
+    return;
+  }
+
+  try {
+    const response = await httpRequest.get(
+      `/api/business/restaurants/${rid}/stats/weekly.pdf`,
+      null,
+      { responseType: 'blob' }
+    );
+
+    const blob = response.data;
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `LunchGo-weekly-stats-${rid}.pdf`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    const status = error?.response?.status ?? 'unknown';
+    window.alert(`문제가 발생했습니다. code: ${status}`);
+  }
+};
+
 </script>
 
 <template>
@@ -324,7 +359,16 @@ const selectDay = (day) => {
 
       <main class="flex-1 overflow-y-auto p-8">
         <div class="max-w-7xl mx-auto space-y-8">
-          <h2 class="text-3xl font-bold text-[#1e3a5f]">전체 예약 관리</h2>
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <h2 class="text-3xl font-bold text-[#1e3a5f]">전체 예약 관리</h2>
+            <button
+              type="button"
+              @click="downloadWeeklyReport"
+              class="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-[#6366F1] via-[#EC4899] to-[#F97316] hover:opacity-90 cursor-pointer"
+            >
+              주간 예약 통계 AI 요약 분석서
+            </button>
+          </div>
 
           <!-- Calendar -->
           <div class="bg-white rounded-xl border border-[#e9ecef] p-6">
