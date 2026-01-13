@@ -20,8 +20,8 @@ defineProps({
     default: 0
   },
   estimatedTime: {
-    type: Number,
-    default: 0
+    type: String,
+    default: '약 5초'
   }
 });
 
@@ -55,7 +55,7 @@ defineEmits(['close']);
             </div>
             <div class="flex justify-between items-center bg-[#f8f9fa] rounded-lg px-4 py-2 border border-[#e9ecef]">
               <span class="text-xs text-[#6c757d]">예상 대기 시간</span>
-              <span class="text-sm font-bold text-[#1e3a5f]">약 {{ estimatedTime }}초</span>
+              <span class="text-sm font-bold text-[#1e3a5f]">{{ estimatedTime }}</span>
             </div>
           </div>
           

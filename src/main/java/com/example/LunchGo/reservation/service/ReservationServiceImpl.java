@@ -57,6 +57,21 @@ public class ReservationServiceImpl implements ReservationService {
     public ReservationCreateResponse create(ReservationCreateRequest request) {
         validate(request);
 
+        /*
+         * [예약 대기열 테스트 가이드]
+         * 1. 아래의 Thread.sleep(10000) 주석을 해제합니다.
+         * 2. 서로 다른 브라우저(예: 크롬 일반/시크릿)에서 각각 다른 계정으로 로그인합니다.
+         * 3. 'A' 브라우저에서 예약 버튼을 눌러 10초간 락을 점유합니다.
+         * 4. 10초가 지나기 전 'B' 브라우저에서 예약 버튼을 누르면 즉시 '대기 중' 모달이 뜨는 것을 확인할 수 있습니다.
+         */
+        /*
+        try {
+            Thread.sleep(10000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        */
+
         // 지정한 날짜+시간대의 예약슬롯을 불러오는 서비스 로직(없으면 신규 생성)
         ReservationSlot slot = reservationSlotService.getValidatedSlot(
                 request.getRestaurantId(),

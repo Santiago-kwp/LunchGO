@@ -75,6 +75,15 @@ public class RedisUtil {
     }
 
     /**
+     * 특정 키에 대한 공정 락(Fair Lock)을 가져옵니다.
+     * FairLock은 요청한 순서대로(FIFO) 락을 획득함을 보장합니다.
+     * 선착순 예약 시스템의 공정성을 위해 사용합니다.
+     */
+    public RLock getFairLock(String lockKey) {
+        return redissonClient.getFairLock(lockKey);
+    }
+
+    /**
      * 대기열(Sorted Set)을 가져옵니다.
      */
     public RScoredSortedSet<String> getScoredSortedSet(String key) {

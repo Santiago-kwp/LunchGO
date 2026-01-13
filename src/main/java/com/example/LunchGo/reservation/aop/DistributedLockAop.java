@@ -15,9 +15,19 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Method;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 
+/**
+ * 분산 락 AOP
+ * @Order(Ordered.HIGHEST_PRECEDENCE) 설정 이유:
+ * - @Transactional 보다 락 AOP가 먼저 실행되어야 함.
+ * - 락 대기 시간(waitTime) 동안 DB 커넥션을 점유하지 않도록 하기 위함 (DB 커넥션 고갈 방지).
+ * - 트랜잭션 시작 전에 락을 잡고, 트랜잭션 종료 후에 락을 해제하는 순서를 보장함.
+ */
 @Aspect
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
 @RequiredArgsConstructor
 @Slf4j
 public class DistributedLockAop {
@@ -47,9 +57,9 @@ public class DistributedLockAop {
             }
         }
 
-        // 2. [식당 락] Redisson (Waiting Queue)
-        // Redisson 키는 보통 LOCK: prefix를 붙여서 구분하기도 함 (여기서는 그대로 사용)
-        RLock rLock = redisUtil.getLock(lockKey);
+        // 2. [식당 락] Redisson FairLock (선착순 보장)
+        // 일반 Lock 대신 FairLock을 사용하여 요청 순서대로 락을 획득하도록 함 (FIFO)
+        RLock rLock = redisUtil.getFairLock(lockKey);
         String waitingCountKey = "waiting_count:" + lockKey;
 
         try {
