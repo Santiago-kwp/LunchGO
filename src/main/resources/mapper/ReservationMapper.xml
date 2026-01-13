@@ -344,5 +344,37 @@
             ]]>
     </select>
 
+    <select id="sumMonthlyCapacityByRestaurant" resultType="int">
+        SELECT COALESCE(SUM(max_capacity), 0)
+        FROM restaurant_reservation_slots
+        WHERE restaurant_id = #{restaurantId}
+          AND slot_date BETWEEN CURDATE() - INTERVAL 29 DAY AND CURDATE()
+    </select>
+
+    <select id="selectLast30DaysReservationTypeStats"
+            resultType="com.example.LunchGo.reservation.mapper.row.ReservationDailyTypeStatsRow">
+      <![CDATA[
+            SELECT
+                s.slot_date AS date,
+                SUM(CASE WHEN r.reservation_type = 'RESERVATION_DEPOSIT'
+                          AND r.status NOT IN ('TEMPORARY', 'EXPIRED')
+                         THEN 1 ELSE 0 END) AS depositCount,
+                SUM(CASE WHEN r.reservation_type = 'PREORDER_PREPAY'
+                          AND r.status NOT IN ('TEMPORARY', 'EXPIRED')
+                         THEN 1 ELSE 0 END) AS preorderCount,
+                SUM(CASE WHEN r.status IN ('CANCELLED', 'REFUND_PENDING', 'REFUNDED')
+                         THEN 1 ELSE 0 END) AS cancellationCount,
+                SUM(CASE WHEN r.status IN ('REFUND_PENDING', 'REFUNDED')
+                         THEN 1 ELSE 0 END) AS refundCount,
+                SUM(CASE WHEN r.status NOT IN ('TEMPORARY', 'EXPIRED')
+                         THEN 1 ELSE 0 END) AS totalCount
+            FROM restaurant_reservation_slots s
+                LEFT JOIN reservations r ON r.slot_id = s.slot_id
+            WHERE s.restaurant_id = #{restaurantId}
+              AND s.slot_date BETWEEN CURDATE() - INTERVAL 29 DAY AND CURDATE()
+            GROUP BY s.slot_date
+            ORDER BY s.slot_date ASC
+            ]]>
+    </select>
 
 </mapper>

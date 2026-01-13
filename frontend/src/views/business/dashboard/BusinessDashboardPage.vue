@@ -7,6 +7,11 @@ import StaffSideBar from '@/components/ui/StaffSideBar.vue';
 import { useRouter, useRoute } from 'vue-router';
 import httpRequest from '@/router/httpRequest';
 import { useAccountStore } from '@/stores/account';
+import { Line } from 'vue-chartjs';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
+
 
 const router = useRouter();
 const route = useRoute();
@@ -210,6 +215,68 @@ const salesStats = computed(() => {
     totalGuests: confirmedList.reduce((sum, r) => sum + r.guests, 0),
   };
 });
+
+// 오늘(선택 날짜) 시간대별 예약 건수 그래프: 확정/대기/취소 분리
+const todayHourlyChartData = computed(() => {
+  const labels = Array.from({ length: 24 }, (_, i) => `${i}시`);
+
+  const confirmed = Array(24).fill(0);
+  const pending = Array(24).fill(0);
+  const cancelled = Array(24).fill(0);
+
+  reservationsForDate.value.forEach(r => {
+    const hour = Number(String(r.time).split(':')[0]);
+    if (Number.isNaN(hour)) return;
+
+    if (r.status === 'confirmed') confirmed[hour]++;
+    else if (r.status === 'pending') pending[hour]++;
+    else if (r.status === 'cancelled') cancelled[hour]++;
+  });
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: '확정',
+        data: confirmed,
+        borderColor: '#FF6B4A',
+        backgroundColor: 'rgba(255,107,74,0.12)',
+        pointBackgroundColor: '#FF6B4A',
+        pointBorderColor: '#FF6B4A',
+        tension: 0.35,
+      },
+      {
+        label: '대기',
+        data: pending,
+        borderColor: '#FF9A76',
+        backgroundColor: 'rgba(255,154,118,0.12)',
+        pointBackgroundColor: '#FF9A76',
+        pointBorderColor: '#FF9A76',
+        tension: 0.35,
+      },
+      {
+        label: '취소',
+        data: cancelled,
+        borderColor: '#FFC4B8',
+        backgroundColor: 'rgba(255,196,184,0.12)',
+        pointBackgroundColor: '#FFC4B8',
+        pointBorderColor: '#FFC4B8',
+        borderDash: [6, 4],
+        tension: 0.35,
+      },
+    ],
+  };
+});
+
+
+const todayHourlyChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  scales: {
+    y: { beginAtZero: true },
+  },
+};
+
 </script>
 
 <template>
@@ -257,6 +324,22 @@ const salesStats = computed(() => {
               <p class="text-4xl font-bold text-[#1e3a5f]">{{ stats.cancelled }}건</p>
             </div>
           </div>
+
+          <!-- 오늘 시간대별 예약 그래프 -->
+          <div class="bg-white rounded-xl border border-[#e9ecef] p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-bold text-[#1e3a5f]">오늘 시간대별 예약</h3>
+            </div>
+
+            <div class="h-56">
+              <Line
+                  v-if="todayHourlyChartData"
+                  :data="todayHourlyChartData"
+                  :options="todayHourlyChartOptions"
+              />
+            </div>
+          </div>
+
 
           <!-- Reservations Table -->
           <div class="bg-white rounded-xl border border-[#e9ecef] overflow-visible">

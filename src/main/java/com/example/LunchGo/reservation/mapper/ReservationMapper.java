@@ -5,6 +5,8 @@ import com.example.LunchGo.reservation.domain.ReservationSlot;
 import com.example.LunchGo.reservation.mapper.row.ReservationCreateRow;
 import java.time.LocalDate;
 import java.time.LocalTime;
+
+import com.example.LunchGo.reservation.mapper.row.ReservationDailyTypeStatsRow;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
@@ -88,4 +90,9 @@ public interface ReservationMapper {
 
     List<com.example.LunchGo.reservation.mapper.row.BusinessVisitNotificationRow>
     selectBusinessVisitNotifications(@Param("restaurantId") Long restaurantId);
+
+    int sumMonthlyCapacityByRestaurant(Long restaurantId);
+
+    List<ReservationDailyTypeStatsRow> selectLast30DaysReservationTypeStats(@Param("restaurantId") Long restaurantId);
+
 }

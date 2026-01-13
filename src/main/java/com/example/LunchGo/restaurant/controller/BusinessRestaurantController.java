@@ -14,6 +14,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import com.example.LunchGo.restaurant.dto.MonthlySettlementResponse;
+import com.example.LunchGo.restaurant.service.BusinessSettlementService;
+
 
 import java.util.Map;
 import java.util.Optional;
@@ -25,6 +28,8 @@ public class BusinessRestaurantController {
 
     private final BusinessRestaurantService businessRestaurantService;
     private final RestaurantStatsService restaurantStatsService;
+    private final BusinessSettlementService businessSettlementService;
+
 
     @PreAuthorize("hasAuthority('ROLE_OWNER')")
     @GetMapping("/owner/restaurant")
@@ -114,4 +119,18 @@ public class BusinessRestaurantController {
         headers.setContentLength(pdf.length);
         return new ResponseEntity<>(pdf, headers, HttpStatus.OK);
     }
+
+    @PreAuthorize("hasAuthority('ROLE_OWNER')")
+    @GetMapping("/restaurants/{id}/settlement/last30days")
+    public ResponseEntity<MonthlySettlementResponse> getLast30DaysSettlement(
+            @PathVariable("id") Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        Optional<Long> restaurantId = businessRestaurantService.findRestaurantIdByOwnerId(userDetails.getId());
+        if (restaurantId.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        if (!restaurantId.get().equals(id)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        return ResponseEntity.ok(businessSettlementService.getLast30Days(id));
+    }
+
 }

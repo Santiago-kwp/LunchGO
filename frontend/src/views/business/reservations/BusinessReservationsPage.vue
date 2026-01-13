@@ -7,6 +7,16 @@ import StaffSideBar from '@/components/ui/StaffSideBar.vue';
 import { useRouter, useRoute } from 'vue-router';
 import httpRequest from '@/router/httpRequest';
 import { useAccountStore } from '@/stores/account';
+import { Line } from 'vue-chartjs';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend
+} from 'chart.js';
 
 const router = useRouter();
 const route = useRoute();
@@ -75,6 +85,22 @@ const dateFilteredReservations = computed(() => {
 });
 
 const reservations = ref([]);
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
+
+const settlement = ref(null);
+
+const loadSettlement = async (rid) => {
+  const targetRid = Number(rid || restaurantId.value || 0);
+  if (!targetRid) return;
+
+  try {
+    const res = await httpRequest.get(`/api/business/restaurants/${targetRid}/settlement/last30days`);
+    settlement.value = res.data;
+  } catch (e) {
+    console.error('정산(30일) 조회 실패:', e);
+  }
+};
 
 // 통계
 const stats = computed(() => ({
@@ -202,6 +228,7 @@ onMounted(async () => {
   const rid = await ensureRestaurantId();
   if (rid) {
     await loadReservations(rid);
+    await loadSettlement(rid);
   }
 });
 
@@ -341,6 +368,111 @@ const downloadWeeklyReport = async () => {
   }
 };
 
+const settlementChartData = computed(() => {
+  if (!settlement.value?.daily) return null;
+
+  const labels = settlement.value.daily.map(d => d.date);
+
+  const depositSeries = settlement.value.daily.map(d => d.depositReservations ?? 0);
+  const preorderSeries = settlement.value.daily.map(d => d.preorderReservations ?? 0);
+
+  const cancelRateSeries = settlement.value.daily.map(d => d.cancellationRate ?? 0);
+  const refundRateSeries = settlement.value.daily.map(d => d.refundRate ?? 0);
+
+  const datasets = [
+    {
+      label: '예약하기',
+      data: depositSeries,
+      yAxisID: 'y',
+      borderColor: '#FF6B4A',
+      backgroundColor: 'rgba(255,107,74,0.15)',
+      pointBackgroundColor: '#FF6B4A',
+      pointBorderColor: '#FF6B4A',
+      tension: 0.35,
+    },
+  ];
+
+  if (settlement.value.preorderAvailable) {
+    datasets.push({
+      label: '선주문/선결제',
+      data: preorderSeries,
+      yAxisID: 'y',
+      borderColor: '#FFC4B8',
+      backgroundColor: 'rgba(255,196,184,0.18)',
+      pointBackgroundColor: '#FFC4B8',
+      pointBorderColor: '#FFC4B8',
+      tension: 0.35,
+    });
+  }
+
+  datasets.push(
+      {
+        label: '취소율(%)',
+        data: cancelRateSeries,
+        yAxisID: 'y1',
+        borderColor: '#FF8A5B',
+        backgroundColor: 'rgba(255,138,91,0.12)',
+        pointBackgroundColor: '#FF8A5B',
+        pointBorderColor: '#FF8A5B',
+        borderDash: [6, 4],
+        tension: 0.35,
+      },
+      {
+        label: '환불율(%)',
+        data: refundRateSeries,
+        yAxisID: 'y1',
+        borderColor: '#FFB199',
+        backgroundColor: 'rgba(255,177,153,0.12)',
+        pointBackgroundColor: '#FFB199',
+        pointBorderColor: '#FFB199',
+        borderDash: [2, 3],
+        tension: 0.35,
+      }
+  );
+
+
+  return { labels, datasets };
+});
+
+
+const cancellationChartData = computed(() => {
+  if (!settlement.value?.daily) return null;
+
+  const labels = settlement.value.daily.map(d => d.date);
+  const cancelRateSeries = settlement.value.daily.map(d => d.cancellationRate ?? 0);
+
+  return {
+    labels,
+    datasets: [
+      { label: '취소율(%)', data: cancelRateSeries }
+    ]
+  };
+});
+
+
+const settlementChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  scales: {
+    y: {
+      beginAtZero: true,
+      position: 'left',
+      title: { display: true, text: '예약 건수' },
+    },
+    y1: {
+      beginAtZero: true,
+      min: 0,
+      max: 100,
+      position: 'right',
+      grid: { drawOnChartArea: false }, // %축 격자 겹침 방지
+      title: { display: true, text: '비율(%)' },
+    },
+  },
+};
+
+
+
+
 </script>
 
 <template>
@@ -357,8 +489,8 @@ const downloadWeeklyReport = async () => {
     <div class="flex-1 flex flex-col overflow-hidden">
       <BusinessHeader />
 
+
       <main class="flex-1 overflow-y-auto p-8">
-        <div class="max-w-7xl mx-auto space-y-8">
           <div class="flex flex-wrap items-center justify-between gap-4">
             <h2 class="text-3xl font-bold text-[#1e3a5f]">전체 예약 관리</h2>
             <button
@@ -368,6 +500,49 @@ const downloadWeeklyReport = async () => {
             >
               주간 예약 통계 AI 요약 분석서
             </button>
+          </div>
+
+            <div class="max-w-7xl mx-auto space-y-8">
+              <!-- 정산(최근 30일) 요약 + 추이 -->
+              <div v-if="settlement" class="space-y-6">
+                <!-- Summary Cards (기존 Stats Cards 톤 그대로) -->
+                <div class="grid grid-cols-4 gap-6">
+                  <div class="bg-white rounded-xl border border-[#e9ecef] p-6">
+                    <p class="text-sm text-[#6c757d] mb-2">최근 30일 예약</p>
+                    <p class="text-4xl font-bold text-[#1e3a5f]">{{ settlement.reservationCount }}건</p>
+                  </div>
+
+                  <div class="bg-white rounded-xl border border-[#e9ecef] p-6">
+                    <p class="text-sm text-[#6c757d] mb-2">최근 30일 매출</p>
+                    <p class="text-4xl font-bold text-[#1e3a5f]">{{ Number(settlement.totalSales).toLocaleString() }}원</p>
+                  </div>
+
+                  <div class="bg-white rounded-xl border border-[#e9ecef] p-6">
+                    <p class="text-sm text-[#6c757d] mb-2">예약율</p>
+                    <p class="text-4xl font-bold text-[#1e3a5f]">{{ settlement.reservationRate }}%</p>
+                  </div>
+
+                  <div class="bg-white rounded-xl border border-[#e9ecef] p-6">
+                    <p class="text-sm text-[#6c757d] mb-2">총 수용 인원</p>
+                    <p class="text-4xl font-bold text-[#1e3a5f]">{{ settlement.totalCapacity }}명</p>
+                  </div>
+                </div>
+
+
+            <!-- Chart Card (기존 섹션 카드 톤 그대로) -->
+            <div class="bg-white rounded-xl border border-[#e9ecef] p-6">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-[#1e3a5f]">최근 30일 예약 추이</h3>
+              </div>
+
+              <div class="h-64">
+                <Line
+                    v-if="settlementChartData"
+                    :data="settlementChartData"
+                    :options="settlementChartOptions"
+                />
+              </div>
+            </div>
           </div>
 
           <!-- Calendar -->
