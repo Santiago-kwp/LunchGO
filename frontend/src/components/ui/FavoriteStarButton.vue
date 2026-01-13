@@ -14,7 +14,7 @@ const props = defineProps({
   buttonClass: {
     type: String,
     default:
-      "absolute top-3 right-3 z-10 p-2 rounded-full bg-white/90 shadow-card text-[#c4c4c4] hover:text-[#ff6b4a] transition-colors",
+      "absolute top-3 right-3 z-10 p-2 rounded-full bg-white/95 border border-[#e9ecef] shadow-card text-[#adb5bd] hover:text-[#ff6b4a] hover:bg-[#f8f9fa] transition-colors",
   },
   initialFavorite: {
     type: Boolean,
@@ -85,7 +85,7 @@ const toggleFavorite = async () => {
   <button
     type="button"
     ref="buttonRef"
-    :class="buttonClass"
+    :class="[buttonClass, isActive ? 'border-transparent' : '']"
     :aria-pressed="ariaPressed"
     @click.stop.prevent="toggleFavorite"
   >

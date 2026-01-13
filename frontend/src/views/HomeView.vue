@@ -155,6 +155,87 @@ const categories = ref([]);
 const restaurantTags = ref([]);
 const ingredients = ref([]);
 const hasAutoRefreshedCafeteria = ref(false);
+const isBudgetLoading = ref(false);
+const isCafeteriaLoading = ref(false);
+const ingredientEmojiMap = {
+  계란: "🥚",
+  우유: "🥛",
+  유제품: "🥛",
+  치즈: "🧀",
+  땅콩: "🥜",
+  견과류: "🥜",
+  아몬드: "🥜",
+  호두: "🥜",
+  대두: "🫘",
+  콩: "🫘",
+  밀: "🌾",
+  메밀: "🌾",
+  새우: "🦐",
+  게: "🦀",
+  갑각류: "🦐",
+  오징어: "🦑",
+  생선: "🐟",
+  조개: "🐚",
+  굴: "🦪",
+  토마토: "🍅",
+  복숭아: "🍑",
+  닭: "🍗",
+  돼지: "🐷",
+  소고기: "🥩",
+  고수: "🌿",
+  오이: "🥒",
+  비건: "🥗",
+  매운: "🌶️",
+  매운맛: "🌶️",
+};
+
+const getIngredientEmoji = (ingredient) => {
+  if (!ingredient) return "";
+  const match = Object.entries(ingredientEmojiMap).find(([key]) =>
+    ingredient.includes(key)
+  );
+  return match ? match[1] : "";
+};
+
+const restaurantTagEmojiMap = {
+  단체: "👥",
+  회식: "🍻",
+  모임: "🧑‍🤝‍🧑",
+  혼밥: "🍽️",
+  가족: "👨‍👩‍👧‍👦",
+  데이트: "💕",
+  뷰: "🌆",
+  경치: "🌆",
+  분위기: "🕯️",
+  조용: "🤫",
+  활기: "🎉",
+  룸: "🚪",
+  프라이빗: "🔒",
+  와인: "🍷",
+  주류: "🍺",
+  가성비: "💸",
+  예약: "📌",
+  주차: "🅿️",
+  포장: "🥡",
+  배달: "🛵",
+  반려동물: "🐾",
+  키즈: "🧒",
+  휠체어: "♿",
+  장애인: "♿",
+  콜키지: "🍷",
+  와이파이: "📶",
+  WiFi: "📶",
+  와이파이존: "📶",
+  "24시간": "🕒",
+};
+
+const getRestaurantTagEmoji = (tag) => {
+  if (!tag) return "";
+  const match = Object.entries(restaurantTagEmojiMap).find(([key]) =>
+    tag.includes(key)
+  );
+  return match ? match[1] : "";
+};
 
 const fetchSearchTags = async () => {
   try {
@@ -296,6 +377,10 @@ const {
   applyUserMapCenter,
   isWithinDistance,
   calculateDistanceKm,
+  drawRoute,
+  clearRoute,
+  setRouteFocus,
+  clearRouteFocus,
 } = useHomeMap({
   isLoggedIn,
   fetchUserAddress,
@@ -409,9 +494,37 @@ const weatherThemeStyle = computed(() => {
 const formatTemp = (value) =>
   Number.isFinite(value) ? `${Math.round(value)}°` : "--°";
 const weatherDisplayLabel = computed(() => weatherThemeStyle.value?.label || "");
+const formatRouteDistance = (meters) => {
+  if (!Number.isFinite(meters)) return "-";
+  if (meters < 1000) return `${Math.round(meters)}m`;
+  return `${(meters / 1000).toFixed(1)}km`;
+};
+const formatRouteDuration = (seconds) => {
+  if (!Number.isFinite(seconds)) return "-";
+  const totalMinutes = Math.round(seconds / 60);
+  if (totalMinutes < 60) return `${totalMinutes}분`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}시간 ${minutes}분`;
+};
+const isRecommendationLoading = computed(() => {
+  if (selectedRecommendation.value === RECOMMEND_WEATHER) {
+    return isWeatherLoading.value;
+  }
+  if (selectedRecommendation.value === RECOMMEND_TASTE) {
+    return isTagMappingLoading.value;
+  }
+  if (selectedRecommendation.value === RECOMMEND_BUDGET) {
+    return isBudgetLoading.value;
+  }
+  return false;
+});
 
 const restaurantsPerPage = 10;
 const currentPage = ref(1);
+const routeInfo = ref(null);
+const routeError = ref("");
+const routeLoadingId = ref(null);
 const isTrendingSort = computed(() => selectedRecommendation.value === RECOMMEND_TRENDING);
 const restaurantIndexById = new Map(
     restaurants.map((restaurant) => [String(restaurant.id), restaurant])
@@ -457,6 +570,59 @@ const getSortId = (restaurant) => {
   const value = Number(restaurant?.id);
   return Number.isFinite(value) ? value : 0;
 };
+const handleCheckRoute = async (restaurant) => {
+  if (!restaurant) return;
+  routeError.value = "";
+  routeInfo.value = null;
+  routeLoadingId.value = restaurant.id ?? restaurant.restaurantId ?? null;
+
+  try {
+    const coords = await resolveRestaurantCoords(restaurant);
+    if (!coords) {
+      routeError.value = "경로를 확인할 수 없습니다.";
+      return;
+    }
+    setRouteFocus(coords, restaurant.name);
+    if (
+      !Number.isFinite(mapCenter.value?.lat) ||
+      !Number.isFinite(mapCenter.value?.lng)
+    ) {
+      routeError.value = "회사 위치를 확인할 수 없습니다.";
+      return;
+    }
+    const response = await httpRequest.post("/api/map/route", {
+      origin: { lat: mapCenter.value.lat, lng: mapCenter.value.lng },
+      destination: { lat: coords.lat, lng: coords.lng },
+    });
+    const data = response?.data || {};
+    if (Array.isArray(data.path) && data.path.length) {
+      drawRoute(data.path);
+    }
+    setRouteFocus(coords, restaurant.name);
+    routeInfo.value = {
+      restaurantId: restaurant.id ?? restaurant.restaurantId ?? null,
+      restaurantName: restaurant.name,
+      distanceMeters: data.distanceMeters ?? null,
+      durationSeconds: data.durationSeconds ?? null,
+    };
+  } catch (error) {
+    routeError.value = "경로를 불러오지 못했습니다.";
+  } finally {
+    routeLoadingId.value = null;
+  }
+};
+
+const clearRouteInfo = () => {
+  routeInfo.value = null;
+  routeError.value = "";
+  routeLoadingId.value = null;
+  clearRoute();
+  clearRouteFocus();
+};
+
+watch(selectedRecommendation, () => {
+  clearRouteInfo();
+});
 const processedRestaurants = computed(() => {
   let result = activeRestaurantSource.value.slice();
 
@@ -1018,6 +1184,23 @@ const resetFilters = () => {
   clearTagMappingRecommendations();
 };
 
+const runBudgetRecommendations = (budget) => {
+  isBudgetLoading.value = true;
+  setTimeout(() => {
+    fetchBudgetRecommendations(budget);
+    isBudgetLoading.value = false;
+  }, 0);
+};
+
+const runCafeteriaRecommendations = async (baseDate) => {
+  isCafeteriaLoading.value = true;
+  try {
+    await requestCafeteriaRecommendations(baseDate);
+  } finally {
+    isCafeteriaLoading.value = false;
+  }
+};
+
 const closeFilterModal = () => {
   resetFilters();
   selectedSort.value = sortOptions[0];
@@ -1040,7 +1223,7 @@ const handleCafeteriaMenuEdit = () => {
 };
 
 const handleCafeteriaRecommendNow = async () => {
-  await requestCafeteriaRecommendations(resolveCafeteriaBaseDate());
+  await runCafeteriaRecommendations(resolveCafeteriaBaseDate());
   isFilterOpen.value = false;
 };
 
@@ -1315,7 +1498,7 @@ onMounted(async () => {
         }
       }
       if (selectedRecommendation.value === RECOMMEND_BUDGET) {
-        fetchBudgetRecommendations(filterPerPersonBudget.value);
+        runBudgetRecommendations(filterPerPersonBudget.value);
       }
       if (selectedRecommendation.value === RECOMMEND_WEATHER) {
         fetchWeatherRecommendationsForCenter();
@@ -1379,7 +1562,7 @@ const {
   filterForm,
   sortOptions,
   filterPerPersonBudget,
-  fetchBudgetRecommendations,
+  fetchBudgetRecommendations: runBudgetRecommendations,
   clearBudgetRecommendations,
   fetchWeatherRecommendations: fetchWeatherRecommendationsForCenter,
   clearWeatherRecommendations,
@@ -1391,7 +1574,7 @@ const {
   resolveCafeteriaBaseDate,
   checkCafeteriaMenuStatus,
   openCafeteriaModal,
-  requestCafeteriaRecommendations,
+  requestCafeteriaRecommendations: runCafeteriaRecommendations,
   hasConfirmedMenus,
   currentPage,
   isFilterOpen,
@@ -1460,10 +1643,10 @@ onBeforeUnmount(() => {
       <div class="relative h-64">
         <div ref="mapContainer" class="w-full h-full" />
         <div
-            class="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/20 via-transparent to-transparent"
+            class="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/20 via-transparent to-transparent z-0"
         />
         <div
-            class="absolute top-4 right-4 z-10 pointer-events-auto flex flex-col items-center gap-2"
+            class="absolute top-4 right-4 z-20 pointer-events-auto flex flex-col items-center gap-2"
         >
           <button
               @click="changeMapDistance(-1)"
@@ -1492,10 +1675,30 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <div
-            class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-card flex items-center gap-2 text-sm text-[#1e3a5f]"
+          v-if="routeInfo || routeError"
+          class="absolute bottom-4 right-4 z-20 max-w-[220px] bg-white/95 backdrop-blur px-3 py-2 rounded-xl shadow-card text-xs text-[#1e3a5f]"
         >
-          <MapPin class="w-4 h-4 text-[#ff6b4a]" />
-          <span>{{ currentLocation }} · {{ currentDistanceLabel }} 반경</span>
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <p v-if="routeInfo" class="font-semibold truncate">
+                {{ routeInfo.restaurantName }}
+              </p>
+              <p v-if="routeError" class="text-red-500">
+                {{ routeError }}
+              </p>
+              <p v-else class="text-[11px] text-[#6c757d] mt-1">
+                거리 {{ formatRouteDistance(routeInfo?.distanceMeters) }} ·
+                예상 {{ formatRouteDuration(routeInfo?.durationSeconds) }}
+              </p>
+            </div>
+            <button
+              type="button"
+              class="text-[#adb5bd] hover:text-[#6c757d]"
+              @click="clearRouteInfo"
+            >
+              <X class="w-3 h-3" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1581,11 +1784,16 @@ onBeforeUnmount(() => {
             :isTrendingLoading="isTrendingLoading"
             :trendingError="trendingError"
             :trendingCards="trendingCards"
-            :isWeatherLoading="isWeatherLoading"
+            :isRecommendationLoading="isRecommendationLoading"
+            :isCafeteriaLoading="isCafeteriaLoading"
             :tagMappingNotice="tagMappingNotice"
             :tasteRecommendationSummary="tasteRecommendationSummary"
             :filterPerPersonBudgetDisplay="filterPerPersonBudgetDisplay"
             :paginatedRestaurants="paginatedRestaurants"
+            :showRouteButton="Boolean(selectedRecommendation)"
+            :onCheckRoute="handleCheckRoute"
+            :routeLoadingId="routeLoadingId"
+            :routeInfo="routeInfo"
             :onSelectRecommendation="handleRecommendationQuickSelect"
             :onOpenSearch="() => (isSearchOpen = true)"
             :onClearCafeteria="() => clearRecommendation(RECOMMEND_CAFETERIA)"
@@ -2065,7 +2273,12 @@ onBeforeUnmount(() => {
                     : 'bg-[#f8f9fa] text-gray-700 hover:bg-[#e9ecef]'
                 }`"
               >
-                {{ tag }}
+                <span class="inline-flex items-center gap-2">
+                  <span v-if="getRestaurantTagEmoji(tag)" class="text-base">
+                    {{ getRestaurantTagEmoji(tag) }}
+                  </span>
+                  <span>{{ tag }}</span>
+                </span>
               </button>
             </div>
           </div>
@@ -2084,7 +2297,12 @@ onBeforeUnmount(() => {
                     : 'bg-[#f8f9fa] text-gray-700 hover:bg-[#e9ecef]'
                 }`"
               >
-                {{ ingredient }}
+                <span class="inline-flex items-center gap-2">
+                  <span v-if="getIngredientEmoji(ingredient)" class="text-base">
+                    {{ getIngredientEmoji(ingredient) }}
+                  </span>
+                  <span>{{ ingredient }}</span>
+                </span>
               </button>
             </div>
           </div>

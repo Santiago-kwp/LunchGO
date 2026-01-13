@@ -320,6 +320,21 @@ const sharedFolders = computed(() => {
   return [...approvedSent, ...approvedReceived];
 });
 
+const pendingSentLinks = computed(() =>
+  sentLinks.value.filter((item) => item.status === 'PENDING')
+);
+const pendingReceivedLinks = computed(() =>
+  receivedLinks.value.filter((item) => item.status === 'PENDING')
+);
+const selectedSharedUser = computed(() => {
+  if (selectedSharedUserId.value === null) return null;
+  return (
+    sharedFolders.value.find(
+      (link) => link.counterpartId === selectedSharedUserId.value
+    ) || null
+  );
+});
+
 const statusLabel = (status: LinkItem['status']) => {
   if (status === 'APPROVED') return '승인됨';
   if (status === 'REJECTED') return '거절됨';
@@ -410,12 +425,12 @@ const statusLabel = (status: LinkItem['status']) => {
         <div class="bg-white border border-[#e9ecef] rounded-xl p-4 shadow-sm">
           <h4 class="font-semibold text-[#1e3a5f] text-sm mb-3">링크 요청함</h4>
           <div v-if="isLinkLoading" class="text-xs text-[#1e3a5f]">불러오는 중...</div>
-          <div v-else-if="sentLinks.length === 0" class="text-xs text-[#1e3a5f]">
+          <div v-else-if="pendingSentLinks.length === 0" class="text-xs text-[#1e3a5f]">
             요청한 링크가 없습니다.
           </div>
           <div v-else class="space-y-2">
             <div
-              v-for="link in sentLinks"
+              v-for="link in pendingSentLinks"
               :key="link.linkId"
               class="flex items-center justify-between text-xs border border-[#e9ecef] rounded-lg px-3 py-2"
             >
@@ -433,9 +448,13 @@ const statusLabel = (status: LinkItem['status']) => {
                 </div>
               </div>
               <div class="flex items-center gap-2">
-                <span class="text-[#1e3a5f]">{{ statusLabel(link.status) }}</span>
+                <span
+                  class="text-[11px] px-2 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200"
+                >
+                  {{ statusLabel(link.status) }}
+                </span>
                 <button
-                  class="text-xs text-[#ff6b4a]"
+                  class="text-xs text-[#ff6b4a] font-semibold"
                   @click="handleDeleteLink(link.counterpartId)"
                 >
                   삭제
@@ -448,12 +467,12 @@ const statusLabel = (status: LinkItem['status']) => {
         <div class="bg-white border border-[#e9ecef] rounded-xl p-4 shadow-sm">
           <h4 class="font-semibold text-[#1e3a5f] text-sm mb-3">링크 수신함</h4>
           <div v-if="isLinkLoading" class="text-xs text-[#1e3a5f]">불러오는 중...</div>
-          <div v-else-if="receivedLinks.length === 0" class="text-xs text-[#1e3a5f]">
+          <div v-else-if="pendingReceivedLinks.length === 0" class="text-xs text-[#1e3a5f]">
             수신된 링크가 없습니다.
           </div>
           <div v-else class="space-y-2">
             <div
-              v-for="link in receivedLinks"
+              v-for="link in pendingReceivedLinks"
               :key="link.linkId"
               class="flex items-center justify-between text-xs border border-[#e9ecef] rounded-lg px-3 py-2"
             >
@@ -471,28 +490,25 @@ const statusLabel = (status: LinkItem['status']) => {
                 </div>
               </div>
               <div class="flex items-center gap-2">
-                <span class="text-[#1e3a5f]">{{ statusLabel(link.status) }}</span>
-                <div v-if="link.status === 'PENDING'" class="flex gap-2">
+                <span
+                  class="text-[11px] px-2 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200"
+                >
+                  {{ statusLabel(link.status) }}
+                </span>
+                <div class="flex gap-2">
                   <button
-                    class="text-xs text-[#1e3a5f]"
+                    class="text-xs text-[#1e3a5f] font-semibold"
                     @click="handleRespondLink(link.linkId, 'APPROVED')"
                   >
                     수락
                   </button>
                   <button
-                    class="text-xs text-[#ff6b4a]"
+                    class="text-xs text-[#ff6b4a] font-semibold"
                     @click="handleRespondLink(link.linkId, 'REJECTED')"
                   >
-                    거절
+                    삭제
                   </button>
                 </div>
-                <button
-                  v-else
-                  class="text-xs text-[#ff6b4a]"
-                  @click="handleDeleteLink(link.counterpartId)"
-                >
-                  삭제
-                </button>
               </div>
             </div>
           </div>
@@ -507,7 +523,12 @@ const statusLabel = (status: LinkItem['status']) => {
             <button
               v-for="link in sharedFolders"
               :key="link.linkId"
-              class="w-full text-left border border-[#e9ecef] rounded-lg px-3 py-2 text-xs hover:bg-[#f8f9fa]"
+              :class="[
+                'w-full text-left border rounded-lg px-3 py-2 text-xs transition-colors',
+                selectedSharedUserId === link.counterpartId
+                  ? 'border-[#ff6b4a] bg-[#fff5f3]'
+                  : 'border-[#e9ecef] hover:bg-[#f8f9fa]',
+              ]"
               @click="handleOpenSharedFolder(link.counterpartId)"
             >
               <div class="flex items-center gap-3">
@@ -528,7 +549,24 @@ const statusLabel = (status: LinkItem['status']) => {
 
           <div v-if="selectedSharedUserId !== null" class="mt-3">
             <div class="flex items-center justify-between mb-2">
-              <p class="text-xs font-semibold text-[#1e3a5f]">공유된 즐겨찾기</p>
+              <div class="flex items-center gap-2">
+                <img
+                  v-if="selectedSharedUser"
+                  :src="resolveProfileImage(selectedSharedUser.counterpartImage)"
+                  :alt="selectedSharedUser.counterpartNickname || selectedSharedUser.counterpartName"
+                  class="w-6 h-6 rounded-full object-cover border border-[#e9ecef] bg-white"
+                />
+                <div>
+                  <p class="text-xs font-semibold text-[#1e3a5f]">
+                    {{ selectedSharedUser
+                      ? `${selectedSharedUser.counterpartNickname || selectedSharedUser.counterpartName}님의 공유 폴더`
+                      : '공유된 즐겨찾기' }}
+                  </p>
+                  <p v-if="selectedSharedUser" class="text-[10px] text-[#1e3a5f]">
+                    {{ selectedSharedUser.counterpartEmail }}
+                  </p>
+                </div>
+              </div>
               <button
                 class="text-xs text-[#1e3a5f]"
                 @click="handleOpenSharedFolder(selectedSharedUserId)"

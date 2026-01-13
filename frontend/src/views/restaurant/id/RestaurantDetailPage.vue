@@ -91,6 +91,12 @@ const handleNextImage = () => {
 const detailMapContainer = ref(null);
 let detailMapInstance = null;
 let detailMarker = null;
+const detailKakaoMapsApi = ref(null);
+const detailRoutePolyline = ref(null);
+const detailRouteOriginMarker = ref(null);
+const routeInfo = ref(null);
+const routeError = ref('');
+const isRouteLoading = ref(false);
 const detailMapDistanceSteps = Object.freeze([
   { label: '100m', level: 2 },
   { label: '250m', level: 3 },
@@ -118,6 +124,18 @@ const detailDistanceSliderFill = computed(() => {
     100
   );
 });
+
+const formatRouteDistance = (meters) => {
+  if (!Number.isFinite(meters)) return '-';
+  if (meters < 1000) return `${Math.round(meters)}m`;
+  return `${(meters / 1000).toFixed(1)}km`;
+};
+
+const formatRouteDuration = (seconds) => {
+  if (!Number.isFinite(seconds)) return '-';
+  const totalMinutes = Math.max(1, Math.round(seconds / 60));
+  return `${totalMinutes}분`;
+};
 
 const representativeReviews = ref([]);
 const restaurantReviewSummary = ref(null);
@@ -231,6 +249,17 @@ const fetchRestaurantDetail = async () => {
   }
 };
 
+const fetchCompanyAddress = async () => {
+  const id = userId.value;
+  if (!id) return null;
+  try {
+    const response = await httpRequest.get(`/api/info/user/${id}`);
+    return response.data?.companyAddress || null;
+  } catch (error) {
+    return null;
+  }
+};
+
 const loadRepresentativeReviews = async () => {
   try {
     const response = await axios.get(`/api/restaurants/${restaurantId}/reviews`, {
@@ -313,6 +342,7 @@ const initializeDetailMap = async () => {
   }
   try {
     const kakaoMaps = await loadKakaoMaps();
+    detailKakaoMapsApi.value = kakaoMaps;
     const center = new kakaoMaps.LatLng(
       restaurantInfo.value.coords.lat,
       restaurantInfo.value.coords.lng,
@@ -342,6 +372,117 @@ const initializeDetailMap = async () => {
     applyDetailMapZoom();
   } catch (error) {
     console.error('식당 위치 지도를 불러오지 못했습니다.', error);
+  }
+};
+
+const clearDetailRoute = () => {
+  if (detailRoutePolyline.value) {
+    detailRoutePolyline.value.setMap(null);
+    detailRoutePolyline.value = null;
+  }
+  if (detailRouteOriginMarker.value) {
+    detailRouteOriginMarker.value.setMap(null);
+    detailRouteOriginMarker.value = null;
+  }
+};
+
+const drawDetailRoute = (pathPoints = []) => {
+  if (!detailMapInstance || !detailKakaoMapsApi.value) return;
+  clearDetailRoute();
+  if (!Array.isArray(pathPoints) || !pathPoints.length) return;
+
+  const kakaoMaps = detailKakaoMapsApi.value;
+  const path = pathPoints
+    .filter((point) => Number.isFinite(point?.lat) && Number.isFinite(point?.lng))
+    .map((point) => new kakaoMaps.LatLng(point.lat, point.lng));
+  if (path.length < 2) return;
+
+  detailRoutePolyline.value = new kakaoMaps.Polyline({
+    path,
+    strokeWeight: 6,
+    strokeColor: '#d9480f',
+    strokeOpacity: 0.95,
+    strokeStyle: 'solid',
+  });
+  detailRoutePolyline.value.setMap(detailMapInstance);
+
+  const bounds = new kakaoMaps.LatLngBounds();
+  path.forEach((point) => bounds.extend(point));
+  detailMapInstance.setBounds(bounds, 20, 20, 20, 20);
+};
+
+const renderRouteOriginMarker = (coords) => {
+  if (!detailMapInstance || !detailKakaoMapsApi.value) return;
+  const kakaoMaps = detailKakaoMapsApi.value;
+  const markerSvg =
+    "data:image/svg+xml;utf8," +
+    "<svg xmlns='http://www.w3.org/2000/svg' width='32' height='46' viewBox='0 0 32 46'>" +
+    "<path d='M16 1C8.8 1 3 6.8 3 14c0 9.3 13 30 13 30s13-20.7 13-30C29 6.8 23.2 1 16 1z' fill='%231e3a5f' stroke='white' stroke-width='2'/>" +
+    "<circle cx='16' cy='14' r='5' fill='white'/>" +
+    '</svg>';
+  const markerImage = new kakaoMaps.MarkerImage(
+    markerSvg,
+    new kakaoMaps.Size(32, 46),
+    { offset: new kakaoMaps.Point(16, 46) },
+  );
+  if (detailRouteOriginMarker.value) {
+    detailRouteOriginMarker.value.setMap(null);
+  }
+  detailRouteOriginMarker.value = new kakaoMaps.Marker({
+    position: new kakaoMaps.LatLng(coords.lat, coords.lng),
+    title: '회사',
+    image: markerImage,
+  });
+  detailRouteOriginMarker.value.setMap(detailMapInstance);
+};
+
+const handleCheckRoute = async () => {
+  if (!restaurantInfo.value?.coords) {
+    routeError.value = '식당 위치를 확인할 수 없습니다.';
+    return;
+  }
+  if (!isLoggedIn.value) {
+    routeError.value = '로그인 후 경로를 확인할 수 있습니다.';
+    return;
+  }
+
+  isRouteLoading.value = true;
+  routeError.value = '';
+  routeInfo.value = null;
+
+  try {
+    if (!detailMapInstance && detailMapContainer.value) {
+      await nextTick();
+      await initializeDetailMap();
+    }
+    const companyAddress = await fetchCompanyAddress();
+    if (!companyAddress) {
+      routeError.value = '회사 주소를 등록해 주세요.';
+      return;
+    }
+    const originCoords = await geocodeAddress(companyAddress);
+    if (!originCoords) {
+      routeError.value = '회사 위치를 확인할 수 없습니다.';
+      return;
+    }
+    const destinationCoords = restaurantInfo.value.coords;
+    const response = await httpRequest.post('/api/map/route', {
+      origin: { lat: originCoords.lat, lng: originCoords.lng },
+      destination: { lat: destinationCoords.lat, lng: destinationCoords.lng },
+    });
+    const data = response?.data || {};
+    if (Array.isArray(data.path) && data.path.length) {
+      drawDetailRoute(data.path);
+    }
+    renderRouteOriginMarker(originCoords);
+    routeInfo.value = {
+      distanceMeters: data.distanceMeters ?? null,
+      durationSeconds: data.durationSeconds ?? null,
+    };
+  } catch (error) {
+    routeError.value = '경로를 불러오지 못했습니다.';
+  } finally {
+    isRouteLoading.value = false;
   }
 };
 
@@ -384,6 +525,7 @@ onBeforeUnmount(() => {
   if (detailMarker) {
     detailMarker.setMap(null);
   }
+  clearDetailRoute();
   detailMarker = null;
   detailMapInstance = null;
 });
@@ -391,6 +533,9 @@ onBeforeUnmount(() => {
 watch(restaurantInfo, async (newValue) => {
   if (newValue && newValue.coords) {
     await nextTick();
+    clearDetailRoute();
+    routeInfo.value = null;
+    routeError.value = '';
     initializeDetailMap();
   }
 });
@@ -535,7 +680,32 @@ watch(detailMapDistanceStepIndex, () => {
         </div>
 
         <div class="px-4 py-5 bg-white border-b border-[#e9ecef]">
-          <h3 class="text-lg font-semibold text-[#1e3a5f] mb-3">위치 안내</h3>
+          <div class="flex items-center gap-3 mb-3">
+            <h3 class="text-lg font-semibold text-[#1e3a5f]">위치 안내</h3>
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors"
+                :class="routeInfo
+                  ? 'bg-[#ff6b4a] border-[#ff6b4a] text-white hover:bg-[#ff7d61]'
+                  : 'bg-white border-[#e9ecef] text-[#1e3a5f] hover:bg-[#f8f9fa]'"
+                :disabled="isRouteLoading || routeInfo"
+                @click="handleCheckRoute"
+              >
+                {{ isRouteLoading ? '경로 확인 중' : '경로 및 거리 확인' }}
+              </button>
+              <span
+                v-if="routeInfo"
+                class="text-xs font-semibold text-[#1e3a5f] whitespace-nowrap"
+              >
+                거리 {{ formatRouteDistance(routeInfo.distanceMeters) }} · 예상
+                {{ formatRouteDuration(routeInfo.durationSeconds) }}
+              </span>
+              <span v-else-if="routeError" class="text-xs text-[#e03131]">
+                {{ routeError }}
+              </span>
+            </div>
+          </div>
           <div
             class="relative w-full h-56 rounded-xl border border-[#e9ecef] overflow-hidden"
           >

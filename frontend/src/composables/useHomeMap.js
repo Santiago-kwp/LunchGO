@@ -15,7 +15,9 @@ export const useHomeMap = ({
   const mapInstance = ref(null);
   const kakaoMapsApi = ref(null);
   const isMapReady = ref(false);
-  const mapMarkers = [];
+  const markerRegistry = new Map();
+  const isMapInteracting = ref(false);
+  const needsMarkerRender = ref(false);
   const fallbackMapCenter = {
     lat: 37.394374,
     lng: 127.110636,
@@ -23,6 +25,11 @@ export const useHomeMap = ({
   const fallbackAddress = "경기도 성남시 분당구 판교역로 235";
   const mapCenter = ref({ ...fallbackMapCenter });
   const currentLocation = ref(fallbackAddress);
+  const routePolyline = ref(null);
+  const routeFocus = ref(null);
+  const routeOriginMarker = ref(null);
+  const routeFocusMarker = ref(null);
+  const selectedMarkerKey = ref(null);
   const mapDistanceSteps = Object.freeze([
     { label: "100m", level: 2 },
     { label: "250m", level: 3 },
@@ -52,6 +59,18 @@ export const useHomeMap = ({
   const getRestaurants = () =>
     typeof restaurants === "function" ? restaurants() : restaurants || [];
 
+  const getRestaurantKey = (restaurant) => {
+    const id =
+      restaurant?.id ?? restaurant?.restaurantId ?? restaurant?.restaurant_id;
+    if (id !== undefined && id !== null && id !== "") {
+      return String(id);
+    }
+    const name = restaurant?.name ?? "unknown";
+    const address =
+      restaurant?.address ?? restaurant?.roadAddress ?? restaurant?.location ?? "";
+    return `${name}-${address}`;
+  };
+
   const haversineDistance = (coordsA = {}, coordsB = {}) => {
     if (!coordsA.lat || !coordsA.lng || !coordsB.lat || !coordsB.lng) {
       return Number.POSITIVE_INFINITY;
@@ -79,11 +98,42 @@ export const useHomeMap = ({
     return haversineDistance(coords, mapCenter.value) <= limitKm;
   };
 
-  const renderMapMarkers = async (kakaoMaps) => {
-    if (!mapInstance.value) return;
+  const setMarkerVisible = (marker, visible) => {
+    if (!marker) return;
+    if (typeof marker.setVisible === "function") {
+      marker.setVisible(visible);
+      return;
+    }
+    if (!visible) {
+      marker.setMap(null);
+    }
+  };
 
-    mapMarkers.forEach((marker) => marker.setMap(null));
-    mapMarkers.length = 0;
+  const renderMapMarkers = async (kakaoMaps, shouldClear = true) => {
+    if (!mapInstance.value) return;
+    if (isMapInteracting.value) return;
+
+    const selectedMarkerImage = new kakaoMaps.MarkerImage(
+      "data:image/svg+xml;utf8," +
+        "<svg xmlns='http://www.w3.org/2000/svg' width='34' height='50' viewBox='0 0 34 50'>" +
+        "<path d='M17 1C9.4 1 3 7.4 3 15.1c0 10.1 14 32.9 14 32.9s14-22.8 14-32.9C31 7.4 24.6 1 17 1z' fill='%231e3a5f' stroke='%23ffffff' stroke-width='2'/>" +
+        "<circle cx='17' cy='15' r='5.5' fill='white'/>" +
+        "</svg>",
+      new kakaoMaps.Size(34, 50),
+      { offset: new kakaoMaps.Point(17, 50) }
+    );
+    if (shouldClear) {
+      markerRegistry.forEach((entry) => entry.marker.setMap(null));
+      markerRegistry.clear();
+      if (routeOriginMarker.value) {
+        routeOriginMarker.value.setMap(null);
+        routeOriginMarker.value = null;
+      }
+      if (routeFocusMarker.value) {
+        routeFocusMarker.value.setMap(null);
+        routeFocusMarker.value = null;
+      }
+    }
 
     const markerSvg =
       "data:image/svg+xml;utf8," +
@@ -96,9 +146,52 @@ export const useHomeMap = ({
       new kakaoMaps.Size(32, 46),
       { offset: new kakaoMaps.Point(16, 46) }
     );
+    const originMarkerSvg =
+      "data:image/svg+xml;utf8," +
+      "<svg xmlns='http://www.w3.org/2000/svg' width='32' height='46' viewBox='0 0 32 46'>" +
+      "<path d='M16 1C8.8 1 3 6.8 3 14c0 9.3 13 30 13 30s13-20.7 13-30C29 6.8 23.2 1 16 1z' fill='%231e3a5f' stroke='white' stroke-width='2'/>" +
+      "<circle cx='16' cy='14' r='5' fill='white'/>" +
+      "</svg>";
+    const originMarkerImage = new kakaoMaps.MarkerImage(
+      originMarkerSvg,
+      new kakaoMaps.Size(32, 46),
+      { offset: new kakaoMaps.Point(16, 46) }
+    );
 
     const distanceLimit = selectedDistanceKm.value;
+    const applyMarkerStyle = (key, marker) => {
+      if (!marker) return;
+      const isSelected = key && selectedMarkerKey.value === key;
+      marker.setImage(isSelected ? selectedMarkerImage : markerImage);
+    };
 
+    if (routeFocus.value && isValidCoords(routeFocus.value)) {
+      markerRegistry.forEach((entry) => setMarkerVisible(entry.marker, false));
+      if (routeFocusMarker.value) {
+        routeFocusMarker.value.setMap(null);
+        routeFocusMarker.value = null;
+      }
+      if (isValidCoords(mapCenter.value)) {
+        const originMarker = new kakaoMaps.Marker({
+          position: new kakaoMaps.LatLng(mapCenter.value.lat, mapCenter.value.lng),
+          title: "회사",
+          image: originMarkerImage,
+        });
+        originMarker.setMap(mapInstance.value);
+        routeOriginMarker.value = originMarker;
+      }
+
+      const focusMarker = new kakaoMaps.Marker({
+        position: new kakaoMaps.LatLng(routeFocus.value.lat, routeFocus.value.lng),
+        title: routeFocus.value.name || "식당",
+        image: markerImage,
+      });
+      focusMarker.setMap(mapInstance.value);
+      routeFocusMarker.value = focusMarker;
+      return;
+    }
+
+    const nextKeys = new Set();
     for (const restaurant of getRestaurants()) {
       const coords = await resolveRestaurantCoords(restaurant);
       if (!isValidCoords(coords)) continue;
@@ -106,22 +199,67 @@ export const useHomeMap = ({
         continue;
       }
 
-      const marker = new kakaoMaps.Marker({
-        position: new kakaoMaps.LatLng(coords.lat, coords.lng),
-        title: restaurant.name,
-        image: markerImage,
-      });
+      const key = getRestaurantKey(restaurant);
+      nextKeys.add(key);
+      const coordsKey = `${coords.lat},${coords.lng}`;
+      const existing = markerRegistry.get(key);
 
       try {
-        marker.setMap(mapInstance.value);
-        kakaoMaps.event.addListener(marker, "click", () => {
-          onMarkerClick?.(restaurant);
-        });
-        mapMarkers.push(marker);
+        if (existing) {
+          existing.restaurant = restaurant;
+          if (existing.coordsKey !== coordsKey) {
+            existing.marker.setPosition(
+              new kakaoMaps.LatLng(coords.lat, coords.lng)
+            );
+            existing.coordsKey = coordsKey;
+          }
+          if (typeof existing.marker.setVisible === "function") {
+            existing.marker.setVisible(true);
+          } else if (!existing.marker.getMap()) {
+            existing.marker.setMap(mapInstance.value);
+          }
+          applyMarkerStyle(key, existing.marker);
+        } else {
+          const marker = new kakaoMaps.Marker({
+            position: new kakaoMaps.LatLng(coords.lat, coords.lng),
+            title: restaurant.name,
+            image: markerImage,
+          });
+          marker.setMap(mapInstance.value);
+          if (onMarkerClick) {
+            const clickHandler = () => {
+              const entry = markerRegistry.get(key);
+              if (entry?.restaurant) {
+                selectedMarkerKey.value = key;
+                markerRegistry.forEach((value, entryKey) => {
+                  applyMarkerStyle(entryKey, value.marker);
+                });
+                onMarkerClick(entry.restaurant);
+              }
+            };
+            kakaoMaps.event.addListener(marker, "click", clickHandler);
+            markerRegistry.set(key, {
+              marker,
+              restaurant,
+              coordsKey,
+              clickHandler,
+            });
+          } else {
+            markerRegistry.set(key, { marker, restaurant, coordsKey });
+          }
+          applyMarkerStyle(key, marker);
+        }
       } catch (error) {
         console.error("지도 마커 표시 실패:", restaurant?.name, error);
       }
     }
+
+    markerRegistry.forEach((entry, key) => {
+      if (!nextKeys.has(key)) {
+        entry.marker.setMap(null);
+        markerRegistry.delete(key);
+      }
+    });
   };
 
   const levelForDistance = (stepIndex) => {
@@ -135,6 +273,9 @@ export const useHomeMap = ({
   let pendingMapZoomLevel = null;
   const maxMapZoomAttempts = 3;
   const scheduleMapZoom = (force = false) => {
+    if (isMapInteracting.value) {
+      return;
+    }
     if (mapZoomRafId) {
       cancelAnimationFrame(mapZoomRafId);
     }
@@ -146,6 +287,7 @@ export const useHomeMap = ({
     mapZoomRafId = requestAnimationFrame(() => {
       mapZoomRafId = 0;
       if (!mapInstance.value) return;
+      if (isMapInteracting.value) return;
       if (!force && !isMapReady.value) return;
       if (isSearchOpen.value) return;
       if (!mapContainer.value?.offsetWidth || !mapContainer.value?.offsetHeight) {
@@ -159,11 +301,6 @@ export const useHomeMap = ({
       const attemptZoom = () => {
         if (!mapInstance.value) return;
         try {
-          mapInstance.value.relayout?.();
-          if (typeof mapInstance.value.getBounds === "function") {
-            const bounds = mapInstance.value.getBounds();
-            if (!bounds) throw new Error("map-bounds-unavailable");
-          }
           if (typeof mapInstance.value.getLevel === "function") {
             const currentLevel = mapInstance.value.getLevel();
             if (currentLevel === targetLevel) {
@@ -225,12 +362,30 @@ export const useHomeMap = ({
         center,
         level: levelForDistance(mapDistanceStepIndex.value),
       });
-      kakaoMaps.event.addListener(mapInstance.value, "idle", () => {
-        if (pendingMapZoomLevel != null) {
-          scheduleMapZoom(true);
+      kakaoMaps.event.addListener(mapInstance.value, "zoom_start", () => {
+        isMapInteracting.value = true;
+      });
+      kakaoMaps.event.addListener(mapInstance.value, "zoom_end", () => {
+        isMapInteracting.value = false;
+        if (needsMarkerRender.value) {
+          scheduleMapMarkerRender();
         }
       });
-
+      kakaoMaps.event.addListener(mapInstance.value, "dragstart", () => {
+        isMapInteracting.value = true;
+      });
+      kakaoMaps.event.addListener(mapInstance.value, "dragend", () => {
+        isMapInteracting.value = false;
+        if (needsMarkerRender.value) {
+          scheduleMapMarkerRender();
+        }
+      });
+      kakaoMaps.event.addListener(mapInstance.value, "idle", () => {
+        isMapInteracting.value = false;
+        if (needsMarkerRender.value) {
+          scheduleMapMarkerRender();
+        }
+      });
       await renderMapMarkers(kakaoMaps);
       applyHomeMapZoom(true);
       isMapReady.value = true;
@@ -244,6 +399,10 @@ export const useHomeMap = ({
     if (mapRenderRafId) {
       cancelAnimationFrame(mapRenderRafId);
     }
+    needsMarkerRender.value = true;
+    if (isMapInteracting.value) {
+      return;
+    }
     mapRenderRafId = requestAnimationFrame(() => {
       mapRenderRafId = 0;
       if (!isMapReady.value || !kakaoMapsApi.value || !mapInstance.value) {
@@ -252,7 +411,8 @@ export const useHomeMap = ({
       if (!mapContainer.value?.offsetWidth || !mapContainer.value?.offsetHeight) {
         return;
       }
-      renderMapMarkers(kakaoMapsApi.value);
+      renderMapMarkers(kakaoMapsApi.value, false);
+      needsMarkerRender.value = false;
     });
   };
 
@@ -303,14 +463,29 @@ export const useHomeMap = ({
       }
     }
 
-    scheduleMapMarkerRender();
+    if (!routeFocus.value && kakaoMapsApi.value) {
+      renderMapMarkers(kakaoMapsApi.value);
+    }
   });
 
   onBeforeUnmount(() => {
-    mapMarkers.forEach((marker) => marker.setMap(null));
-    mapMarkers.length = 0;
+    markerRegistry.forEach((entry) => entry.marker.setMap(null));
+    markerRegistry.clear();
     mapInstance.value = null;
     isMapReady.value = false;
+    if (routePolyline.value) {
+      routePolyline.value.setMap(null);
+      routePolyline.value = null;
+    }
+    if (routeOriginMarker.value) {
+      routeOriginMarker.value.setMap(null);
+      routeOriginMarker.value = null;
+    }
+    if (routeFocusMarker.value) {
+      routeFocusMarker.value.setMap(null);
+      routeFocusMarker.value = null;
+    }
+    routeFocus.value = null;
     if (mapRenderRafId) {
       cancelAnimationFrame(mapRenderRafId);
       mapRenderRafId = 0;
@@ -324,6 +499,68 @@ export const useHomeMap = ({
       mapZoomRetryId = 0;
     }
   });
+
+  const clearRoute = () => {
+    if (routePolyline.value) {
+      routePolyline.value.setMap(null);
+      routePolyline.value = null;
+    }
+  };
+
+  const setRouteFocus = (coords, name) => {
+    if (!coords) {
+      routeFocus.value = null;
+      scheduleMapMarkerRender();
+      return;
+    }
+    const normalized = {
+      lat: Number(coords.lat),
+      lng: Number(coords.lng),
+    };
+    if (!isValidCoords(normalized)) {
+      routeFocus.value = null;
+      scheduleMapMarkerRender();
+      return;
+    }
+    routeFocus.value = { ...normalized, name };
+    scheduleMapMarkerRender();
+  };
+
+  const clearRouteFocus = () => {
+    routeFocus.value = null;
+    if (routeOriginMarker.value) {
+      routeOriginMarker.value.setMap(null);
+      routeOriginMarker.value = null;
+    }
+    if (routeFocusMarker.value) {
+      routeFocusMarker.value.setMap(null);
+      routeFocusMarker.value = null;
+    }
+    selectedMarkerKey.value = null;
+    scheduleMapMarkerRender();
+  };
+
+  const drawRoute = (pathPoints = []) => {
+    if (!mapInstance.value || !kakaoMapsApi.value?.LatLng) return;
+    clearRoute();
+    if (!Array.isArray(pathPoints) || pathPoints.length === 0) return;
+
+    const kakaoMaps = kakaoMapsApi.value;
+    const path = pathPoints
+      .filter((point) => Number.isFinite(point?.lat) && Number.isFinite(point?.lng))
+      .map((point) => new kakaoMaps.LatLng(point.lat, point.lng));
+    if (path.length < 2) return;
+
+    const polyline = new kakaoMaps.Polyline({
+      path,
+      strokeWeight: 6,
+      strokeColor: "#d9480f",
+      strokeOpacity: 0.95,
+      strokeStyle: "solid",
+    });
+    polyline.setMap(mapInstance.value);
+    routePolyline.value = polyline;
+  };
 
   return {
     mapContainer,
@@ -340,5 +577,9 @@ export const useHomeMap = ({
     applyHomeMapZoom,
     isWithinDistance,
     calculateDistanceKm: haversineDistance,
+    drawRoute,
+    clearRoute,
+    setRouteFocus,
+    clearRouteFocus,
   };
 };

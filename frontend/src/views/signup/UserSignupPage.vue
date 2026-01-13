@@ -1,9 +1,10 @@
 ﻿<script setup lang="ts">
 import { ref, watch, computed, onUnmounted, onMounted } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
-import { ArrowLeft, ChevronRight, Check, X } from 'lucide-vue-next'; // 아이콘 추가
+import { ArrowLeft, ChevronRight, ChevronDown, Check, X } from 'lucide-vue-next'; // 아이콘 추가
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
+import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import Input from '@/components/ui/Input.vue';
 import TERMS_POLICY_TEXT from '@/content/서비스 이용 약관.md?raw';
 import PRIVACY_POLICY_TEXT from '@/content/privacyPolicy.md?raw';
@@ -11,6 +12,24 @@ import { marked } from 'marked';
 import httpRequest from '@/router/httpRequest';
 
 const router = useRouter();
+
+const isAlertOpen = ref(false);
+const alertMessage = ref('');
+const alertConfirmAction = ref<null | (() => void)>(null);
+
+const openAlert = (message: string, onConfirm?: () => void) => {
+  alertMessage.value = message;
+  alertConfirmAction.value = onConfirm ?? null;
+  isAlertOpen.value = true;
+  return true;
+};
+
+const handleAlertConfirm = () => {
+  isAlertOpen.value = false;
+  const action = alertConfirmAction.value;
+  alertConfirmAction.value = null;
+  if (action) action();
+};
 
 const name = ref('');
 const emailLocal = ref('');
@@ -29,6 +48,8 @@ const email = computed(() => {
   return `${emailLocal.value}@${emailDomain.value}`;
 });
 const isEmailUnique = ref(false);
+const isEmailDomainOpen = ref(false);
+const emailDomainDropdownRef = ref<HTMLElement | null>(null);
 const phone = ref('');
 const verificationCode = ref(''); //사용자가 입력한 인증번호
 const password = ref('');
@@ -86,7 +107,7 @@ onMounted(() => {
 const handleAddressSearch = () => {
   //TypeScript에서 window객체의 daum 프로퍼티 접근을 위해 any 타입 단언 사용
   if (!(window as any).daum || !(window as any).daum.Postcode) {
-    alert('주소 검색 서비스를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+    openAlert('주소 검색 서비스를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
     loadDaumPostcodeScript();
     return;
   }
@@ -192,39 +213,61 @@ const startTimer = () => {
 
 onUnmounted(() => {
   if (timerInterval.value) clearInterval(timerInterval.value);
+  document.removeEventListener('click', handleEmailDomainClickOutside);
 });
 
-const checkInputElement = () => {
-  if(!emailLocal.value || !emailDomain.value) return alert('이메일을 입력해주세요.');
-  if (emailLocal.value.length < 5)
-    return alert('이메일 아이디는 5자 이상이어야 합니다.');
+const handleEmailDomainClickOutside = (event: MouseEvent) => {
+  if (!emailDomainDropdownRef.value) return;
+  if (!emailDomainDropdownRef.value.contains(event.target as Node)) {
+    isEmailDomainOpen.value = false;
+  }
+};
 
-  if (!isEmailUnique.value) return alert('이메일 중복확인이 필요합니다.');
-  if (!password.value) return alert('비밀번호를 입력해주세요.');
+onMounted(() => {
+  document.addEventListener('click', handleEmailDomainClickOutside);
+});
+
+const toggleEmailDomainDropdown = () => {
+  if (isEmailUnique.value) return;
+  isEmailDomainOpen.value = !isEmailDomainOpen.value;
+};
+
+const selectEmailDomain = (domain: string) => {
+  emailDomain.value = domain;
+  isEmailDomainOpen.value = false;
+};
+
+const checkInputElement = () => {
+  if (!emailLocal.value || !emailDomain.value) return openAlert('이메일을 입력해주세요.');
+  if (emailLocal.value.length < 5)
+    return openAlert('이메일 아이디는 5자 이상이어야 합니다.');
+
+  if (!isEmailUnique.value) return openAlert('이메일 중복확인이 필요합니다.');
+  if (!password.value) return openAlert('비밀번호를 입력해주세요.');
 
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,20}$/;
 
   if (!passwordRegex.test(password.value))
-    return alert(
+    return openAlert(
       '비밀번호는 8~20자이어야 하며, 영문 대문자, 소문자, 숫자, 특수문자를 모두 포함해야 합니다.'
     );
-  if (!passwordConfirm.value) return alert('비밀번호 재입력이 필요합니다.');
-  if (!name.value) return alert('이름을 입력해주세요.');
-  if (!companyName.value) return alert('회사명을 입력해주세요.');
-  if (!companyFrontAddress.value) return alert('도로명주소를 입력해주세요.');
-  return null;
+  if (!passwordConfirm.value) return openAlert('비밀번호 재입력이 필요합니다.');
+  if (!name.value) return openAlert('이름을 입력해주세요.');
+  if (!companyName.value) return openAlert('회사명을 입력해주세요.');
+  if (!companyFrontAddress.value) return openAlert('도로명주소를 입력해주세요.');
+  return false;
 };
 
 // 인증번호 발송
 const handleSendVerifyCode = async () => {
-  if (checkInputElement() !== null) {
+  if (checkInputElement()) {
     return;
   }
 
   isPhoneVerified.value = false;
   verificationCode.value = '';
 
-  alert(`인증번호를 발송했습니다: ${phone.value}`);
+  openAlert(`인증번호를 발송했습니다: ${phone.value}`);
   try {
     await httpRequest.post('/api/sms/send', { phone: phone.value }, { skipAuth: true });
 
@@ -233,15 +276,15 @@ const handleSendVerifyCode = async () => {
   }catch(error){
     const status = error.response.status;
 
-    if(status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
-    else alert(`메시지 전송에 오류가 발생했습니다. (Code: ${status})`);
+    if (status === 400) openAlert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else openAlert(`메시지 전송에 오류가 발생했습니다. (Code: ${status})`);
   }  
 };
 
 // 인증번호 확인
 const handleVerifyCode = async () => {
-  if (!verificationCode.value) return alert('인증번호를 입력해주세요.');
-  if (isTimeout.value) return alert('입력 시간이 초과되었습니다. 재발송해주세요.');
+  if (!verificationCode.value) return openAlert('인증번호를 입력해주세요.');
+  if (isTimeout.value) return openAlert('입력 시간이 초과되었습니다. 재발송해주세요.');
 
   try {
     const response = await httpRequest.post('/api/sms/verify', {
@@ -250,21 +293,21 @@ const handleVerifyCode = async () => {
     }, { skipAuth: true });
 
     if(response.data === true){
-      alert('인증이 완료되었습니다.');
+      openAlert('인증이 완료되었습니다.');
       isPhoneVerified.value = true; // 인증 완료 상태로 변경
 
       // 타이머 정지
       if (timerInterval.value) clearInterval(timerInterval.value);
     } else{
-      alert("인증번호가 일치하지 않습니다. 다시 확인해주세요.");
+      openAlert("인증번호가 일치하지 않습니다. 다시 확인해주세요.");
 
       isPhoneVerified.value = false;
     }
   } catch (error) {
     // 에러 처리
     const status = error.response.status;
-    if (status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
-    else alert(`오류가 발생했습니다. (Code: ${status})`);
+    if (status === 400) openAlert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else openAlert(`오류가 발생했습니다. (Code: ${status})`);
     
     isPhoneVerified.value = false;
   }
@@ -277,7 +320,11 @@ const modalContent = ref('');
 const modalContentHtml = computed(() => marked.parse(modalContent.value, { breaks: true }));
 
 const handleEmailDuplicateCheck = async () => {
-  if(!emailLocal.value || !emailDomain.value) return alert('이메일을 입력해주세요.');
+  if (isEmailUnique.value) {
+    isEmailUnique.value = false;
+    return;
+  }
+  if (!emailLocal.value || !emailDomain.value) return openAlert('이메일을 입력해주세요.');
 
   //백엔드 연동해서 이메일 unique한지 check
   try{
@@ -285,22 +332,22 @@ const handleEmailDuplicateCheck = async () => {
       email: email.value
     }, { skipAuth: true });
 
-    alert('사용 가능한 이메일입니다.');
+    openAlert('사용 가능한 이메일입니다.');
     isEmailUnique.value = true;
   }catch(error){
     const status = error.response.status;
 
     switch(status){
       case 400:
-        alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+        openAlert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
         break;
       case 409:
-        alert("이미 사용중인 이메일입니다.");
+        openAlert("이미 사용중인 이메일입니다.");
         emailLocal.value = '';
         emailDomain.value = '';
         break;
       default:
-        alert(`오류가 발생했습니다. (Code: ${status})`);
+        openAlert(`오류가 발생했습니다. (Code: ${status})`);
     }
   }
 };
@@ -329,23 +376,22 @@ const closeModal = () => {
 };
 
 const handleSignup = async () => {
-  if (checkInputElement() !== null) return;
-  if (!isCodeSent.value) return alert('휴대전화 인증은 필수입니다.');
+  if (checkInputElement()) return;
+  if (!isCodeSent.value) return openAlert('휴대전화 인증은 필수입니다.');
 
   if (password.value !== passwordConfirm.value) {
-    alert('비밀번호가 일치하지 않습니다.');
-
     //비밀번호 확인 입력창 비우고 포커스 이동
     passwordConfirm.value = '';
     passwordConfirmRef.value?.focus(); 
+    openAlert('비밀번호가 일치하지 않습니다.');
     return;
   }
 
   // 인증번호 체크
-  if (!isPhoneVerified.value) return alert('휴대전화 인증은 필수입니다.');
+  if (!isPhoneVerified.value) return openAlert('휴대전화 인증은 필수입니다.');
 
   if (!agreeTerms.value || !agreePrivacy.value) {
-    alert('필수 약관에 동의해주세요.');
+    openAlert('필수 약관에 동의해주세요.');
     return;
   }
 
@@ -361,13 +407,12 @@ const handleSignup = async () => {
 
     //타이머 실행되고 있으면 정지
     if (timerInterval.value) clearInterval(timerInterval.value);
-    alert('회원가입 완료!');
-    router.push('/');
+    openAlert('회원가입 완료!', () => router.push('/'));
   }catch(error){
     const status = error.response.status;
 
-    if(status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
-    else alert(`오류가 발생했습니다. (Code: ${status})`);
+    if (status === 400) openAlert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else openAlert(`오류가 발생했습니다. (Code: ${status})`);
   }  
 };
 </script>
@@ -421,15 +466,38 @@ const handleSignup = async () => {
                   class="flex-1 h-12 px-4 border-[#dee2e6] rounded-lg focus:border-[#ff6b4a] focus:ring-1 focus:ring-[#ff6b4a] text-[#1e3a5f]"
                 />
                 <span class="text-[#6c757d]">@</span>
-                <select
-                  v-model="emailDomain"
-                  :disabled="isEmailUnique"
-                  class="h-12 px-3 border border-[#dee2e6] rounded-lg bg-white text-[#1e3a5f] focus:border-[#ff6b4a] focus:ring-1 focus:ring-[#ff6b4a]"
-                >
-                  <option v-for="domain in emailDomains" :key="domain" :value="domain">
-                    {{ domain }}
-                  </option>
-                </select>
+                <div ref="emailDomainDropdownRef" class="relative">
+                  <button
+                    type="button"
+                    :class="[
+                      'h-12 min-w-[140px] px-3 border rounded-lg bg-white text-sm flex items-center justify-between gap-2 transition-colors',
+                      isEmailUnique
+                        ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-[#dee2e6]'
+                        : 'border-[#dee2e6] text-[#1e3a5f] hover:bg-white focus:border-[#ff6b4a]'
+                    ]"
+                    @click.stop="toggleEmailDomainDropdown"
+                  >
+                    <span class="truncate">
+                      {{ emailDomain || '도메인 선택' }}
+                    </span>
+                    <ChevronDown class="w-4 h-4 text-[#1e3a5f]" />
+                  </button>
+
+                  <div
+                    v-if="isEmailDomainOpen"
+                    class="absolute left-0 right-0 mt-2 bg-white border border-[#e9ecef] rounded-lg shadow-md z-30 overflow-y-auto max-h-56"
+                  >
+                    <button
+                      v-for="domain in emailDomains"
+                      :key="domain"
+                      type="button"
+                      class="w-full text-left px-4 py-2 text-sm hover:bg-[#f8f9fa]"
+                      @click.stop="selectEmailDomain(domain)"
+                    >
+                      {{ domain }}
+                    </button>
+                  </div>
+                </div>
               </div>
               <Button
                 type="button"
@@ -437,7 +505,7 @@ const handleSignup = async () => {
                 variant="outline"
                 class="h-12 px-4 border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] rounded-lg whitespace-nowrap"
               >
-                중복확인
+                {{ isEmailUnique ? '수정' : '중복확인' }}
               </Button>
             </div>
           </div>
@@ -801,6 +869,15 @@ const handleSignup = async () => {
       </div>
     </div>
   </Transition>
+
+  <ConfirmModal
+    :is-open="isAlertOpen"
+    :message="alertMessage"
+    :show-cancel="false"
+    confirm-text="확인"
+    @confirm="handleAlertConfirm"
+    @close="handleAlertConfirm"
+  />
 </template>
 
 <style scoped>

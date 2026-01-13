@@ -100,9 +100,10 @@ const formatTime = (value) => {
 };
 
 const mapReservation = (item) => {
-  let reservationStatus = statusMap[item.reservationStatus] || "confirmed";
+  const rawStatus = item.reservationStatus || item.status;
+  let reservationStatus = statusMap[rawStatus] || "confirmed";
   const cancelledBy = String(item.cancelledBy || "").toUpperCase();
-  if (item.reservationStatus === "CANCELLED" && cancelledBy === "OWNER") {
+  if (rawStatus === "CANCELLED" && cancelledBy === "OWNER") {
     reservationStatus = "restaurant_cancelled";
   }
   const fallbackVisitCount = reservationStatus === "completed" ? 1 : 0;

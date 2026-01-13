@@ -12,11 +12,30 @@ import {
 } from 'lucide-vue-next'; // 아이콘 추가
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
+import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import Input from '@/components/ui/Input.vue';
 import PRIVACY_POLICY_TEXT from '@/content/privacyPolicy.md?raw';
 import TERMS_POLICY_TEXT from '@/content/서비스 이용 약관.md?raw';
 
 const router = useRouter();
+
+const isAlertOpen = ref(false);
+const alertMessage = ref('');
+const alertConfirmAction = ref<null | (() => void)>(null);
+
+const openAlert = (message: string, onConfirm?: () => void) => {
+  alertMessage.value = message;
+  alertConfirmAction.value = onConfirm ?? null;
+  isAlertOpen.value = true;
+  return true;
+};
+
+const handleAlertConfirm = () => {
+  isAlertOpen.value = false;
+  const action = alertConfirmAction.value;
+  alertConfirmAction.value = null;
+  if (action) action();
+};
 
 const name = ref('');
 const loginId = ref('');
@@ -172,28 +191,28 @@ onUnmounted(() => {
 });
 
 const checkInputElement = () => {
-  if (!loginId.value) return alert('아이디를 입력해주세요.');
-  if (!isLoginIdUnique.value) return alert('아이디 중복 확인이 필요합니다.');
-  if (!password.value) return alert('비밀번호를 입력해주세요.');
-  if (!passwordConfirm.value) return alert('비밀번호 재입력이 필요합니다.');
-  if (!name.value) return alert('이름(대표자명)을 입력해주세요.');
+  if (!loginId.value) return openAlert('아이디를 입력해주세요.');
+  if (!isLoginIdUnique.value) return openAlert('아이디 중복 확인이 필요합니다.');
+  if (!password.value) return openAlert('비밀번호를 입력해주세요.');
+  if (!passwordConfirm.value) return openAlert('비밀번호 재입력이 필요합니다.');
+  if (!name.value) return openAlert('이름(대표자명)을 입력해주세요.');
   //전화번호도 인증, 사업자 등록번호도 인증해야하므로 별도로 입력 관리
-  return null;
+  return false;
 };
 
 //아이디 중복체크 버튼
 const handleLoginIdDuplicateCheck = async () => {
   const loginIdRegex = /^(?=.*[a-z])(?=.*\d)[a-z\d]{7,15}$/;
-  if (!loginId.value) return alert('아이디를 먼저 입력해주세요.');
+  if (!loginId.value) return openAlert('아이디를 먼저 입력해주세요.');
   if (!loginIdRegex.test(loginId.value))
-    return alert(
+    return openAlert(
       '아이디는 7~15자이어야 하며, 영문 소문자, 숫자만 포함해야합니다.'
     );
 
   try{
     await axios.post('/api/auth/loginId', {loginId: loginId.value});
 
-    alert('사용 가능한 아이디입니다.');
+    openAlert('사용 가능한 아이디입니다.');
     isLoginIdUnique.value = true;
 
   }catch(error){
@@ -201,24 +220,24 @@ const handleLoginIdDuplicateCheck = async () => {
 
     switch(status){
       case 400:
-        alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+        openAlert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
         break;
       case 409:
-        alert("이미 사용중인 아이디입니다.");
+        openAlert("이미 사용중인 아이디입니다.");
         loginId.value = '';
         break;
       default:
-        alert(`오류가 발생했습니다. (Code: ${status})`);
+        openAlert(`오류가 발생했습니다. (Code: ${status})`);
     }
   }
 };
 
 //사업자등록번호 인증 api 연동 버튼
 const handleBusinessNumCheck = async () => {
-  if (!name.value) return alert('이름(대표자명)을 먼저 입력해주세요.');
+  if (!name.value) return openAlert('이름(대표자명)을 먼저 입력해주세요.');
   if (!startAt.value || startAt.value.length < 10)
-    return alert('개업일자를 올바르게 입력해주세요.');
-  if (!businessNum.value) return alert('사업자 등록번호를 먼저 입력해주세요.');
+    return openAlert('개업일자를 올바르게 입력해주세요.');
+  if (!businessNum.value) return openAlert('사업자 등록번호를 먼저 입력해주세요.');
 
   //api 호출해서 확인하려면 데이터 정제 필수
   const cleanBusinessNum = businessNum.value.replace(/[^0-9]/g, '');
@@ -283,7 +302,7 @@ const handleBusinessNumCheck = async () => {
         return;
       }
     } else {
-      return alert('검증 오류가 발생했습니다.');
+      return openAlert('검증 오류가 발생했습니다.');
     }
   } catch (e) {
     console.error('API Error: ', e);
@@ -296,11 +315,11 @@ const handleBusinessNumCheck = async () => {
 
 // 인증번호 발송
 const handleSendVerifyCode = async () => {
-  if (checkInputElement() !== null) {
+  if (checkInputElement()) {
     return;
   }
 
-  alert(`인증번호를 발송했습니다: ${phone.value}`);
+  openAlert(`인증번호를 발송했습니다: ${phone.value}`);
 
   try{
     await axios.post('/api/sms/send', {phone: phone.value});
@@ -311,15 +330,15 @@ const handleSendVerifyCode = async () => {
   }catch(error){
     const status = error.response.status;
 
-    if(status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
-    else alert(`메시지 전송에 오류가 발생했습니다. (Code: ${status})`);
+    if (status === 400) openAlert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else openAlert(`메시지 전송에 오류가 발생했습니다. (Code: ${status})`);
   }
 };
 
 //인증번호 확인
 const handleVerifyCode = async() => {
-  if (!verificationCode.value) return alert('인증번호를 입력해주세요.');
-  if (isTimeout.value) return alert('입력 시간이 초과되었습니다. 재발송해주세요.');
+  if (!verificationCode.value) return openAlert('인증번호를 입력해주세요.');
+  if (isTimeout.value) return openAlert('입력 시간이 초과되었습니다. 재발송해주세요.');
 
   try {
     const response = await axios.post('/api/sms/verify', {
@@ -328,13 +347,13 @@ const handleVerifyCode = async() => {
     });
 
     if(response.data === true){
-      alert('인증이 완료되었습니다.');
+      openAlert('인증이 완료되었습니다.');
       isPhoneVerified.value = true; // 인증 완료 상태로 변경
 
       // 타이머 정지
       if (timerInterval.value) clearInterval(timerInterval.value);
     } else{
-      alert("인증번호가 일치하지 않습니다. 다시 확인해주세요.");
+      openAlert("인증번호가 일치하지 않습니다. 다시 확인해주세요.");
       
       isPhoneVerified.value = false;
     }
@@ -342,8 +361,8 @@ const handleVerifyCode = async() => {
   } catch (error) {
     // 에러 처리
     const status = error.response.status;
-    if (status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
-    else alert(`오류가 발생했습니다. (Code: ${status})`);
+    if (status === 400) openAlert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else openAlert(`오류가 발생했습니다. (Code: ${status})`);
     
     isPhoneVerified.value = false;
   }
@@ -375,27 +394,26 @@ const closeModal = () => {
 const handleSignup = async () => {
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,20}$/;
 
-  if (checkInputElement() !== null) return;
-  if (!isPhoneVerified.value) return alert('휴대전화 인증은 필수입니다.');
+  if (checkInputElement()) return;
+  if (!isPhoneVerified.value) return openAlert('휴대전화 인증은 필수입니다.');
 
   if (!passwordRegex.test(password.value))
-    return alert(
+    return openAlert(
       '비밀번호는 8~20자이어야 하며, 영문 대문자, 소문자, 숫자, 특수문자를 모두 포함해야 합니다.'
     );
 
   if (password.value !== passwordConfirm.value) {
-    alert('비밀번호가 일치하지 않습니다.');
-
     //비밀번호 확인 입력창 비우고 포커스 이동
     passwordConfirm.value = '';
     passwordConfirmRef.value?.focus(); // 포커스 함수 실행
+    openAlert('비밀번호가 일치하지 않습니다.');
     return;
   }
   //사업자등록번호 인증여부 확인
-  if(!isBusinessNumAppropriate.value) return alert("사업자 등록번호 인증은 필수입니다.");
+  if (!isBusinessNumAppropriate.value) return openAlert("사업자 등록번호 인증은 필수입니다.");
 
   if (!agreeTerms.value || !agreePrivacy.value) {
-    alert('필수 약관에 동의해주세요.');
+    openAlert('필수 약관에 동의해주세요.');
     return;
   }
 
@@ -411,13 +429,12 @@ const handleSignup = async () => {
 
     //타이머 실행되고 있으면 정지
     if (timerInterval.value) clearInterval(timerInterval.value);
-    alert('회원가입 완료!');
-    router.push('/');
+    openAlert('회원가입 완료!', () => router.push('/'));
   }catch(error){
     const status = error.response.status;
 
-    if(status === 400) alert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
-    else alert(`오류가 발생했습니다. (Code: ${status})`);
+    if (status === 400) openAlert("[400 Bad Request] 잘못된 요청입니다. 입력값을 확인해주세요.");
+    else openAlert(`오류가 발생했습니다. (Code: ${status})`);
   }
 };
 </script>
@@ -836,6 +853,15 @@ const handleSignup = async () => {
       </div>
     </div>
   </Transition>
+
+  <ConfirmModal
+    :is-open="isAlertOpen"
+    :message="alertMessage"
+    :show-cancel="false"
+    confirm-text="확인"
+    @confirm="handleAlertConfirm"
+    @close="handleAlertConfirm"
+  />
 </template>
 
 <style scoped>

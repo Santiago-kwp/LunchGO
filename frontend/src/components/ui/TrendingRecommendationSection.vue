@@ -24,6 +24,22 @@ defineProps({
     type: Array,
     default: () => [],
   },
+  showRouteButton: {
+    type: Boolean,
+    default: false,
+  },
+  onCheckRoute: {
+    type: Function,
+    default: null,
+  },
+  routeLoadingId: {
+    type: [Number, String],
+    default: null,
+  },
+  routeInfo: {
+    type: Object,
+    default: null,
+  },
   onToggleFavorite: {
     type: Function,
     default: () => {},
@@ -52,6 +68,10 @@ defineProps({
     <RestaurantCardList
       v-if="!isLoading && cards.length"
       :restaurants="cards"
+      :showRouteButton="showRouteButton"
+      :onCheckRoute="onCheckRoute"
+      :routeLoadingId="routeLoadingId"
+      :routeInfo="routeInfo"
     />
   </section>
 </template>

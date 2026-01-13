@@ -107,6 +107,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/cafeteria/menus/confirm").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.GET, "/api/cafeteria/menus/week").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.GET, "/api/cafeteria/recommendations").hasAuthority("ROLE_USER")
+                        .requestMatchers(HttpMethod.POST, "/api/map/distance").hasAuthority("ROLE_USER")
+                        .requestMatchers(HttpMethod.POST, "/api/map/route").hasAuthority("ROLE_USER")
 
                         .requestMatchers(HttpMethod.POST, "/api/bookmark-links").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.PATCH, "/api/bookmark-links/*").hasAuthority("ROLE_USER")

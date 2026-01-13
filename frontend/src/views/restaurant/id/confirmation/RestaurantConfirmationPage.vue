@@ -100,7 +100,7 @@ const fetchReservationDetail = async () => {
 
     reservation.value = {
       confirmationNumber: data.reservationCode || reservation.value.confirmationNumber,
-      status: data.status || reservation.value.status,
+      status: data.reservationStatus || data.status || reservation.value.status,
       cancelledBy: data.cancelledBy ? String(data.cancelledBy).toUpperCase() : reservation.value.cancelledBy,
       restaurant: {
         name: data.restaurant?.name || reservation.value.restaurant.name,
@@ -390,7 +390,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Payment Info -->
-      <div class="bg-white px-4 py-5 mt-2">
+      <div v-if="reservation.status !== 'CANCELLED'" class="bg-white px-4 py-5 mt-2">
         <h2 class="text-base font-semibold text-[#1e3a5f] mb-4">결제 정보</h2>
         <div v-if="paymentStatus.paid" class="space-y-2.5">
           <div class="flex items-center justify-between text-sm">

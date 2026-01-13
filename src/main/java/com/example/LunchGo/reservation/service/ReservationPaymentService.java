@@ -8,10 +8,12 @@ import com.example.LunchGo.reservation.domain.ReservationStatus;
 import com.example.LunchGo.reservation.dto.*;
 import com.example.LunchGo.reservation.entity.Payment;
 import com.example.LunchGo.reservation.entity.Reservation;
+import com.example.LunchGo.reservation.entity.ReservationCancellation;
 import com.example.LunchGo.reservation.entity.ReservationSlot;
 import com.example.LunchGo.reservation.mapper.ReservationSummaryMapper;
 import com.example.LunchGo.reservation.mapper.row.ReservationMenuItemRow;
 import com.example.LunchGo.reservation.repository.PaymentRepository;
+import com.example.LunchGo.reservation.repository.ReservationCancellationRepository;
 import com.example.LunchGo.reservation.repository.ReservationRepository;
 import com.example.LunchGo.reservation.repository.ReservationSlotRepository;
 import com.example.LunchGo.restaurant.entity.Restaurant;
@@ -50,6 +52,7 @@ public class ReservationPaymentService {
     private final PortoneVerificationService portoneVerificationService;
     private final RestaurantStatsEventService statsEventService;
     private final ReservationSummaryMapper reservationSummaryMapper;
+    private final ReservationCancellationRepository reservationCancellationRepository;
     private final OwnerRepository ownerRepository;
     private final UserRepository userRepository;
     private final SmsService smsService;
@@ -287,6 +290,9 @@ public class ReservationPaymentService {
         Reservation reservation = getReservation(reservationId);
         ReservationSlot slot = getSlot(reservation.getSlotId());
         Restaurant restaurant = getRestaurant(slot.getRestaurantId());
+        ReservationCancellation cancellation = reservationCancellationRepository
+            .findByReservationId(reservationId)
+            .orElse(null);
 
         Payment payment = paymentRepository.findTopByReservationIdAndStatusOrderByApprovedAtDesc(
                 reservationId,
@@ -311,6 +317,8 @@ public class ReservationPaymentService {
 
         return ReservationConfirmationResponse.builder()
             .reservationCode(reservation.getReservationCode())
+            .status(reservation.getStatus() != null ? reservation.getStatus().name() : null)
+            .cancelledBy(cancellation != null ? cancellation.getCancelledBy() : null)
             .restaurant(ReservationConfirmationResponse.RestaurantInfo.builder()
                 .name(restaurant.getName())
                 .address(formatAddress(restaurant))

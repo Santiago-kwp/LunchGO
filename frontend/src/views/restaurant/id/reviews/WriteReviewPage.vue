@@ -866,9 +866,9 @@ onMounted(async () => {
             </div>
             <button
               v-if="receipt.uploaded"
-              class="px-3 py-1.5 rounded-full bg-purple-600 text-white text-xs font-medium whitespace-nowrap"
+              class="px-3 py-1.5 rounded-full bg-[#ff6b4a] text-white text-xs font-medium whitespace-nowrap"
             >
-              영수증 업로드
+              영수증 업로드 완료
             </button>
             <span
               v-else-if="!hasPrepayMenuItems"

@@ -29,3 +29,6 @@ portone:
 reservation:
   payment-expiry:
     interval-ms: ${RESERVATION_PAYMENT_EXPIRY_INTERVAL_MS:10000}
+
+kakao:
+  rest-api-key: ${KAKAO_REST_API_KEY:}

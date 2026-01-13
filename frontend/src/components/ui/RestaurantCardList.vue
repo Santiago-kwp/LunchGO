@@ -13,6 +13,22 @@ const props = defineProps({
     type: [String, Number],
     default: null,
   },
+  showRouteButton: {
+    type: Boolean,
+    default: false,
+  },
+  onCheckRoute: {
+    type: Function,
+    default: null,
+  },
+  routeLoadingId: {
+    type: [Number, String],
+    default: null,
+  },
+  routeInfo: {
+    type: Object,
+    default: null,
+  },
   favoriteRestaurantIds: {
     type: Array,
     default: () => [],
@@ -65,6 +81,28 @@ const formatTagLabel = (tag) => {
 const formatRating = (rating) => {
   const value = Number(rating);
   return Number.isFinite(value) ? value.toFixed(1) : "-";
+};
+
+const getRestaurantId = (restaurant) =>
+  restaurant?.id ?? restaurant?.restaurantId ?? restaurant?.restaurant_id ?? null;
+
+const isRouteActive = (restaurant) => {
+  const currentId = getRestaurantId(restaurant);
+  const activeId = props.routeInfo?.restaurantId;
+  if (currentId == null || activeId == null) return false;
+  return String(currentId) === String(activeId);
+};
+
+const formatRouteDistance = (meters) => {
+  if (!Number.isFinite(meters)) return "-";
+  if (meters < 1000) return `${Math.round(meters)}m`;
+  return `${(meters / 1000).toFixed(1)}km`;
+};
+
+const formatRouteDuration = (seconds) => {
+  if (!Number.isFinite(seconds)) return "-";
+  const totalMinutes = Math.max(1, Math.round(seconds / 60));
+  return `${totalMinutes}분`;
 };
 </script>
 
@@ -120,9 +158,35 @@ const formatRating = (rating) => {
                 {{ formatTagLabel(tag) }}
               </span>
             </div>
-            <p class="text-sm font-semibold text-[#1e3a5f]">
-              {{ restaurant.price || "가격 정보 없음" }}
-            </p>
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-sm font-semibold text-[#1e3a5f]">
+                {{ restaurant.price || "가격 정보 없음" }}
+              </p>
+              <div v-if="showRouteButton" class="flex flex-col items-end gap-1">
+                <span
+                  v-if="isRouteActive(restaurant)"
+                  class="text-xs font-semibold text-[#1e3a5f] whitespace-nowrap"
+                >
+                  {{ formatRouteDistance(routeInfo?.distanceMeters) }} · 예상
+                  {{ formatRouteDuration(routeInfo?.durationSeconds) }}
+                </span>
+                <button
+                  type="button"
+                  class="text-[11px] px-2.5 py-1 rounded-full border transition-colors whitespace-nowrap"
+                  :class="isRouteActive(restaurant)
+                    ? 'bg-[#ff6b4a] border-[#ff6b4a] text-white hover:bg-[#ff7d61]'
+                    : 'border-[#e9ecef] text-[#1e3a5f] bg-white hover:bg-[#f8f9fa]'"
+                  :disabled="routeLoadingId === (restaurant.id ?? restaurant.restaurantId)"
+                  @click.stop.prevent="onCheckRoute && onCheckRoute(restaurant)"
+                >
+                  {{
+                    routeLoadingId === (restaurant.id ?? restaurant.restaurantId)
+                      ? "경로 확인 중"
+                      : "경로 및 거리 확인"
+                  }}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </Card>

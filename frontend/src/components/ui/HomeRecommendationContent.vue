@@ -42,6 +42,14 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  isRecommendationLoading: {
+    type: Boolean,
+    default: false,
+  },
+  isCafeteriaLoading: {
+    type: Boolean,
+    default: false,
+  },
   trendingError: {
     type: String,
     default: "",
@@ -49,10 +57,6 @@ defineProps({
   trendingCards: {
     type: Array,
     default: () => [],
-  },
-  isWeatherLoading: {
-    type: Boolean,
-    default: false,
   },
   tagMappingNotice: {
     type: String,
@@ -69,6 +73,22 @@ defineProps({
   paginatedRestaurants: {
     type: Array,
     default: () => [],
+  },
+  showRouteButton: {
+    type: Boolean,
+    default: false,
+  },
+  onCheckRoute: {
+    type: Function,
+    default: null,
+  },
+  routeLoadingId: {
+    type: [Number, String],
+    default: null,
+  },
+  routeInfo: {
+    type: Object,
+    default: null,
   },
   onSelectRecommendation: {
     type: Function,
@@ -152,6 +172,11 @@ defineProps({
       :show-buttons="false"
       :onOpenSearch="onOpenSearch"
       :onClearRecommendations="onClearCafeteria"
+      :showRouteButton="showRouteButton"
+      :onCheckRoute="onCheckRoute"
+      :routeLoadingId="routeLoadingId"
+      :routeInfo="routeInfo"
+      :isLoading="isCafeteriaLoading"
       :isModalOpen="isCafeteriaModalOpen"
       :isProcessing="isCafeteriaOcrLoading"
       :ocrResult="cafeteriaOcrResult"
@@ -176,6 +201,10 @@ defineProps({
       :error="trendingError"
       :cards="trendingCards"
       :onClear="onClearTrending"
+      :showRouteButton="showRouteButton"
+      :onCheckRoute="onCheckRoute"
+      :routeLoadingId="routeLoadingId"
+      :routeInfo="routeInfo"
     />
 
     <HomeRecommendationHeader
@@ -199,12 +228,10 @@ defineProps({
       :onClear="onClearBudget"
     />
 
-    <div
-      v-if="!cafeteriaRecommendations.length && selectedRecommendation === recommendWeatherKey && isWeatherLoading"
-      class="px-4"
-    >
-      <RestaurantCardSkeletonList :count="3" />
-    </div>
+    <RestaurantCardSkeletonList
+      v-if="!cafeteriaRecommendations.length && !isTrendingSort && isRecommendationLoading"
+      :count="3"
+    />
 
     <div
       v-else-if="!cafeteriaRecommendations.length && !isTrendingSort && !paginatedRestaurants.length"
@@ -215,6 +242,10 @@ defineProps({
     <RestaurantCardList
       v-else-if="!cafeteriaRecommendations.length && !isTrendingSort"
       :restaurants="paginatedRestaurants"
+      :showRouteButton="showRouteButton"
+      :onCheckRoute="onCheckRoute"
+      :routeLoadingId="routeLoadingId"
+      :routeInfo="routeInfo"
     />
   </div>
 </template>

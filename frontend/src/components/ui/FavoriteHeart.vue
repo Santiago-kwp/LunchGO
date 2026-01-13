@@ -103,14 +103,17 @@ const toggleFavorite = async () => {
   <button
     ref="buttonRef"
     @click.prevent="toggleFavorite"
-    class="w-6 h-6 flex items-center justify-center hover:bg-gray-50 rounded-full transition-colors focus:outline-none"
+    class="w-6 h-6 flex items-center justify-center rounded-full transition-colors focus:outline-none"
+    :class="isActive
+      ? 'bg-white hover:bg-gray-50'
+      : 'bg-white border border-[#e9ecef] shadow-sm hover:bg-[#f8f9fa]'"
     :title="isActive ? '즐겨찾기 해제' : '즐겨찾기 등록'"
   >
     <Heart 
       class="w-4 h-4 transition-all duration-200" 
       :class="isActive 
         ? 'fill-[#ff6b4a] text-[#ff6b4a]' 
-        : 'fill-none text-gray-300'"
+        : 'fill-none text-[#adb5bd]'"
     />
   </button>
   <LoginRequiredModal

@@ -19,6 +19,10 @@ const props = defineProps({
     type: String,
     default: "취소",
   },
+  showCancel: {
+    type: Boolean,
+    default: true,
+  },
   anchorRect: {
     type: Object,
     default: null,
@@ -75,6 +79,7 @@ const modalStyle = computed(() => {
         </p>
         <div class="mt-4 flex justify-end gap-2">
           <Button
+            v-if="showCancel"
             variant="outline"
             class="h-8 px-3 text-xs border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa]"
             @click="$emit('close')"
