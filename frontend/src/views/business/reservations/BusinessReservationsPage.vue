@@ -418,7 +418,7 @@ const settlementChartData = computed(() => {
         tension: 0.35,
       },
       {
-        label: '환불율(%)',
+        label: '환불률(%)',
         data: refundRateSeries,
         yAxisID: 'y1',
         borderColor: '#FFB199',
