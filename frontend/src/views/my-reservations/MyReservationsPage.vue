@@ -77,6 +77,13 @@ const statusMap = {
   NO_SHOW: "refunded",
 };
 
+const statusPriority = {
+  confirmed: 1,
+  pending_payment: 2,
+  cancelled: 3,
+  restaurant_cancelled: 3,
+};
+
 const formatDate = (value) => {
   if (!value) return "";
   const date = new Date(value);
@@ -118,6 +125,7 @@ const mapReservation = (item) => {
     payment: item.payment?.amount ? { amount: item.payment.amount } : null,
     reservationStatus,
     cancelledBy: item.cancelledBy,
+    cancelledAt: item.cancelledAt || null,
     review: item.review
       ? {
           id: item.review.id,
@@ -130,11 +138,45 @@ const mapReservation = (item) => {
   };
 };
 
+const isCancelledStatus = (reservation) =>
+  reservation?.reservationStatus === "cancelled" ||
+  reservation?.reservationStatus === "restaurant_cancelled";
+
+const getBookingTimestamp = (reservation) => {
+  const date = reservation?.booking?.date;
+  const time = reservation?.booking?.time;
+  if (!date) return Number.NEGATIVE_INFINITY;
+  const normalizedDate = String(date).replace(/\./g, "-");
+  const normalizedTime = time ? String(time) : "00:00";
+  const parsed = new Date(`${normalizedDate}T${normalizedTime}`);
+  return Number.isNaN(parsed.getTime()) ? Number.NEGATIVE_INFINITY : parsed.getTime();
+};
+
+const getCancelledTimestamp = (reservation) => {
+  const value = reservation?.cancelledAt;
+  if (!value) return Number.NEGATIVE_INFINITY;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? Number.NEGATIVE_INFINITY : parsed.getTime();
+};
+
+const getActivityTimestamp = (reservation) =>
+  isCancelledStatus(reservation)
+    ? Math.max(getCancelledTimestamp(reservation), getBookingTimestamp(reservation))
+    : getBookingTimestamp(reservation);
+
+const sortUpcomingByPriority = (reservations) =>
+  [...reservations].sort((a, b) => {
+    const priorityA = statusPriority[a.reservationStatus] ?? 99;
+    const priorityB = statusPriority[b.reservationStatus] ?? 99;
+    if (priorityA !== priorityB) return priorityA - priorityB;
+    return getActivityTimestamp(b) - getActivityTimestamp(a);
+  });
+
 const filteredPastReservations = computed(() => {
   const query = pastSearchQuery.value.trim().toLowerCase();
   const status = pastStatusFilter.value;
 
-  return pastReservations.value.filter((reservation) => {
+  const filtered = pastReservations.value.filter((reservation) => {
     if (status !== "all" && reservation.reservationStatus !== status) {
       return false;
     }
@@ -145,6 +187,12 @@ const filteredPastReservations = computed(() => {
       name.toLowerCase().includes(query) ||
       address.toLowerCase().includes(query)
     );
+  });
+  return [...filtered].sort((a, b) => {
+    const priorityA = statusPriority[a.reservationStatus] ?? 99;
+    const priorityB = statusPriority[b.reservationStatus] ?? 99;
+    if (priorityA !== priorityB) return priorityA - priorityB;
+    return getActivityTimestamp(b) - getActivityTimestamp(a);
   });
 });
 
@@ -174,7 +222,7 @@ const loadReservations = async (type) => {
     if (type === "past") {
       pastReservations.value = mapped;
     } else {
-      upcomingReservations.value = mapped;
+      upcomingReservations.value = sortUpcomingByPriority(mapped);
     }
   } catch (error) {
     console.error("예약 내역 조회 실패:", error);

@@ -1,6 +1,7 @@
 package com.example.LunchGo.reservation.dto;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -21,6 +22,7 @@ public class ReservationHistoryItem {
     private PaymentInfo payment;
     private String reservationStatus;
     private String cancelledBy;
+    private LocalDateTime cancelledAt;
     private ReviewInfo review;
 
     @Getter

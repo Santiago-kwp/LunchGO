@@ -87,6 +87,7 @@ public class ReservationHistoryServiceImpl implements ReservationHistoryService 
                 payment,
                 row.getReservationStatus(),
                 row.getCancelledBy(),
+                row.getCancelledAt(),
                 review
             ));
         }

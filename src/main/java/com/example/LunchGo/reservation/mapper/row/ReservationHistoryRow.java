@@ -1,6 +1,7 @@
 package com.example.LunchGo.reservation.mapper.row;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import lombok.Getter;
 import lombok.Setter;
@@ -29,6 +30,7 @@ public class ReservationHistoryRow {
     private Integer totalAmount;
 
     private String cancelledBy;
+    private LocalDateTime cancelledAt;
 
     private Long reviewId;
     private Integer reviewRating;
