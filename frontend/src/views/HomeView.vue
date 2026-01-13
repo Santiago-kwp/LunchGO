@@ -45,7 +45,7 @@ const accountStore = useAccountStore();
 const isLoggedIn = computed(() =>
     Boolean(accountStore.accessToken || localStorage.getItem("accessToken"))
 );
-const { fetchFavorites, clearFavorites, userId } = useFavorites();
+const { fetchFavorites, clearFavorites, userId, favoriteRestaurantIds } = useFavorites();
 
 const getStoredMember = () => {
   if (typeof window === "undefined") return null;
@@ -65,6 +65,10 @@ const memberId = computed(() => {
   const parsed = Number(rawId);
   return Number.isNaN(parsed) ? null : parsed;
 });
+
+const favoriteIdSet = computed(
+  () => new Set(favoriteRestaurantIds.value.map((id) => Number(id)))
+);
 
 // State management (React's useState -> Vue's ref)
 const isFilterOpen = ref(false);
@@ -624,7 +628,7 @@ const canGoNext = computed(() => currentPageGroupEnd.value < totalPages.value);
 const isCalendarOpen = ref(false);
 const calendarMonth = ref(new Date());
 const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
-const selectedMapRestaurant = ref(null);
+const selectedMapRestaurants = ref([]);
 
 const formattedSearchDate = computed(() => {
   if (!searchDate.value) {
@@ -816,10 +820,10 @@ const fetchReviewSummary = async (restaurantId) => {
   }
 };
 
-const updateSelectedMapRestaurant = (restaurant) => {
+const normalizeMapRestaurant = (restaurant) => {
   const key = String(restaurant.id);
   const summary = reviewSummaryCache.value[key];
-  selectedMapRestaurant.value = {
+  return {
     ...restaurant,
     image:
         restaurantImageOverrides.value[String(restaurant.id)] ?? restaurant.image,
@@ -828,13 +832,22 @@ const updateSelectedMapRestaurant = (restaurant) => {
   };
 };
 
+const updateSelectedMapRestaurants = (restaurants) => {
+  selectedMapRestaurants.value = restaurants.map(normalizeMapRestaurant);
+};
+
+const refreshSelectedMapRestaurants = () => {
+  if (!selectedMapRestaurants.value.length) return;
+  selectedMapRestaurants.value = selectedMapRestaurants.value.map(normalizeMapRestaurant);
+};
+
 const ensureReviewSummary = async (restaurant) => {
   const key = String(restaurant.id);
   if (!reviewSummaryCache.value[key]) {
     await fetchReviewSummary(restaurant.id);
   }
-  if (selectedMapRestaurant.value?.id === restaurant.id) {
-    updateSelectedMapRestaurant(restaurant);
+  if (selectedMapRestaurants.value.some((item) => item.id === restaurant.id)) {
+    refreshSelectedMapRestaurants();
   }
 };
 
@@ -1230,7 +1243,7 @@ const restoreSearchState = async () => {
 };
 
 const closeMapRestaurantModal = () => {
-  selectedMapRestaurant.value = null;
+  selectedMapRestaurants.value = [];
 };
 
 const resolveCafeteriaBaseDate = () => {
@@ -1618,54 +1631,65 @@ onBeforeUnmount(() => {
       </div>
 
       <div
-          v-if="selectedMapRestaurant"
+          v-if="selectedMapRestaurants.length"
           class="fixed bottom-20 left-0 right-0 z-[60] px-4"
       >
-        <div class="max-w-[500px] mx-auto">
-          <RouterLink
-              :to="`/restaurant/${selectedMapRestaurant.id}`"
-              class="block bg-white border border-[#e9ecef] shadow-card rounded-2xl p-4"
-              @click="closeMapRestaurantModal"
-          >
-            <div class="flex gap-3">
-              <img
-                  :src="selectedMapRestaurant.image || '/placeholder.svg'"
-                  :alt="selectedMapRestaurant.name"
-                  class="w-20 h-20 rounded-xl object-cover flex-shrink-0"
-              />
-              <div class="flex-1 min-w-0">
-                <div class="flex items-start justify-between gap-2 mb-1">
-                  <div class="min-w-0 flex-1">
-                    <p class="text-sm font-semibold text-[#1e3a5f]">
-                      {{ selectedMapRestaurant.name }}
-                    </p>
-                    <p class="text-xs text-gray-700 truncate">
-                      {{ selectedMapRestaurant.address }}
-                    </p>
+        <div class="max-w-[500px] mx-auto bg-white border border-[#e9ecef] shadow-card rounded-2xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-sm font-semibold text-[#1e3a5f]">
+              같은 건물 식당 {{ selectedMapRestaurants.length }}곳
+            </p>
+            <button
+                @click="closeMapRestaurantModal"
+                class="text-gray-700 hover:text-gray-700"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+          <div class="space-y-3 max-h-[40vh] overflow-y-auto pr-1">
+            <RouterLink
+                v-for="restaurant in selectedMapRestaurants"
+                :key="restaurant.id"
+                :to="`/restaurant/${restaurant.id}`"
+                class="block border border-[#e9ecef] rounded-xl p-3 hover:bg-[#f8f9fa]"
+                @click="closeMapRestaurantModal"
+            >
+              <div class="flex gap-3">
+                <img
+                    :src="restaurant.image || '/placeholder.svg'"
+                    :alt="restaurant.name"
+                    class="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                />
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-semibold text-[#1e3a5f]">
+                    {{ restaurant.name }}
+                  </p>
+                  <p class="text-xs text-gray-700 truncate">
+                    {{ restaurant.address }}
+                  </p>
+                  <div class="flex items-center gap-2 text-xs text-gray-700 mt-1">
+                    <span
+                        class="flex items-center gap-1 text-[#1e3a5f] font-semibold"
+                    >
+                      <Star class="w-3.5 h-3.5 fill-[#ffc107] text-[#ffc107]" />
+                      {{ restaurant.rating }}
+                    </span>
+                    <span
+                        v-if="favoriteIdSet.has(Number(restaurant.id))"
+                        class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"
+                    >
+                      즐겨찾기
+                    </span>
+                    <span>리뷰 {{ restaurant.reviews }}개</span>
+                    <span>{{ restaurant.category }}</span>
                   </div>
-                  <button
-                      @click.stop.prevent="closeMapRestaurantModal"
-                      class="text-gray-700 hover:text-gray-700"
-                  >
-                    <X class="w-4 h-4" />
-                  </button>
+                  <p class="text-sm font-semibold text-[#1e3a5f] mt-1">
+                    {{ restaurant.price }}
+                  </p>
                 </div>
-                <div class="flex items-center gap-2 text-xs text-gray-700">
-                  <span
-                      class="flex items-center gap-1 text-[#1e3a5f] font-semibold"
-                  >
-                    <Star class="w-3.5 h-3.5 fill-[#ffc107] text-[#ffc107]" />
-                    {{ selectedMapRestaurant.rating }}
-                  </span>
-                  <span>리뷰 {{ selectedMapRestaurant.reviews }}개</span>
-                  <span>{{ selectedMapRestaurant.category }}</span>
-                </div>
-                <p class="text-sm font-semibold text-[#1e3a5f] mt-2">
-                  {{ selectedMapRestaurant.price }}
-                </p>
               </div>
-            </div>
-          </RouterLink>
+            </RouterLink>
+          </div>
         </div>
       </div>
 
