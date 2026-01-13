@@ -85,7 +85,7 @@ public class ReservationServiceImpl implements ReservationService {
         // 불필요한 트랜잭션 롤백 비용을 절감하기 위해 애플리케이션 레벨에서 먼저 확인합니다.
         // DistributedLock(개인 락)은 5초 이내의 중복 요청만 막아주므로, 이 로직이 필수적입니다.
         if (reservationMapper.countActiveReservation(request.getUserId(), slot.getSlotId()) > 0) {
-            throw new DuplicateReservationException("동일 시간대에 예약된 내역이 았습니다.");
+            throw new DuplicateReservationException("동일 시간대에 예약된 내역이 있습니다.");
         }
 
         // PREORDER_PREPAY면 메뉴 스냅샷(이름/가격) 확정 + 합계 계산
