@@ -1,13 +1,14 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, watch, computed, onUnmounted, onMounted } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { ArrowLeft, ChevronRight, Check, X } from 'lucide-vue-next'; // 아이콘 추가
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import Input from '@/components/ui/Input.vue';
+import TERMS_POLICY_TEXT from '@/content/서비스 이용 약관.md?raw';
 import PRIVACY_POLICY_TEXT from '@/content/privacyPolicy.md?raw';
-import axios from 'axios';
 import { marked } from 'marked';
+import httpRequest from '@/router/httpRequest';
 
 const router = useRouter();
 
@@ -225,7 +226,7 @@ const handleSendVerifyCode = async () => {
 
   alert(`인증번호를 발송했습니다: ${phone.value}`);
   try {
-    await axios.post('/api/sms/send', {phone: phone.value});
+    await httpRequest.post('/api/sms/send', { phone: phone.value }, { skipAuth: true });
 
     isCodeSent.value = true;
     startTimer(); 
@@ -243,10 +244,10 @@ const handleVerifyCode = async () => {
   if (isTimeout.value) return alert('입력 시간이 초과되었습니다. 재발송해주세요.');
 
   try {
-    const response = await axios.post('/api/sms/verify', {
+    const response = await httpRequest.post('/api/sms/verify', {
       phone: phone.value,
       verifyCode: verificationCode.value
-    });
+    }, { skipAuth: true });
 
     if(response.data === true){
       alert('인증이 완료되었습니다.');
@@ -280,9 +281,9 @@ const handleEmailDuplicateCheck = async () => {
 
   //백엔드 연동해서 이메일 unique한지 check
   try{
-    await axios.post('/api/auth/email',{
+    await httpRequest.post('/api/auth/email', {
       email: email.value
-    });
+    }, { skipAuth: true });
 
     alert('사용 가능한 이메일입니다.');
     isEmailUnique.value = true;
@@ -309,8 +310,7 @@ const openModal = (type) => {
   isTermsModalOpen.value = true;
   if (type === 'terms') {
     modalTitle.value = '서비스 이용약관';
-    modalContent.value =
-      '제1조 (목적)\n이 약관은 런치고 서비스의 이용조건 및 절차...';
+    modalContent.value = TERMS_POLICY_TEXT;
   } else if (type === 'privacy') {
     modalTitle.value = '개인정보 처리방침';
     modalContent.value = PRIVACY_POLICY_TEXT;
@@ -353,11 +353,11 @@ const handleSignup = async () => {
   let totalAddress = companyFrontAddress.value + ' ' + companyBackAddress.value;
 
   try {
-    await axios.post('/api/join/user', {
+    await httpRequest.post('/api/join/user', {
       email: email.value, password: password.value, name: name.value, 
       phone: phone.value, companyName: companyName.value,
       companyAddress: totalAddress, marketingAgree: agreeMarketing.value
-    });
+    }, { skipAuth: true });
 
     //타이머 실행되고 있으면 정지
     if (timerInterval.value) clearInterval(timerInterval.value);

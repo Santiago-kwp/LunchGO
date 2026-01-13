@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, watch, computed, onUnmounted, onMounted } from 'vue';
 import axios from 'axios';
 import { marked } from 'marked';
@@ -14,6 +14,7 @@ import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import Input from '@/components/ui/Input.vue';
 import PRIVACY_POLICY_TEXT from '@/content/privacyPolicy.md?raw';
+import TERMS_POLICY_TEXT from '@/content/서비스 이용 약관.md?raw';
 
 const router = useRouter();
 
@@ -359,8 +360,7 @@ const openModal = (type) => {
   isTermsModalOpen.value = true;
   if (type === 'terms') {
     modalTitle.value = '서비스 이용약관';
-    modalContent.value =
-      '제1조 (목적)\n이 약관은 런치고 서비스의 이용조건 및 절차...';
+    modalContent.value = TERMS_POLICY_TEXT;
   } else if (type === 'privacy') {
     modalTitle.value = '개인정보 처리방침';
     modalContent.value = PRIVACY_POLICY_TEXT;

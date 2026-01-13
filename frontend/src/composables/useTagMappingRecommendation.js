@@ -29,7 +29,7 @@ export const useTagMappingRecommendation = () => {
   const mapToRestaurants = (mappings) =>
     mappings
       .map((mapping) => {
-        const restaurant = getRestaurantById(mapping?.restaurantId-3);
+        const restaurant = getRestaurantById(mapping?.restaurantId);
         if (!restaurant) {
           return null;
         }
