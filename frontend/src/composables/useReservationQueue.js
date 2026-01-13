@@ -18,6 +18,18 @@ export function useReservationQueue() {
   const estimatedWaitTime = ref(0);
 
   // 예상 대기 시간 포맷팅 (초 -> 분/초)
+  const formattedWaitTime = computed(() => {
+    const totalSeconds = estimatedWaitTime.value;
+    if (totalSeconds <= 0) return `약 ${DEFAULT_ESTIMATED_TIME}초`;
+    
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    
+    if (mins > 0) {
+      return `약 ${mins}분 ${secs > 0 ? secs + '초' : ''}`.trim();
+    }
+    return `약 ${totalSeconds}초`;
+  });
   
   /**
    * 예약 대기열 처리 로직
