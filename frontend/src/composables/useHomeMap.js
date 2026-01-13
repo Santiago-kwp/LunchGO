@@ -9,6 +9,7 @@ export const useHomeMap = ({
   selectedDistanceKm,
   resolveRestaurantCoords,
   onMarkerClick,
+  favoriteIdSet,
   restaurants,
 }) => {
   const mapContainer = ref(null);
@@ -135,12 +136,18 @@ export const useHomeMap = ({
       }
     }
 
-    const markerSvg =
-      "data:image/svg+xml;utf8," +
-      "<svg xmlns='http://www.w3.org/2000/svg' width='32' height='46' viewBox='0 0 32 46'>" +
-      "<path d='M16 1C8.8 1 3 6.8 3 14c0 9.3 13 30 13 30s13-20.7 13-30C29 6.8 23.2 1 16 1z' fill='%23ff6b4a' stroke='white' stroke-width='2'/>" +
-      "<circle cx='16' cy='14' r='5' fill='white'/>" +
-      "</svg>";
+    const buildMarkerSvg = (body) =>
+      `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="46" viewBox="0 0 32 46">${body}</svg>`
+      )}`;
+    const markerSvg = buildMarkerSvg(
+      '<path d="M16 1C8.8 1 3 6.8 3 14c0 9.3 13 30 13 30s13-20.7 13-30C29 6.8 23.2 1 16 1z" fill="#ff6b4a" stroke="white" stroke-width="2"/>' +
+        '<circle cx="16" cy="14" r="5" fill="white"/>'
+    );
+    const favoriteMarkerSvg = buildMarkerSvg(
+      '<path d="M16 1C8.8 1 3 6.8 3 14c0 9.3 13 30 13 30s13-20.7 13-30C29 6.8 23.2 1 16 1z" fill="#007bff" stroke="white" stroke-width="2"/>' +
+        '<path d="M16 8.5l2.1 4.3 4.7.7-3.4 3.3.8 4.7-4.2-2.2-4.2 2.2.8-4.7-3.4-3.3 4.7-.7z" fill="white"/>'
+    );
     const markerImage = new kakaoMaps.MarkerImage(
       markerSvg,
       new kakaoMaps.Size(32, 46),
@@ -154,6 +161,8 @@ export const useHomeMap = ({
       "</svg>";
     const originMarkerImage = new kakaoMaps.MarkerImage(
       originMarkerSvg,
+    const favoriteMarkerImage = new kakaoMaps.MarkerImage(
+      favoriteMarkerSvg,
       new kakaoMaps.Size(32, 46),
       { offset: new kakaoMaps.Point(16, 46) }
     );
@@ -164,6 +173,8 @@ export const useHomeMap = ({
       const isSelected = key && selectedMarkerKey.value === key;
       marker.setImage(isSelected ? selectedMarkerImage : markerImage);
     };
+    const favoriteIds = favoriteIdSet?.value ?? new Set();
+    const markerGroups = new Map();
 
     if (routeFocus.value && isValidCoords(routeFocus.value)) {
       markerRegistry.forEach((entry) => setMarkerVisible(entry.marker, false));
@@ -198,6 +209,14 @@ export const useHomeMap = ({
       if (distanceLimit && !isWithinDistance(coords, distanceLimit)) {
         continue;
       }
+      const coordKey = `${coords.lat.toFixed(6)},${coords.lng.toFixed(6)}`;
+      const group = markerGroups.get(coordKey) ?? {
+        coords,
+        restaurants: [],
+      };
+      group.restaurants.push(restaurant);
+      markerGroups.set(coordKey, group);
+    }
 
       const key = getRestaurantKey(restaurant);
       nextKeys.add(key);
@@ -249,8 +268,24 @@ export const useHomeMap = ({
           }
           applyMarkerStyle(key, marker);
         }
+    for (const group of markerGroups.values()) {
+      const hasFavorite = group.restaurants.some((item) =>
+        favoriteIds.has(Number(item.id))
+      );
+      const marker = new kakaoMaps.Marker({
+        position: new kakaoMaps.LatLng(group.coords.lat, group.coords.lng),
+        title: group.restaurants[0]?.name ?? "",
+        image: hasFavorite ? favoriteMarkerImage : markerImage,
+      });
+
+      try {
+        marker.setMap(mapInstance.value);
+        kakaoMaps.event.addListener(marker, "click", () => {
+          onMarkerClick?.(group.restaurants);
+        });
+        mapMarkers.push(marker);
       } catch (error) {
-        console.error("지도 마커 표시 실패:", restaurant?.name, error);
+        console.error("지도 마커 표시 실패:", group?.restaurants?.[0]?.name, error);
       }
     }
 
@@ -467,6 +502,13 @@ export const useHomeMap = ({
       renderMapMarkers(kakaoMapsApi.value);
     }
   });
+
+  watch(
+    () => favoriteIdSet?.value,
+    () => {
+      scheduleMapMarkerRender();
+    }
+  );
 
   onBeforeUnmount(() => {
     markerRegistry.forEach((entry) => entry.marker.setMap(null));

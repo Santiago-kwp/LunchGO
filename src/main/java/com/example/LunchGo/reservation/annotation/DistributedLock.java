@@ -23,10 +23,11 @@ public @interface DistributedLock {
 
     /**
      * 식당 락 대기 시간 (Redisson)
-     * 0L로 설정하여 락 획득 실패 시 즉시 예외를 발생시킴 (Fail-Fast)
-     * AOP 우선순위 조정(@Order)과 결합하여 DB 커넥션 낭비를 방지함.
+     * 2L로 설정하여 가벼운 경합은 서버 내부에서 대기 후 처리하고(Throughput 향상),
+     * 대기가 길어질 경우에만 예외를 발생시켜 클라이언트 대기 모달을 유도함 (Fail-Fast).
+     * AOP 우선순위 조정(@Order)과 결합하여 대기 시 DB 커넥션 낭비를 방지함.
      */
-    long waitTime() default 0L;
+    long waitTime() default 2L;
 
     /**
      * 식당 락 점유 시간 (Redisson)

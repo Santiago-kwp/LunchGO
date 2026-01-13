@@ -75,6 +75,11 @@ public interface ReservationMapper {
     );
     List<ReservationMenuItemRow> selectReservationMenuItems(@Param("reservationId") Long reservationId);
 
+    int countActiveReservation(
+            @Param("userId") Long userId,
+            @Param("slotId") Long slotId
+    );
+
     // --- reminder ---
     List<com.example.LunchGo.reservation.mapper.row.ReminderSendRow> selectReminderTargets();
 

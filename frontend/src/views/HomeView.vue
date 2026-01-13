@@ -21,7 +21,7 @@ import {
 import Button from "@/components/ui/Button.vue"; // Import our custom Button component
 import AppFooter from "@/components/ui/AppFooter.vue";
 import BottomNav from "@/components/ui/BottomNav.vue";
-import { RouterLink } from "vue-router"; // Import Vue RouterLink
+import { RouterLink, useRouter } from "vue-router"; // Import Vue RouterLink
 import { geocodeAddress } from "@/utils/kakao";
 import { restaurants as restaurantData } from "@/data/restaurants";
 import AppHeader from "@/components/ui/AppHeader.vue";
@@ -43,10 +43,11 @@ import axios from "axios";
 import httpRequest from "@/router/httpRequest.js";
 
 const accountStore = useAccountStore();
+const router = useRouter();
 const isLoggedIn = computed(() =>
     Boolean(accountStore.accessToken || localStorage.getItem("accessToken"))
 );
-const { fetchFavorites, clearFavorites, userId } = useFavorites();
+const { fetchFavorites, clearFavorites, userId, favoriteRestaurantIds } = useFavorites();
 
 const getStoredMember = () => {
   if (typeof window === "undefined") return null;
@@ -66,6 +67,10 @@ const memberId = computed(() => {
   const parsed = Number(rawId);
   return Number.isNaN(parsed) ? null : parsed;
 });
+
+const favoriteIdSet = computed(
+  () => new Set(favoriteRestaurantIds.value.map((id) => Number(id)))
+);
 
 // State management (React's useState -> Vue's ref)
 const isFilterOpen = ref(false);
@@ -315,9 +320,15 @@ const selectedDistanceKm = computed(() => {
 
 const restaurantGeocodeCache = new Map();
 
-const handleMapMarkerClick = (restaurant) => {
-  updateSelectedMapRestaurant(restaurant);
-  ensureReviewSummary(restaurant);
+const handleMapMarkerClick = (restaurants = []) => {
+  if (!restaurants.length) return;
+  restaurants.forEach((restaurant) => {
+    fetchRestaurantImage(restaurant.id);
+  });
+  updateSelectedMapRestaurants(restaurants);
+  restaurants.forEach((restaurant) => {
+    ensureReviewSummary(restaurant);
+  });
 };
 
 async function resolveRestaurantCoords(restaurant) {
@@ -390,6 +401,7 @@ const {
   selectedDistanceKm,
   resolveRestaurantCoords,
   onMarkerClick: handleMapMarkerClick,
+  favoriteIdSet,
   restaurants: restaurantData,
 });
 
@@ -399,7 +411,7 @@ const RECOMMEND_TASTE = "\uCDE8\uD5A5 \uB9DE\uCDA4 \uD83D\uDE0B";
 const RECOMMEND_TRENDING = "\uC778\uAE30\uC21C \uD83D\uDD25";
 const RECOMMEND_WEATHER = "\uB0A0\uC528 \uCD94\uCC9C \u2600\uFE0F";
 const TAG_MESSAGE_LOGIN = "\uB85C\uADF8\uC778\uC774 \uD544\uC694\uD569\uB2C8\uB2E4";
-const TAG_MESSAGE_SPECIALITY = "\uD2B9\uC774\uC0AC\uD56D \uD0DC\uADF8\uB97C \uBA3C\uC800 \uCD94\uAC00\uD574\uC8FC\uC138\uC694";
+const TAG_MESSAGE_SPECIALITY = "\uD2B9\uC774\uC0AC\uD56D\uC744 \uBA3C\uC800 \uB4F1\uB85D\uD574\uC8FC\uC138\uC694";
 const TAG_MESSAGE_LOADING = "\uCD94\uCC9C \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4";
 const TAG_MESSAGE_ERROR = "\uCD94\uCC9C \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4";
 
@@ -427,13 +439,17 @@ const tagMappingNotice = computed(() => {
     return TAG_MESSAGE_LOGIN;
   }
   if (tagMappingMessageCode.value === "SPECIALITY_REQUIRED") {
-    return TAG_MESSAGE_SPECIALITY;
+    return "";
   }
   if (tagMappingError.value) {
-    return TAG_MESSAGE_ERROR;
+    return "";
   }
   return "";
 });
+
+const goToSpeciality = () => {
+  router.push({ path: "/mypage", hash: "#speciality-section" });
+};
 const tasteRecommendationSummary = computed(() => {
   if (selectedRecommendation.value !== RECOMMEND_TASTE) {
     return "";
@@ -833,7 +849,7 @@ const canGoNext = computed(() => currentPageGroupEnd.value < totalPages.value);
 const isCalendarOpen = ref(false);
 const calendarMonth = ref(new Date());
 const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
-const selectedMapRestaurant = ref(null);
+const selectedMapRestaurants = ref([]);
 
 const formattedSearchDate = computed(() => {
   if (!searchDate.value) {
@@ -1025,10 +1041,10 @@ const fetchReviewSummary = async (restaurantId) => {
   }
 };
 
-const updateSelectedMapRestaurant = (restaurant) => {
+const normalizeMapRestaurant = (restaurant) => {
   const key = String(restaurant.id);
   const summary = reviewSummaryCache.value[key];
-  selectedMapRestaurant.value = {
+  return {
     ...restaurant,
     image:
         restaurantImageOverrides.value[String(restaurant.id)] ?? restaurant.image,
@@ -1037,13 +1053,29 @@ const updateSelectedMapRestaurant = (restaurant) => {
   };
 };
 
+const updateSelectedMapRestaurants = (restaurants) => {
+  selectedMapRestaurants.value = restaurants.map(normalizeMapRestaurant);
+};
+
+const refreshSelectedMapRestaurants = () => {
+  if (!selectedMapRestaurants.value.length) return;
+  selectedMapRestaurants.value = selectedMapRestaurants.value.map(normalizeMapRestaurant);
+};
+
+const formatRating = (value) => {
+  if (value == null) return "0.0";
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return "0.0";
+  return parsed.toFixed(1);
+};
+
 const ensureReviewSummary = async (restaurant) => {
   const key = String(restaurant.id);
   if (!reviewSummaryCache.value[key]) {
     await fetchReviewSummary(restaurant.id);
   }
-  if (selectedMapRestaurant.value?.id === restaurant.id) {
-    updateSelectedMapRestaurant(restaurant);
+  if (selectedMapRestaurants.value.some((item) => item.id === restaurant.id)) {
+    refreshSelectedMapRestaurants();
   }
 };
 
@@ -1456,7 +1488,7 @@ const restoreSearchState = async () => {
 };
 
 const closeMapRestaurantModal = () => {
-  selectedMapRestaurant.value = null;
+  selectedMapRestaurants.value = [];
 };
 
 const resolveCafeteriaBaseDate = () => {
@@ -1887,54 +1919,65 @@ onBeforeUnmount(() => {
       </div>
 
       <div
-          v-if="selectedMapRestaurant"
+          v-if="selectedMapRestaurants.length"
           class="fixed bottom-20 left-0 right-0 z-[60] px-4"
       >
-        <div class="max-w-[500px] mx-auto">
-          <RouterLink
-              :to="`/restaurant/${selectedMapRestaurant.id}`"
-              class="block bg-white border border-[#e9ecef] shadow-card rounded-2xl p-4"
-              @click="closeMapRestaurantModal"
-          >
-            <div class="flex gap-3">
-              <img
-                  :src="selectedMapRestaurant.image || '/placeholder.svg'"
-                  :alt="selectedMapRestaurant.name"
-                  class="w-20 h-20 rounded-xl object-cover flex-shrink-0"
-              />
-              <div class="flex-1 min-w-0">
-                <div class="flex items-start justify-between gap-2 mb-1">
-                  <div class="min-w-0 flex-1">
-                    <p class="text-sm font-semibold text-[#1e3a5f]">
-                      {{ selectedMapRestaurant.name }}
-                    </p>
-                    <p class="text-xs text-gray-700 truncate">
-                      {{ selectedMapRestaurant.address }}
-                    </p>
+        <div class="max-w-[500px] mx-auto bg-white border border-[#e9ecef] shadow-card rounded-2xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-sm font-semibold text-[#1e3a5f]">
+              같은 건물 식당 {{ selectedMapRestaurants.length }}곳
+            </p>
+            <button
+                @click="closeMapRestaurantModal"
+                class="text-gray-700 hover:text-gray-700"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+          <div class="space-y-3 max-h-[40vh] overflow-y-auto pr-1">
+            <RouterLink
+                v-for="restaurant in selectedMapRestaurants"
+                :key="restaurant.id"
+                :to="`/restaurant/${restaurant.id}`"
+                class="block border border-[#e9ecef] rounded-xl p-3 hover:bg-[#f8f9fa]"
+                @click="closeMapRestaurantModal"
+            >
+              <div class="flex gap-3">
+                <img
+                    :src="restaurant.image || '/placeholder.svg'"
+                    :alt="restaurant.name"
+                    class="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                />
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-semibold text-[#1e3a5f]">
+                    {{ restaurant.name }}
+                  </p>
+                  <p class="text-xs text-gray-700 truncate">
+                    {{ restaurant.address }}
+                  </p>
+                  <div class="flex items-center gap-2 text-xs text-gray-700 mt-1">
+                    <span
+                        class="flex items-center gap-1 text-[#1e3a5f] font-semibold"
+                    >
+                      <Star class="w-3.5 h-3.5 fill-[#ffc107] text-[#ffc107]" />
+                      {{ formatRating(restaurant.rating) }}
+                    </span>
+                    <span
+                        v-if="favoriteIdSet.has(Number(restaurant.id))"
+                        class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"
+                    >
+                      즐겨찾기
+                    </span>
+                    <span>리뷰 {{ restaurant.reviews }}개</span>
+                    <span>{{ restaurant.category }}</span>
                   </div>
-                  <button
-                      @click.stop.prevent="closeMapRestaurantModal"
-                      class="text-gray-700 hover:text-gray-700"
-                  >
-                    <X class="w-4 h-4" />
-                  </button>
+                  <p class="text-sm font-semibold text-[#1e3a5f] mt-1">
+                    {{ restaurant.price }}
+                  </p>
                 </div>
-                <div class="flex items-center gap-2 text-xs text-gray-700">
-                  <span
-                      class="flex items-center gap-1 text-[#1e3a5f] font-semibold"
-                  >
-                    <Star class="w-3.5 h-3.5 fill-[#ffc107] text-[#ffc107]" />
-                    {{ selectedMapRestaurant.rating }}
-                  </span>
-                  <span>리뷰 {{ selectedMapRestaurant.reviews }}개</span>
-                  <span>{{ selectedMapRestaurant.category }}</span>
-                </div>
-                <p class="text-sm font-semibold text-[#1e3a5f] mt-2">
-                  {{ selectedMapRestaurant.price }}
-                </p>
               </div>
-            </div>
-          </RouterLink>
+            </RouterLink>
+          </div>
         </div>
       </div>
 

@@ -11,6 +11,7 @@ import com.example.LunchGo.reservation.mapper.row.ReservationCreateRow;
 import com.example.LunchGo.restaurant.entity.Menu;
 import com.example.LunchGo.restaurant.repository.MenuRepository;
 import lombok.RequiredArgsConstructor;
+import org.apache.ibatis.exceptions.PersistenceException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -80,6 +81,14 @@ public class ReservationServiceImpl implements ReservationService {
                 request.getPartySize()
         );
 
+        // [중복 예약 사전 검증]
+        // DB 유니크 제약조건(uk_user_slot_active) 위반 시 발생하는 SQL 에러 로그를 방지하고,
+        // 불필요한 트랜잭션 롤백 비용을 절감하기 위해 애플리케이션 레벨에서 먼저 확인합니다.
+        // DistributedLock(개인 락)은 5초 이내의 중복 요청만 막아주므로, 이 로직이 필수적입니다.
+        if (reservationMapper.countActiveReservation(request.getUserId(), slot.getSlotId()) > 0) {
+            throw new DuplicateReservationException("동일 시간대에 예약된 내역이 있습니다.");
+        }
+
         // PREORDER_PREPAY면 메뉴 스냅샷(이름/가격) 확정 + 합계 계산
         List<ReservationCreateRequest.MenuItem> reqMenuItems = request.getMenuItems();
         List<MenuSnapshot> snapshots = new ArrayList<>();
@@ -135,7 +144,7 @@ public class ReservationServiceImpl implements ReservationService {
 
         try {
             reservationMapper.insertReservation(reservation);
-        } catch (DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException | PersistenceException e) {
             // 결제 대기 시간 만료 전, 약간의 텀을 두고 중복된 예약 요청이 발생했을 때의 중복 예약 방지
             throw new DuplicateReservationException("이미 결제 대기 중인 예약 요청입니다.");
         }
