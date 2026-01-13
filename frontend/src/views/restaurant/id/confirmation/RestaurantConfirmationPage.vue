@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { CheckCircle2, MapPin, Calendar, Clock, Users } from 'lucide-vue-next';
 import { RouterLink, useRoute, useRouter } from 'vue-router'; // Import Vue RouterLink
 import httpRequest from '@/router/httpRequest';
@@ -13,6 +13,35 @@ const isLoading = ref(false);
 const errorMessage = ref('');
 const completionAttempted = ref(false);
 const paymentStatus = ref({ paid: false, paidAt: '' });
+const bookingSummary = ref({ paymentDeadlineAt: null });
+const nowTick = ref(Date.now());
+let countdownTimer = null;
+
+const normalizeDeadline = (raw) => {
+  if (!raw) return null;
+  if (typeof raw !== "string") return raw;
+  if (raw.includes("T")) return raw;
+  return raw.replace(" ", "T");
+};
+
+const countdownText = computed(() => {
+  const deadlineRaw = normalizeDeadline(bookingSummary.value.paymentDeadlineAt);
+  if (!deadlineRaw) return "";
+  const deadline = new Date(deadlineRaw);
+  if (Number.isNaN(deadline.getTime())) return "";
+  const diffMs = deadline.getTime() - nowTick.value;
+  if (diffMs <= 0) {
+    return "결제 시간이 초과되었습니다";
+  }
+  const totalSec = Math.floor(diffMs / 1000);
+  const minutes = Math.floor(totalSec / 60);
+  const seconds = totalSec % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+});
+
+const isPendingPayment = computed(
+  () => reservation.value.status !== "CANCELLED" && !paymentStatus.value.paid
+);
 
 const shortConfirmationNumber = (value) => {
   const raw = String(value ?? '').trim();
@@ -95,6 +124,17 @@ const fetchReservationDetail = async () => {
     errorMessage.value = error?.message || '예약 정보를 불러오지 못했습니다.';
   } finally {
     isLoading.value = false;
+  }
+};
+
+const fetchBookingSummary = async () => {
+  if (!reservationId) return;
+  try {
+    const response = await httpRequest.get(`/api/reservations/${reservationId}/summary`);
+    bookingSummary.value.paymentDeadlineAt =
+      response.data?.paymentDeadlineAt ?? response.data?.holdExpiresAt ?? null;
+  } catch (error) {
+    bookingSummary.value.paymentDeadlineAt = null;
   }
 };
 
@@ -189,7 +229,17 @@ onMounted(async () => {
     return;
   }
   await fetchPaymentStatus();
+  await fetchBookingSummary();
   await fetchReservationDetail();
+  countdownTimer = setInterval(() => {
+    nowTick.value = Date.now();
+  }, 1000);
+});
+
+onUnmounted(() => {
+  if (countdownTimer) {
+    clearInterval(countdownTimer);
+  }
 });
 </script>
 
@@ -199,7 +249,7 @@ onMounted(async () => {
       <!-- Success Header -->
       <div class="bg-white px-4 pt-12 pb-8 text-center border-b border-[#e9ecef]">
         <div class="w-16 h-16 rounded-full gradient-primary flex items-center justify-center mx-auto mb-4 shadow-button-hover">
-          <CheckCircle2 class="w-10 h-10 text-white" />
+          <component :is="isPendingPayment ? Clock : CheckCircle2" class="w-10 h-10 text-white" />
         </div>
         <h1 class="text-2xl font-bold text-[#1e3a5f] mb-2">
           <template v-if="reservation.status === 'CANCELLED'">
@@ -223,6 +273,12 @@ onMounted(async () => {
             <br />
             결제 후 다시 확인해 주세요
           </template>
+        </p>
+        <p
+          v-if="isPendingPayment && countdownText"
+          class="mt-3 text-sm text-red-500"
+        >
+          결제 남은 시간 : {{ countdownText }}
         </p>
         <p v-if="isLoading" class="mt-3 text-xs text-[#6c757d]">예약 정보를 불러오는 중...</p>
         <p v-if="errorMessage" class="mt-3 text-xs text-red-500">{{ errorMessage }}</p>
@@ -389,8 +445,7 @@ onMounted(async () => {
           class="flex-1"
         >
           <Button
-            variant="outline"
-            class="w-full h-12 border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] rounded-xl font-semibold"
+            class="w-full h-12 bg-gradient-to-r from-[#ff6b4a] to-[#ff8e72] text-white rounded-xl font-semibold shadow-button-hover hover:shadow-button-pressed"
           >
             결제 페이지로
           </Button>

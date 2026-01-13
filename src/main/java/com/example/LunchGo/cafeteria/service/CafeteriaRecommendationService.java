@@ -31,6 +31,8 @@ public class CafeteriaRecommendationService {
     private static final int DEFAULT_RECOMMENDATION_LIMIT = 2;
     private static final String NO_AVOID_MENU_MESSAGE =
         "기피 메뉴가 없으시군요? 그럼 이런 곳은 어때요?";
+    private static final String NO_CAFETERIA_MENU_MESSAGE =
+        "구내식당 운영을 안하니 여긴 어때요?";
     private static final List<String> PORK_INGREDIENTS = List.of("돼지고기");
     private static final List<String> BEEF_INGREDIENTS = List.of("소고기");
     private static final List<String> CHICKEN_INGREDIENTS = List.of("닭고기");
@@ -39,16 +41,24 @@ public class CafeteriaRecommendationService {
     private static final List<String> CRUSTACEAN_INGREDIENTS = List.of("갑각류");
     private static final List<String> FISH_INGREDIENTS = List.of("생선");
     private static final List<String> BUCKWHEAT_INGREDIENTS = List.of("메밀");
-    private static final List<String> DAIRY_INGREDIENTS = List.of("치즈", "유제품");
+    private static final List<String> DAIRY_INGREDIENTS = List.of(
+        "치즈",
+        "유제품",
+        "우유",
+        "크림",
+        "버터",
+        "느끼한",
+        "느끼한 음식"
+    );
     private static final List<String> EGG_INGREDIENTS = List.of("계란");
     private static final List<String> FLOUR_INGREDIENTS = List.of("밀가루");
-    private static final List<String> PEANUT_INGREDIENTS = List.of("땅콩");
-    private static final List<String> NUT_INGREDIENTS = List.of("견과류");
+    private static final List<String> PEANUT_INGREDIENTS = List.of("땅콩", "견과류");
+    private static final List<String> NUT_INGREDIENTS = List.of("견과류", "땅콩");
     private static final List<String> HERB_INGREDIENTS = List.of("고수");
     private static final List<String> CUCUMBER_INGREDIENTS = List.of("오이");
     private static final List<String> KIMCHI_INGREDIENTS = List.of("김치");
     private static final List<String> VEGAN_INGREDIENTS = List.of("비건");
-    private static final List<String> SPICY_INGREDIENTS = List.of("매운맛");
+    private static final List<String> SPICY_INGREDIENTS = List.of("매운맛", "매운", "매운 음식");
     private static final Map<String, List<String>> MENU_INGREDIENT_MAP = Map.ofEntries(
         Map.entry("제육", PORK_INGREDIENTS),
         Map.entry("돈가스", PORK_INGREDIENTS),
@@ -80,6 +90,8 @@ public class CafeteriaRecommendationService {
         Map.entry("치즈", DAIRY_INGREDIENTS),
         Map.entry("크림", DAIRY_INGREDIENTS),
         Map.entry("우유", DAIRY_INGREDIENTS),
+        Map.entry("버터", DAIRY_INGREDIENTS),
+        Map.entry("마요", DAIRY_INGREDIENTS),
         Map.entry("계란", EGG_INGREDIENTS),
         Map.entry("달걀", EGG_INGREDIENTS),
         Map.entry("밀", FLOUR_INGREDIENTS),
@@ -115,11 +127,15 @@ public class CafeteriaRecommendationService {
         Set<Long> excludedRestaurantIds = loadExcludedRestaurantIds(dislikedKeywords);
 
         int candidateLimit = Math.max(limitPerDay * 10, 10);
-        List<CafeteriaRestaurantProjection> candidateProjections = cafeteriaRestaurantRepository
-            .findCandidateRestaurants(candidateLimit)
+        List<CafeteriaRestaurantProjection> allCandidateProjections = cafeteriaRestaurantRepository
+            .findCandidateRestaurants(candidateLimit);
+        List<CafeteriaRestaurantProjection> filteredProjections = allCandidateProjections
             .stream()
             .filter(projection -> !excludedRestaurantIds.contains(projection.getRestaurantId()))
             .toList();
+        List<CafeteriaRestaurantProjection> candidateProjections = filteredProjections.isEmpty()
+            ? allCandidateProjections
+            : filteredProjections;
         List<CafeteriaRestaurantRecommendationDto> candidates = candidateProjections
             .stream()
             .map(this::toRecommendation)
@@ -129,6 +145,14 @@ public class CafeteriaRecommendationService {
         for (int index = 0; index < days.size(); index++) {
             CafeteriaDayMenuDto day = days.get(index);
             if (day.getMenus() == null || day.getMenus().isEmpty()) {
+                List<CafeteriaRestaurantRecommendationDto> selected =
+                    pickRandomCheapestCandidates(candidateProjections, limitPerDay);
+                recommendations.add(new CafeteriaDayRecommendationDto(
+                    day.getDay(),
+                    day.getDate(),
+                    NO_CAFETERIA_MENU_MESSAGE,
+                    selected
+                ));
                 continue;
             }
             String avoidMenu = buildAvoidMenu(day.getMenus(), dislikedKeywords);
@@ -330,7 +354,8 @@ public class CafeteriaRecommendationService {
                 continue;
             }
             for (String ingredient : entry.getValue()) {
-                if (keywordLower.equals(ingredient.toLowerCase())) {
+                String ingredientLower = ingredient.toLowerCase();
+                if (keywordLower.contains(ingredientLower) || ingredientLower.contains(keywordLower)) {
                     return true;
                 }
             }

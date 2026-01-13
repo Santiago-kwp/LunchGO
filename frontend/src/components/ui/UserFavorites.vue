@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { Star, Bell, Link2, UserPlus, RefreshCw } from 'lucide-vue-next';
 import FavoriteHeart from '@/components/ui/FavoriteHeart.vue';
@@ -31,6 +31,7 @@ interface LinkItem {
   counterpartEmail: string;
   counterpartNickname: string | null;
   counterpartName: string;
+  counterpartImage?: string | null;
 }
 
 interface SharedBookmark {
@@ -48,6 +49,7 @@ interface UserSearchResult {
   email: string;
   nickname: string | null;
   name: string;
+  image?: string | null;
 }
 
 const props = defineProps<{ userId: number | null }>();
@@ -81,6 +83,13 @@ const isLinkLoading = ref(false);
 const selectedSharedUserId = ref<number | null>(null);
 const sharedBookmarks = ref<SharedBookmark[]>([]);
 const isSharedLoading = ref(false);
+const searchTimer = ref<ReturnType<typeof setTimeout> | null>(null);
+const fallbackProfileImage = '/placeholder-user.jpg';
+
+const resolveProfileImage = (image?: string | null) => {
+  if (!image || !image.trim()) return fallbackProfileImage;
+  return image;
+};
 
 // 1. [API 로직] 즐겨찾기 목록 불러오기
 const fetchFavorites = async () => {
@@ -173,13 +182,14 @@ const handleSearchUser = async () => {
   searchResult.value = null;
   searchResults.value = [];
 
-  if (!linkSearchEmail.value.trim()) {
+  const query = linkSearchEmail.value.trim();
+  if (!query) {
     searchError.value = '이메일을 입력해주세요.';
     return;
   }
 
   try {
-    const response = await searchUsersByEmail(linkSearchEmail.value.trim());
+    const response = await searchUsersByEmail(query);
     const data = Array.isArray(response.data) ? response.data : [];
     searchResults.value = data;
     if (data.length === 1) {
@@ -190,9 +200,44 @@ const handleSearchUser = async () => {
   }
 };
 
+const clearSearchResults = () => {
+  searchError.value = '';
+  searchResult.value = null;
+  searchResults.value = [];
+};
+
+const scheduleSearch = () => {
+  if (searchTimer.value) {
+    clearTimeout(searchTimer.value);
+  }
+
+  const query = linkSearchEmail.value.trim();
+  if (query.length < 3) {
+    clearSearchResults();
+    return;
+  }
+
+  searchTimer.value = setTimeout(() => {
+    handleSearchUser();
+  }, 300);
+};
+
+watch(linkSearchEmail, scheduleSearch);
+
 const handleRequestLink = async (targetUser?: UserSearchResult) => {
   const target = targetUser || searchResult.value;
   if (!props.userId || !target) return;
+  const alreadyLinked = [...sentLinks.value, ...receivedLinks.value].some(
+    (link) => link.counterpartId === target.userId
+  );
+  if (alreadyLinked) {
+    linkRequestError.value = '이미 링크 등록한 이메일입니다.';
+    return;
+  }
+  if (props.userId === target.userId) {
+    linkRequestError.value = '자기 자신에게 링크 요청을 보낼 수 없습니다.';
+    return;
+  }
   try {
     linkRequestError.value = '';
     await requestLink(props.userId, target.userId);
@@ -340,11 +385,18 @@ const statusLabel = (status: LinkItem['status']) => {
               class="p-3 border border-[#e9ecef] rounded-lg bg-[#f8f9fa]"
             >
               <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-sm font-semibold text-[#1e3a5f]">
-                    {{ user.nickname || user.name }}
-                  </p>
-                  <p class="text-xs text-[#1e3a5f]">{{ user.email }}</p>
+                <div class="flex items-center gap-3">
+                  <img
+                    :src="resolveProfileImage(user.image)"
+                    :alt="user.nickname || user.name"
+                    class="w-10 h-10 rounded-full object-cover border border-[#e9ecef] bg-white"
+                  />
+                  <div>
+                    <p class="text-sm font-semibold text-[#1e3a5f]">
+                      {{ user.nickname || user.name }}
+                    </p>
+                    <p class="text-xs text-[#1e3a5f]">{{ user.email }}</p>
+                  </div>
                 </div>
                 <button class="btn-outline-sm" @click="handleRequestLink(user)">
                   <UserPlus class="w-4 h-4 mr-1" />
@@ -367,11 +419,18 @@ const statusLabel = (status: LinkItem['status']) => {
               :key="link.linkId"
               class="flex items-center justify-between text-xs border border-[#e9ecef] rounded-lg px-3 py-2"
             >
-              <div>
-                <p class="font-semibold text-[#1e3a5f]">
-                  {{ link.counterpartNickname || link.counterpartName }}
-                </p>
-                <p class="text-[#1e3a5f]">{{ link.counterpartEmail }}</p>
+              <div class="flex items-center gap-3">
+                <img
+                  :src="resolveProfileImage(link.counterpartImage)"
+                  :alt="link.counterpartNickname || link.counterpartName"
+                  class="w-9 h-9 rounded-full object-cover border border-[#e9ecef] bg-white"
+                />
+                <div>
+                  <p class="font-semibold text-[#1e3a5f]">
+                    {{ link.counterpartNickname || link.counterpartName }}
+                  </p>
+                  <p class="text-[#1e3a5f]">{{ link.counterpartEmail }}</p>
+                </div>
               </div>
               <div class="flex items-center gap-2">
                 <span class="text-[#1e3a5f]">{{ statusLabel(link.status) }}</span>
@@ -398,11 +457,18 @@ const statusLabel = (status: LinkItem['status']) => {
               :key="link.linkId"
               class="flex items-center justify-between text-xs border border-[#e9ecef] rounded-lg px-3 py-2"
             >
-              <div>
-                <p class="font-semibold text-[#1e3a5f]">
-                  {{ link.counterpartNickname || link.counterpartName }}
-                </p>
-                <p class="text-[#1e3a5f]">{{ link.counterpartEmail }}</p>
+              <div class="flex items-center gap-3">
+                <img
+                  :src="resolveProfileImage(link.counterpartImage)"
+                  :alt="link.counterpartNickname || link.counterpartName"
+                  class="w-9 h-9 rounded-full object-cover border border-[#e9ecef] bg-white"
+                />
+                <div>
+                  <p class="font-semibold text-[#1e3a5f]">
+                    {{ link.counterpartNickname || link.counterpartName }}
+                  </p>
+                  <p class="text-[#1e3a5f]">{{ link.counterpartEmail }}</p>
+                </div>
               </div>
               <div class="flex items-center gap-2">
                 <span class="text-[#1e3a5f]">{{ statusLabel(link.status) }}</span>
@@ -444,10 +510,19 @@ const statusLabel = (status: LinkItem['status']) => {
               class="w-full text-left border border-[#e9ecef] rounded-lg px-3 py-2 text-xs hover:bg-[#f8f9fa]"
               @click="handleOpenSharedFolder(link.counterpartId)"
             >
-              <p class="font-semibold text-[#1e3a5f]">
-                {{ link.counterpartNickname || link.counterpartName }}
-              </p>
-              <p class="text-[#1e3a5f]">{{ link.counterpartEmail }}</p>
+              <div class="flex items-center gap-3">
+                <img
+                  :src="resolveProfileImage(link.counterpartImage)"
+                  :alt="link.counterpartNickname || link.counterpartName"
+                  class="w-9 h-9 rounded-full object-cover border border-[#e9ecef] bg-white"
+                />
+                <div>
+                  <p class="font-semibold text-[#1e3a5f]">
+                    {{ link.counterpartNickname || link.counterpartName }}
+                  </p>
+                  <p class="text-[#1e3a5f]">{{ link.counterpartEmail }}</p>
+                </div>
+              </div>
             </button>
           </div>
 

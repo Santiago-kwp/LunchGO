@@ -23,3 +23,27 @@
 - `src/main/java/com/example/LunchGo/bookmark/repository/BookmarkRepository.java`
 - `src/main/java/com/example/LunchGo/bookmark/repository/BookmarkListRow.java`
 - `src/main/java/com/example/LunchGo/bookmark/service/BaseBookmarkService.java`
+
+---
+
+## 문제 2: 중복 링크 요청이 401로 보이는 현상
+
+### 증상
+- 중복 링크 요청 시 브라우저에 `401 Unauthorized`만 표시됨
+- 서버 로그에는 `POST /api/bookmark-links`가 `409`로 찍힘
+- 이어서 `/api/refresh`가 불필요하게 호출됨
+
+### 원인
+- `/api/bookmark-links`에서 409가 발생하면 내부적으로 `/error`로 디스패치됨
+- `/error`가 인증을 요구하면서 401로 응답이 덮임
+- 브라우저는 최종 401만 보게 되어 중복 판단이 실패한 것처럼 보임
+
+### 해결
+- `/error` 경로는 인증 없이 접근하도록 허용
+
+### 적용 파일
+- `src/main/java/com/example/LunchGo/common/config/SecurityConfig.java`
+
+### 참고 로그
+- 409 이후 `/error`에서 401 발생
+- `/error` permitAll 적용 후 브라우저에서 409 확인됨

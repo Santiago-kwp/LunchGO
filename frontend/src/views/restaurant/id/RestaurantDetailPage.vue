@@ -492,12 +492,17 @@ watch(detailMapDistanceStepIndex, () => {
               <p class="text-sm text-gray-700 mb-3 leading-relaxed">
                 {{ taglineDisplay }}
               </p>
-              <p
-                v-if="highlightTags"
-                class="text-xs text-gray-700 mb-3 leading-relaxed"
-              >
-                대표 태그: {{ highlightTags }}
-              </p>
+              <div v-if="highlightTags" class="mb-3">
+                <div class="flex flex-wrap gap-1.5">
+                  <span
+                    v-for="(tag, idx) in highlightTags.split(',')"
+                    :key="idx"
+                    class="inline-flex items-center px-2.5 py-1 text-xs rounded-full bg-gradient-to-r from-[#ff6b4a] to-[#ff8e72] text-white font-semibold shadow-sm"
+                  >
+                    {{ tag.trim() }}
+                  </span>
+                </div>
+              </div>
             </div>
             <FavoriteStarButton
               :restaurant-id="restaurantInfo?.id || Number(restaurantId)"

@@ -193,6 +193,33 @@ docker run --rm -i grafana/k6 run - \
   - 로그인 부하 테스트는 사전 토큰 발급 후 제외하는 시나리오 병행
   - 로그인/예약을 분리 테스트하여 병목 구간 명확화
 
+## 로그인 성능 개선 적용 후 결과 (k6-load-test-once_260112.csv)
+- 적용 변경
+  - `src/main/java/com/example/LunchGo/common/config/SecurityConfig.java`: 로그인 비용 절감을 위한 인코더 설정 조정
+  - `src/main/java/com/example/LunchGo/member/service/BaseMemberService.java`: 비밀번호 인코더 사용 흐름 개선
+- 실행 환경: bastion에서 Docker k6 실행
+- 시나리오: 10 VU, 사용자당 1회 로그인 + 1회 예약 (per-vu-iterations)
+- 파라미터: `RESTAURANT_ID=6`, `SLOT_DATE=2026-01-16`, `SLOT_TIME=11:00`, `PARTY_SIZE=4`, `RESERVATION_TYPE=RESERVATION_DEPOSIT`
+- 결과 요약(k6):
+  - checks_succeeded 100% (20/20)
+  - http_req_failed 20.00% (4/20, 4xx 포함)
+  - http_req_duration avg 240.84ms / p90 410.55ms / p95 418.57ms
+  - iteration_duration avg 483.39ms / p95 706.28ms
+- Scouter 원본: `scouter/k6-load-test-once_260112.csv` (로그인 개선 결과 추가됨)
+- Scouter 분석:
+  - 총 트랜잭션: 32건
+  - 응답시간(ms): 평균 148.31 / p95 393.9 / 최대 399
+  - 서비스 분포: `/api/login<POST>` 10건, `/api/reservations` 10건, `/error` 2건
+  - SQL: 평균 1.97건/요청, SQL 시간 평균 23.13ms
+  - 오류: 2건(`/error`)
+ - 로그인 지표 비교(Scouter `/api/login<POST>` 기준):
+
+| 구분 | 평균(ms) | p95(ms) | 분산 |
+| --- | --- | --- | --- |
+| 260111 | 375.5 | 417.55 | 1523.85 |
+| 260112 | 353.9 | 397.2 | 1951.09 |
+| 변화 | -21.6 (약 5.8% 개선) | -20.35 | 증가 |
+
 ## 정상 동작 베이스라인 (1회 예약 테스트 기준)
 - 기준 시나리오: 10 VU, 사용자당 1회 로그인 + 1회 예약
 - 기대 결과:
@@ -218,11 +245,90 @@ docker run --rm -i grafana/k6 run - \
 | T01 | Baseline A | per-vu-iterations | VU=10 / 1회 | R=6, 2026-01-16 12:00 | 4 | 로그인 10, 예약 10, 오류 0 | 426.8 | 0% (추정) | 0 | scouter 평균 199.6ms |
 | T02 | Baseline B | constant-arrival-rate | 5 RPS / 5s | R=6, 2026-01-16 12:00 | 4 | checks 100%, 예약 5건/20명 | 75.94 | 0% (추정) | 0 | 4xx 포함 |
 | T03 | Baseline C | constant-arrival-rate | 100 RPS / 30s | R=6, 2026-01-16 12:00 | 4 | 과부하, 실패 다수 | 4690 | 미집계 (http_req_failed 95.73%) | 613 | VU 200까지 증가 |
+| T04 | Baseline A (로그인 개선) | per-vu-iterations | VU=10 / 1회 | R=6, 2026-01-16 11:00 | 4 | checks 100%, http_req_failed 20% (4xx 포함) | 418.57 | 0% (5xx) | 0 | k6 avg 240.84ms |
+| T05 | Baseline A (락 TTL 복구) | per-vu-iterations | VU=10 / 1회 | R=6, 2026-01-16 11:00 | 4 | checks 100%, http_req_failed 20% (4xx 포함) | 359.04 | 0% (5xx) | 0 | k6 avg 272.54ms |
+| T06 | Baseline A (분산락/AOP 적용) | per-vu-iterations | VU=100 / 1회 | R=7, 2026-01-16 11:00 | 4 | checks 100%, http_req_failed 45.5% (4xx 포함) | 3690 | 미집계 | 0 | k6 avg 1.86s |
+
+## 데드락 대응 후 1회 예약 테스트 결과 (락 TTL 3s → 5s 복구)
+- 변경 사항: 중복 예약 처리 방지용 Redis 락 유효시간을 3초에서 5초로 원상복구.
+- 실행 환경: bastion에서 Docker k6 실행
+- 시나리오: 10 VU, 사용자당 1회 로그인 + 1회 예약 (per-vu-iterations)
+- 파라미터: `RESTAURANT_ID=6`, `SLOT_DATE=2026-01-16`, `SLOT_TIME=11:00`, `PARTY_SIZE=4`, `RESERVATION_TYPE=RESERVATION_DEPOSIT`
+- k6 결과 요약:
+  - checks_succeeded 100% (20/20)
+  - http_req_failed 20.00% (4/20, 4xx 포함)
+  - http_req_duration avg 272.54ms / p90 357.52ms / p95 359.04ms / max 369.78ms
+  - iteration_duration avg 546.87ms / p95 586.88ms
+- Scouter 원본: `scouter/k6-load-test-once_260112_ttl5.csv`
+- Scouter 분석:
+  - 총 트랜잭션: 30건 (로그인 10, 예약 10, 내부 서비스 10)
+  - 응답시간(ms): 평균 179.57 / p95 344.55 / 최대 350
+  - SQL: 평균 1.93건/요청, SQL 시간 평균 26.87ms
+  - 오류: 0건
+  - 서비스별(`/api/login<POST>` 기준): 평균 338.8ms / p95 347.75ms / 분산 95.96
+  - 서비스별(`/api/reservations` 기준): 평균 188.1ms / p95 232.10ms / 분산 1259.49
+- 정상 동작 판단:
+  - 총 10명 시도, 슬롯 총 27석 기준 최대 6명까지만 성공
+  - 4명 실패는 좌석 부족으로 인한 정상 실패
+- 실패 응답 코드/메시지:
+  - 로그 상 메시지: `잔여석이 부족합니다.`
+  - 상태코드: 로그에 `status=` 값이 비어 있어 미기재(추가 확인 필요)
 ## 관찰 포인트
 - 성공/실패 비율
 - 평균/최대 응답 시간
 - DB/Redis 오류 발생 여부
 - Scouter XLog의 SQL/Redis 오류 스택 유무
+
+---
+
+## 부하 테스트 결과 (k6, 100 동시 시도)
+### 변경 사항
+- Redisson 분산락 기반 예약 대기열 추가
+- AOP로 락 로직 분리: `DistributedLockAop` 적용
+- 주요 수정 파일: `RedissonConfig.java`, `RedisUtil.java`, `DistributedLock.java`,
+  `DistributedLockAop.java`, `ReservationServiceImpl.java`
+
+### 시나리오
+- 100 VUs, 각 1회 예약 시도 (30s 내 완료)
+- 실행: `docker run --rm -i grafana/k6 run - < /root/k6_reservation_loadtest_once.js`
+- 파라미터
+  - `BASE_URL=http://10.0.2.6:8080`
+  - `EMAIL_PREFIX=loadtest.user`
+  - `EMAIL_DOMAIN=example.com`
+  - `PASSWORD=Passw0rd!123`
+  - `RESTAURANT_ID=7`
+  - `SLOT_DATE=2026-01-16`
+  - `SLOT_TIME=11:00`
+  - `PARTY_SIZE=4`
+  - `RESERVATION_TYPE=RESERVATION_DEPOSIT`
+  - `LOAD_VUS=100`
+  - `LOAD_DURATION=30s`
+
+### 결과 요약
+- iterations: 100 (100 VUs * 1 iteration)
+- checks: 200/200 success
+- http_req_duration: avg 1.86s, p90 3.61s, p95 3.69s, max 4.07s
+- iteration_duration: avg 3.74s, p90 4.11s, p95 4.13s, max 4.16s
+- http_req_failed: 45.50% (91/200)
+  - k6 기준 4xx도 실패로 집계되므로 동시성 충돌/좌석 초과 등 예상 4xx가 포함될 수 있음
+
+### Scouter CSV 분석
+- 파일: `scouter/k6-load-test-once_260113_vus100.csv`
+- 총 트랜잭션: 200
+- 응답 시간(ms): avg 1382, p95 2335, max 2457
+- 에러: 0
+- SQL: 총 327회 / 2210ms, 평균 1.64회 / 11.05ms
+- 상위 서비스(총 elapsed 기준)
+  - `/api/login<POST>`: count 100, avg 2006ms, total 200655ms, error 0
+  - `/api/reservations`: count 100, avg 757ms, total 75781ms, error 0
+
+### 실패 건수 상세(가정 확인)
+- 총 수용 가능 인원 36명(4인 파티 기준 9팀)
+- 예약 성공: 9명(2xx)
+- 예약 실패: 91명(4xx 예상)
+- 로그인 성공: 100/100
+- k6 결과의 `http_req_failed 91/200(45.5%)`는 예약 실패 91건과 일치
+  - 4xx 코드별(400/409/429) 분해는 k6 스크립트/로그 집계로 추가 확인 필요
 
 ---
 
