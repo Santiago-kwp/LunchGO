@@ -1,6 +1,7 @@
 package com.example.LunchGo.common.util;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RScoredSortedSet;
 import org.redisson.api.RedissonClient;
@@ -13,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 
 @RequiredArgsConstructor
 @Service
+@Slf4j
 public class RedisUtil {
     /**
      * 스프링이 제공하는 Redis 클라이언트,  Redis 명령어를 자바 코드로 보낼 수 있음
@@ -109,6 +111,11 @@ public class RedisUtil {
      */
     public Long getCount(String key) {
         String val = template.opsForValue().get(key);
-        return val == null ? 0L : Long.parseLong(val);
+        try {
+            return (val == null) ? 0L : Long.parseLong(val);
+        } catch (NumberFormatException e) {
+            log.error("Redis key [{}] has invalid numeric value: [{}]. Returning 0L.", key, val);
+            return 0L;
+        }
     }
 }

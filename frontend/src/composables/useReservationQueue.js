@@ -1,6 +1,12 @@
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 
+const MAX_RETRIES = 10;
+const RETRY_INTERVAL_MIN = 2000;
+const RETRY_INTERVAL_MAX = 4000;
+const ESTIMATED_TIME_PER_PERSON = 3;
+const DEFAULT_ESTIMATED_TIME = 5;
+
 export function useReservationQueue() {
   const router = useRouter();
   
@@ -12,20 +18,6 @@ export function useReservationQueue() {
   const estimatedWaitTime = ref(0);
 
   // 예상 대기 시간 포맷팅 (초 -> 분/초)
-  const formattedWaitTime = computed(() => {
-    const totalSeconds = estimatedWaitTime.value;
-    if (totalSeconds <= 0) return '약 5초';
-    
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    
-    if (mins > 0) {
-      return `약 ${mins}분 ${secs > 0 ? secs + '초' : ''}`.trim();
-    }
-    return `약 ${totalSeconds}초`;
-  });
-
-  const MAX_RETRIES = 10;
   
   /**
    * 예약 대기열 처리 로직
@@ -59,16 +51,17 @@ export function useReservationQueue() {
           if (retryCount < MAX_RETRIES) {
             retryCount++;
             currentWaitingCount.value = waitingCount;
-            // 대기 시간 시뮬레이션: 인원당 약 3초 + 기본 2초
-            estimatedWaitTime.value = waitingCount > 0 ? (waitingCount * 3) : 5;
+            // 대기 시간 시뮬레이션: 인원당 약 3초 + 기본 5초
+            estimatedWaitTime.value = waitingCount > 0 
+              ? (waitingCount * ESTIMATED_TIME_PER_PERSON) 
+              : DEFAULT_ESTIMATED_TIME;
             
             modalType.value = 'waiting';
             modalMessage.value = '예약 요청이 많아 대기 중입니다.\n잠시만 기다려주세요...';
             isWaiting.value = true;
             
-            // 재시도 간격 분산 (Random Backoff/Jitter): 2초 ~ 4초 사이 랜덤
-            // 동시에 여러 사용자가 재시도할 때 서버 부하가 겹치지 않도록 분산함
-            const retryDelay = 2000 + Math.floor(Math.random() * 2000);
+            // 재시도 간격 분산 (Random Backoff/Jitter)
+            const retryDelay = RETRY_INTERVAL_MIN + Math.floor(Math.random() * (RETRY_INTERVAL_MAX - RETRY_INTERVAL_MIN));
             setTimeout(attempt, retryDelay);
             return;
           } else {
