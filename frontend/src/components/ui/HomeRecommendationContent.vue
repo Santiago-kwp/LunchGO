@@ -5,6 +5,8 @@ import HomeRecommendationHeader from "@/components/ui/HomeRecommendationHeader.v
 import RestaurantCardList from "@/components/ui/RestaurantCardList.vue";
 import RestaurantCardSkeletonList from "@/components/ui/RestaurantCardSkeletonList.vue";
 
+const emit = defineEmits(["goToSpeciality"]);
+
 defineProps({
   isLoggedIn: {
     type: Boolean,
@@ -55,6 +57,10 @@ defineProps({
     default: false,
   },
   tagMappingNotice: {
+    type: String,
+    default: "",
+  },
+  tagMappingError: {
     type: String,
     default: "",
   },
@@ -210,7 +216,15 @@ defineProps({
       v-else-if="!cafeteriaRecommendations.length && !isTrendingSort && !paginatedRestaurants.length"
       class="w-full px-4 py-10 text-center text-sm text-gray-700"
     >
-      해당 검색 결과가 없습니다.
+      <button
+        v-if="selectedRecommendation === recommendTasteKey && tagMappingError"
+        type="button"
+        class="cursor-pointer rounded-md border border-[#d9e2ef] bg-[#f4f7fb] px-8 py-4 text-sm font-semibold text-[#1e3a5f] shadow-sm transition hover:border-[#c2d1e6] hover:bg-[#edf3fa]"
+        @click="emit('goToSpeciality')"
+      >
+        특이사항을 먼저 입력해주세요
+      </button>
+      <span v-else>해당 검색 결과가 없습니다.</span>
     </div>
     <RestaurantCardList
       v-else-if="!cafeteriaRecommendations.length && !isTrendingSort"

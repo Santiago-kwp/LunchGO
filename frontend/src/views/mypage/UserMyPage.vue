@@ -871,7 +871,7 @@ const handleWithdraw = () => {
           </div>
         </div>
 
-        <div class="info-card info-card--overflow">
+        <div id="speciality-section" class="info-card info-card--overflow">
           <div class="card-title">기타</div>
 
           <p class="px-6 pt-4 text-xs text-[#1E3A5F] leading-relaxed">

@@ -76,10 +76,16 @@ export const useTagMappingRecommendation = () => {
       tagMappingRaw.value = mappings;
       tagMappingRecommendations.value = mapToRestaurants(mappings);
     } catch (error) {
+      const status = error?.response?.status;
       console.error("Errors occurs: ", error);
-      tagMappingError.value = "Failed to fetch tag mapping recommendations";
       tagMappingRecommendations.value = [];
       tagMappingRaw.value = [];
+      if (status === 404) {
+        tagMappingMessageCode.value = null;
+        tagMappingError.value = "추천 정보를 불러오지 못했습니다";
+      } else {
+        tagMappingError.value = "Failed to fetch tag mapping recommendations";
+      }
     } finally {
       isTagMappingLoading.value = false;
     }

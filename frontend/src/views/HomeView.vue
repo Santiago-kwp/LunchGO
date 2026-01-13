@@ -21,7 +21,7 @@ import {
 import Button from "@/components/ui/Button.vue"; // Import our custom Button component
 import AppFooter from "@/components/ui/AppFooter.vue";
 import BottomNav from "@/components/ui/BottomNav.vue";
-import { RouterLink } from "vue-router"; // Import Vue RouterLink
+import { RouterLink, useRouter } from "vue-router"; // Import Vue RouterLink
 import { geocodeAddress } from "@/utils/kakao";
 import { restaurants as restaurantData } from "@/data/restaurants";
 import AppHeader from "@/components/ui/AppHeader.vue";
@@ -42,6 +42,7 @@ import axios from "axios";
 import httpRequest from "@/router/httpRequest.js";
 
 const accountStore = useAccountStore();
+const router = useRouter();
 const isLoggedIn = computed(() =>
     Boolean(accountStore.accessToken || localStorage.getItem("accessToken"))
 );
@@ -321,7 +322,7 @@ const RECOMMEND_TASTE = "\uCDE8\uD5A5 \uB9DE\uCDA4 \uD83D\uDE0B";
 const RECOMMEND_TRENDING = "\uC778\uAE30\uC21C \uD83D\uDD25";
 const RECOMMEND_WEATHER = "\uB0A0\uC528 \uCD94\uCC9C \u2600\uFE0F";
 const TAG_MESSAGE_LOGIN = "\uB85C\uADF8\uC778\uC774 \uD544\uC694\uD569\uB2C8\uB2E4";
-const TAG_MESSAGE_SPECIALITY = "\uD2B9\uC774\uC0AC\uD56D \uD0DC\uADF8\uB97C \uBA3C\uC800 \uCD94\uAC00\uD574\uC8FC\uC138\uC694";
+const TAG_MESSAGE_SPECIALITY = "\uD2B9\uC774\uC0AC\uD56D\uC744 \uBA3C\uC800 \uB4F1\uB85D\uD574\uC8FC\uC138\uC694";
 const TAG_MESSAGE_LOADING = "\uCD94\uCC9C \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4";
 const TAG_MESSAGE_ERROR = "\uCD94\uCC9C \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4";
 
@@ -349,13 +350,17 @@ const tagMappingNotice = computed(() => {
     return TAG_MESSAGE_LOGIN;
   }
   if (tagMappingMessageCode.value === "SPECIALITY_REQUIRED") {
-    return TAG_MESSAGE_SPECIALITY;
+    return "";
   }
   if (tagMappingError.value) {
-    return TAG_MESSAGE_ERROR;
+    return "";
   }
   return "";
 });
+
+const goToSpeciality = () => {
+  router.push({ path: "/mypage", hash: "#speciality-section" });
+};
 const tasteRecommendationSummary = computed(() => {
   if (selectedRecommendation.value !== RECOMMEND_TASTE) {
     return "";
@@ -1600,9 +1605,11 @@ onBeforeUnmount(() => {
             :trendingCards="trendingCards"
             :isWeatherLoading="isWeatherLoading"
             :tagMappingNotice="tagMappingNotice"
+            :tagMappingError="tagMappingError"
             :tasteRecommendationSummary="tasteRecommendationSummary"
             :filterPerPersonBudgetDisplay="filterPerPersonBudgetDisplay"
             :paginatedRestaurants="paginatedRestaurants"
+            @goToSpeciality="goToSpeciality"
             :onSelectRecommendation="handleRecommendationQuickSelect"
             :onOpenSearch="() => (isSearchOpen = true)"
             :onClearCafeteria="() => clearRecommendation(RECOMMEND_CAFETERIA)"
