@@ -13,8 +13,8 @@
 
 ## 🔁전체 처리 흐름 
 
-1) 사업자가 식당 ID 기준으로 요청
-2) 최근 7일 예약/통계 데이터 수집
+1) 사업자가 식당 ID 기준으로 해당 식당의 일주일치 예약 리스트 요청
+2) 최근 7일 예약 및 재무 통계 데이터 수집
 3) AI 요약 요청 (Gemini)
 4) AI 결과를 PDF 본문으로 변환
 5) PDF 파일 다운로드 응답 반환
@@ -77,9 +77,9 @@
 
 AI에게 아래 섹션을 포함해서 한국어 요약을 생성하도록 요청
 
-- `## 요약`
-- `## 인사이트`
-- `## 개선점 및 추천`
+- `## 핵심 요약`
+- `## 상세 분석`
+- `## 통합 분석 및 추천`
 
 포함 데이터 예시
 
@@ -143,7 +143,7 @@ AI에게 아래 섹션을 포함해서 한국어 요약을 생성하도록 요�
 
 ---
 
-## 설정 예시 ⚙️
+## ⚙️설정 예시 
 
 ```
 gemini.api-key=YOUR_KEY
@@ -153,13 +153,13 @@ pdf.korean-font-path=C:/Windows/Fonts/malgun.ttf
 
 ---
 
-## 프론트엔드 호출 🖱️
+## 🖱️프론트엔드 호출 
 
 `BusinessReservationsPage.vue`에서:
 
 - `GET /api/business/restaurants/{id}/stats/weekly.pdf`
 - `responseType: 'blob'`
-- 파일명: `weekly-stats-{id}.pdf`
+- 파일명: `LunchGo-weekly-stats-{id}.pdf`
 
 다운로드 흐름
 
@@ -168,7 +168,42 @@ pdf.korean-font-path=C:/Windows/Fonts/malgun.ttf
 
 ---
 
-## 운영/주의 사항 ✅
+## 배포 시 주의사항
+
+```
+pdf.korean-font-path=C:/Windows/Fonts/malgun.ttf
+```
+해당 폰트는 윈도우에 default로 존재하는 폰트라서, ncp에 배포할 때는 해당 폰트를 빌드 컨텍스트 안으로 copy 필수
+
+**Docker 이미지에 폰트 올려 배포하는 방법**
+
+1) private server에 이미지를 저장하기
+
+```
+scp -i C:\path\to\lunchgo.pem -o ProxyJump=root@BASTION_PUBLIC_IP 
+C:\Users\j\Downloads\13151B114AE7E3A025\malgun.ttf 
+root@PRIVATE_IP:/opt/lunchgo/fonts/malgun.ttf
+```
+private server에 올려야하므로, bastion을 통해 우회하기
+
+
+2) Docker file에 추가
+
+`cp fonts/malgun.ttf /app/fonts/malgun.ttf`
+
+3. .env 파일에 폰트 경로 설정
+
+`PDF_KOREAN_FONT_PATH=/app/fonts/malgun.ttf`
+
+4. backend-deploy.yml의 docker run 부분에 추가
+
+` -v /opt/lunchgo/fonts:/app/fonts:ro \`
+
+5. 배포
+
+---
+
+## ✅운영/주의 사항 
 
 - AI 응답이 길 경우 자동 줄바꿈 + 페이지 분할 필요
 - 한글 폰트 미설정 시 글자 깨짐 발생
