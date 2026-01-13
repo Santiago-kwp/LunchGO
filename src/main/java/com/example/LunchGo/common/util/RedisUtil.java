@@ -1,6 +1,7 @@
 package com.example.LunchGo.common.util;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RScoredSortedSet;
 import org.redisson.api.RedissonClient;
@@ -13,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 
 @RequiredArgsConstructor
 @Service
+@Slf4j
 public class RedisUtil {
     /**
      * 스프링이 제공하는 Redis 클라이언트,  Redis 명령어를 자바 코드로 보낼 수 있음
@@ -75,9 +77,45 @@ public class RedisUtil {
     }
 
     /**
+     * 특정 키에 대한 공정 락(Fair Lock)을 가져옵니다.
+     * FairLock은 요청한 순서대로(FIFO) 락을 획득함을 보장합니다.
+     * 선착순 예약 시스템의 공정성을 위해 사용합니다.
+     */
+    public RLock getFairLock(String lockKey) {
+        return redissonClient.getFairLock(lockKey);
+    }
+
+    /**
      * 대기열(Sorted Set)을 가져옵니다.
      */
     public RScoredSortedSet<String> getScoredSortedSet(String key) {
         return redissonClient.getScoredSortedSet(key);
+    }
+
+    /**
+     * 키의 값을 1 증가시키고 증가된 값을 반환합니다.
+     */
+    public Long increment(String key) {
+        return template.opsForValue().increment(key);
+    }
+
+    /**
+     * 키의 값을 1 감소시키고 감소된 값을 반환합니다.
+     */
+    public Long decrement(String key) {
+        return template.opsForValue().decrement(key);
+    }
+
+    /**
+     * 키의 현재 값을 조회합니다.
+     */
+    public Long getCount(String key) {
+        String val = template.opsForValue().get(key);
+        try {
+            return (val == null) ? 0L : Long.parseLong(val);
+        } catch (NumberFormatException e) {
+            log.error("Redis key [{}] has invalid numeric value: [{}]. Returning 0L.", key, val);
+            return 0L;
+        }
     }
 }

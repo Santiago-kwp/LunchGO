@@ -1,5 +1,11 @@
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
+
+const MAX_RETRIES = 10;
+const RETRY_INTERVAL_MIN = 2000;
+const RETRY_INTERVAL_MAX = 4000;
+const ESTIMATED_TIME_PER_PERSON = 3;
+const DEFAULT_ESTIMATED_TIME = 5;
 
 export function useReservationQueue() {
   const router = useRouter();
@@ -8,8 +14,22 @@ export function useReservationQueue() {
   const modalType = ref('waiting'); // 'waiting' | 'error'
   const modalMessage = ref('');
   const queueErrorMessage = ref(''); // 컴포넌트의 에러 메시지와 구분하기 위해 이름 변경
+  const currentWaitingCount = ref(0);
+  const estimatedWaitTime = ref(0);
 
-  const MAX_RETRIES = 10;
+  // 예상 대기 시간 포맷팅 (초 -> 분/초)
+  const formattedWaitTime = computed(() => {
+    const totalSeconds = estimatedWaitTime.value;
+    if (totalSeconds <= 0) return `약 ${DEFAULT_ESTIMATED_TIME}초`;
+    
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    
+    if (mins > 0) {
+      return `약 ${mins}분 ${secs > 0 ? secs + '초' : ''}`.trim();
+    }
+    return `약 ${totalSeconds}초`;
+  });
   
   /**
    * 예약 대기열 처리 로직
@@ -28,6 +48,7 @@ export function useReservationQueue() {
         if (onSuccess) onSuccess(result);
       } catch (e) {
         const msg = e.response?.data?.message || e?.message || '';
+        const waitingCount = e.response?.data?.waitingCount || 0;
 
         // 1. 중복 예약 등 에러 모달 ("대기 중" 없는 409)
         if (e.response?.status === 409 && !msg.includes('대기 중')) {
@@ -41,10 +62,19 @@ export function useReservationQueue() {
         if (e.response?.status === 409 && msg.includes('대기 중')) {
           if (retryCount < MAX_RETRIES) {
             retryCount++;
+            currentWaitingCount.value = waitingCount;
+            // 대기 시간 시뮬레이션: 인원당 약 3초 + 기본 5초
+            estimatedWaitTime.value = waitingCount > 0 
+              ? (waitingCount * ESTIMATED_TIME_PER_PERSON) 
+              : DEFAULT_ESTIMATED_TIME;
+            
             modalType.value = 'waiting';
             modalMessage.value = '예약 요청이 많아 대기 중입니다.\n잠시만 기다려주세요...';
             isWaiting.value = true;
-            setTimeout(attempt, 2000); // 2초 후 재시도
+            
+            // 재시도 간격 분산 (Random Backoff/Jitter)
+            const retryDelay = RETRY_INTERVAL_MIN + Math.floor(Math.random() * (RETRY_INTERVAL_MAX - RETRY_INTERVAL_MIN));
+            setTimeout(attempt, retryDelay);
             return;
           } else {
             modalType.value = 'error';
@@ -67,10 +97,9 @@ export function useReservationQueue() {
     await attempt();
   };
 
-  const handleQueueModalClose = (isSubmitting) => {
+  const handleQueueModalClose = () => {
     isWaiting.value = false;
     if (modalType.value === 'error') {
-      if (isSubmitting) isSubmitting.value = false;
       router.push('/');
     }
   };
@@ -80,6 +109,9 @@ export function useReservationQueue() {
     modalType,
     modalMessage,
     queueErrorMessage,
+    currentWaitingCount,
+    estimatedWaitTime,
+    formattedWaitTime,
     processQueue,
     handleQueueModalClose
   };

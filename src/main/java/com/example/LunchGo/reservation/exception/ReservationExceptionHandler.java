@@ -16,9 +16,13 @@ public class ReservationExceptionHandler {
             SlotCapacityExceededException.class,
             WaitingReservationException.class
     })
-    public ResponseEntity<Map<String, String>> handleReservationExceptions(RuntimeException e) {
-        Map<String, String> response = new HashMap<>();
+    public ResponseEntity<Map<String, Object>> handleReservationExceptions(RuntimeException e) {
+        Map<String, Object> response = new HashMap<>();
         response.put("message", e.getMessage());
+
+        if (e instanceof WaitingReservationException) {
+            response.put("waitingCount", ((WaitingReservationException) e).getWaitingCount());
+        }
         
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }

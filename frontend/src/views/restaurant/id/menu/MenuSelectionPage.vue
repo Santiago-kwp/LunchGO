@@ -117,6 +117,8 @@ const {
   modalType, 
   modalMessage, 
   queueErrorMessage, 
+  currentWaitingCount,
+  formattedWaitTime,
   processQueue, 
   handleQueueModalClose 
 } = useReservationQueue();
@@ -315,7 +317,12 @@ const handleProceed = async () => {
       :isOpen="isWaiting" 
       :type="modalType"
       :message="modalMessage || undefined"
-      @close="() => handleQueueModalClose(isSubmitting)"
+      :waitingCount="currentWaitingCount"
+      :estimatedTime="formattedWaitTime"
+      @close="() => {
+        isSubmitting = false;
+        handleQueueModalClose();
+      }"
     />
   </div>
 </template>
