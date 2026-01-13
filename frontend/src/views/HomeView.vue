@@ -11,34 +11,31 @@ import {
 import {
   MapPin,
   Calendar,
-  User,
   Star,
   X,
   Minus,
   Plus,
-  SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
-  Search,
-  Home,
 } from "lucide-vue-next"; // Import Lucide icons for Vue
 import Button from "@/components/ui/Button.vue"; // Import our custom Button component
 import AppFooter from "@/components/ui/AppFooter.vue";
 import BottomNav from "@/components/ui/BottomNav.vue";
 import { RouterLink } from "vue-router"; // Import Vue RouterLink
-import { loadKakaoMaps, geocodeAddress } from "@/utils/kakao";
+import { geocodeAddress } from "@/utils/kakao";
 import { restaurants as restaurantData } from "@/data/restaurants";
 import AppHeader from "@/components/ui/AppHeader.vue";
-import CafeteriaRecommendationSection from "@/components/ui/CafeteriaRecommendationSection.vue";
-import RestaurantCardList from "@/components/ui/RestaurantCardList.vue";
-import RestaurantCardSkeletonList from "@/components/ui/RestaurantCardSkeletonList.vue";
+import HomeSearchBar from "@/components/ui/HomeSearchBar.vue";
+import HomeRecommendationContent from "@/components/ui/HomeRecommendationContent.vue";
+import HomePagination from "@/components/ui/HomePagination.vue";
 import { useCafeteriaRecommendation } from "@/composables/useCafeteriaRecommendation";
-import TrendingRecommendationSection from "@/components/ui/TrendingRecommendationSection.vue";
 import { useTrendingRestaurants } from "@/composables/useTrendingRestaurants";
 import { useBudgetRecommendation, extractPriceValue } from "@/composables/useBudgetRecommendation";
 import { useTagMappingRecommendation } from "@/composables/useTagMappingRecommendation";
 import { useWeatherRecommendation } from "@/composables/useWeatherRecommendation";
 import { useHomeRecommendations } from "@/composables/useHomeRecommendations";
+import { useHomePersistence } from "@/composables/useHomePersistence";
+import { useHomeMap } from "@/composables/useHomeMap";
 import { useAccountStore } from "@/stores/account";
 import { useFavorites } from "@/composables/useFavorites";
 import axios from "axios";
@@ -96,7 +93,6 @@ const {
   requestCafeteriaRecommendations,
 } = useCafeteriaRecommendation({ userId: memberId });
 const cafeteriaImageUrl = computed(() => cafeteriaImageUrlRef.value);
-const homeListStateStorageKey = "homeListState";
 const searchStateStorageKey = "homeSearchState";
 const searchQuery = ref("");
 const filterForm = reactive({
@@ -109,6 +105,8 @@ const filterPartySize = ref(4);
 const filterBudgetMin = 0;
 const filterBudgetMax = 500000;
 const filterBudgetStep = 10000;
+const { loadHomeListState, saveHomeListState, clearHomeListState } =
+  useHomePersistence();
 const filterBudgetPercent = computed(() => {
   if (filterBudgetMax <= filterBudgetMin) return 0;
   const clamped = Math.min(
@@ -196,28 +194,6 @@ const fetchUserAddress = async () => {
   }
 };
 
-const applyUserMapCenter = async () => {
-  if (!isLoggedIn.value) return;
-  const address = await fetchUserAddress();
-  if (!address) {
-    currentLocation.value = fallbackAddress;
-    mapCenter.value = { ...fallbackMapCenter };
-    return;
-  }
-  currentLocation.value = address;
-  try {
-    const coords = await geocodeAddress(address);
-    mapCenter.value = coords;
-    if (mapInstance.value && kakaoMapsApi.value?.LatLng) {
-      const center = new kakaoMapsApi.value.LatLng(coords.lat, coords.lng);
-      mapInstance.value.setCenter(center);
-      scheduleMapMarkerRender();
-    }
-  } catch (error) {
-    // keep fallback center if geocode fails
-  }
-};
-
 const {
   isTrendingLoading,
   trendingRestaurants,
@@ -255,6 +231,82 @@ const selectedDistanceKm = computed(() => {
   return null;
 });
 
+const restaurantGeocodeCache = new Map();
+
+const handleMapMarkerClick = (restaurant) => {
+  updateSelectedMapRestaurant(restaurant);
+  ensureReviewSummary(restaurant);
+};
+
+async function resolveRestaurantCoords(restaurant) {
+  if (restaurant.coords?.lat && restaurant.coords?.lng) {
+    return restaurant.coords;
+  }
+
+  const cacheKey = restaurant.address?.trim() || restaurant.name;
+  if (!cacheKey) {
+    return null;
+  }
+
+  if (restaurantGeocodeCache.has(cacheKey)) {
+    return restaurantGeocodeCache.get(cacheKey);
+  }
+
+  const rawAddress = restaurant.address?.trim();
+  const candidates = [];
+  if (rawAddress) {
+    candidates.push(rawAddress);
+    const withoutParens = rawAddress.split(" (")[0].trim();
+    if (withoutParens && withoutParens !== rawAddress) {
+      candidates.push(withoutParens);
+    }
+    const withoutSemicolon = rawAddress.split(";")[0].trim();
+    if (withoutSemicolon && !candidates.includes(withoutSemicolon)) {
+      candidates.push(withoutSemicolon);
+    }
+  }
+
+  try {
+    for (const candidate of candidates) {
+      try {
+        const coords = await geocodeAddress(candidate);
+        restaurantGeocodeCache.set(cacheKey, coords);
+        restaurant.coords = coords;
+        return coords;
+      } catch (candidateError) {
+        continue;
+      }
+    }
+    throw new Error("geocode-failed");
+  } catch (error) {
+    console.error("주소 지오코딩 실패:", cacheKey, error);
+    return null;
+  }
+}
+
+const {
+  mapContainer,
+  mapCenter,
+  currentLocation,
+  currentDistanceLabel,
+  distanceSliderFill,
+  changeMapDistance,
+  resetMapToHome,
+  initializeMap,
+  applyUserMapCenter,
+  isWithinDistance,
+  calculateDistanceKm,
+} = useHomeMap({
+  isLoggedIn,
+  fetchUserAddress,
+  geocodeAddress,
+  isSearchOpen,
+  selectedDistanceKm,
+  resolveRestaurantCoords,
+  onMarkerClick: handleMapMarkerClick,
+  restaurants: restaurantData,
+});
+
 const RECOMMEND_CAFETERIA = "\uAD6C\uB0B4\uC2DD\uB2F9 \uB300\uCCB4 \uD83C\uDF71";
 const RECOMMEND_BUDGET = "\uC608\uC0B0 \uB9DE\uCDA4 \uD83D\uDCB0";
 const RECOMMEND_TASTE = "\uCDE8\uD5A5 \uB9DE\uCDA4 \uD83D\uDE0B";
@@ -265,10 +317,8 @@ const TAG_MESSAGE_SPECIALITY = "\uD2B9\uC774\uC0AC\uD56D \uD0DC\uADF8\uB97C \uBA
 const TAG_MESSAGE_LOADING = "\uCD94\uCC9C \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4";
 const TAG_MESSAGE_ERROR = "\uCD94\uCC9C \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4";
 
-"\uD2B9\uC774\uC0AC\uD56D \uD0DC\uADF8\uB97C \uBA3C\uC800 \uCD94\uAC00\uD574\uC8FC\uC138\uC694";
-
 const restaurants = restaurantData;
-const baseRestaurants = computed(() => {
+const activeRestaurantSource = computed(() => {
   if (selectedRecommendation.value === RECOMMEND_BUDGET) {
     return budgetRecommendations.value;
   }
@@ -297,6 +347,16 @@ const tagMappingNotice = computed(() => {
     return TAG_MESSAGE_ERROR;
   }
   return "";
+});
+const tasteRecommendationSummary = computed(() => {
+  if (selectedRecommendation.value !== RECOMMEND_TASTE) {
+    return "";
+  }
+  const count = tagMappingRecommendations.value.length;
+  if (!count) {
+    return "";
+  }
+  return `상위 ${count}곳`;
 });
 const weatherThemeMap = {
   hot: {
@@ -398,10 +458,7 @@ const getSortId = (restaurant) => {
   return Number.isFinite(value) ? value : 0;
 };
 const processedRestaurants = computed(() => {
-  let result = baseRestaurants.value.slice();
-  if (selectedRecommendation.value === RECOMMEND_TASTE) {
-    result = tagMappingRecommendations.value.slice();
-  }
+  let result = activeRestaurantSource.value.slice();
 
   if (searchResultIds.value !== null) {
     const validIds = new Set(searchResultIds.value.map(String));
@@ -441,7 +498,7 @@ const processedRestaurants = computed(() => {
 
   const center = mapCenter.value;
   const getDistance = (restaurant) =>
-      haversineDistance(restaurant.coords, center);
+      calculateDistanceKm(restaurant.coords, center);
 
   const sorters = {
     가나다순: (a, b) => {
@@ -564,46 +621,6 @@ const pageNumbers = computed(() => {
 });
 const canGoPrevious = computed(() => currentPageGroupStart.value > 1);
 const canGoNext = computed(() => currentPageGroupEnd.value < totalPages.value);
-const restaurantGeocodeCache = new Map();
-
-const mapContainer = ref(null);
-const mapInstance = ref(null);
-const kakaoMapsApi = ref(null);
-const isMapReady = ref(false);
-const mapMarkers = [];
-const fallbackMapCenter = {
-  lat: 37.394374,
-  lng: 127.110636,
-};
-const fallbackAddress = "경기도 성남시 분당구 판교역로 235";
-const mapCenter = ref({ ...fallbackMapCenter });
-const currentLocation = ref(fallbackAddress);
-const mapDistanceSteps = Object.freeze([
-  { label: "100m", level: 2 },
-  { label: "250m", level: 3 },
-  { label: "500m", level: 4 },
-  { label: "1km", level: 5 },
-  { label: "2km", level: 6 },
-  { label: "3km", level: 7 },
-]);
-const defaultMapDistanceIndex = mapDistanceSteps.findIndex(
-    (step) => step.label === "500m"
-);
-const mapDistanceStepIndex = ref(
-    defaultMapDistanceIndex === -1 ? 0 : defaultMapDistanceIndex
-);
-const currentDistanceLabel = computed(
-    () => mapDistanceSteps[mapDistanceStepIndex.value].label
-);
-const distanceSliderFill = computed(() => {
-  if (mapDistanceSteps.length <= 1) return 0;
-  return (
-      ((mapDistanceSteps.length - 1 - mapDistanceStepIndex.value) /
-          (mapDistanceSteps.length - 1)) *
-      100
-  );
-});
-
 const isCalendarOpen = ref(false);
 const calendarMonth = ref(new Date());
 const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
@@ -831,52 +848,6 @@ watch(
     { immediate: true }
 );
 
-const resolveRestaurantCoords = async (restaurant) => {
-  if (restaurant.coords?.lat && restaurant.coords?.lng) {
-    return restaurant.coords;
-  }
-
-  const cacheKey = restaurant.address?.trim() || restaurant.name;
-  if (!cacheKey) {
-    return null;
-  }
-
-  if (restaurantGeocodeCache.has(cacheKey)) {
-    return restaurantGeocodeCache.get(cacheKey);
-  }
-
-  const rawAddress = restaurant.address?.trim();
-  const candidates = [];
-  if (rawAddress) {
-    candidates.push(rawAddress);
-    const withoutParens = rawAddress.split(" (")[0].trim();
-    if (withoutParens && withoutParens !== rawAddress) {
-      candidates.push(withoutParens);
-    }
-    const withoutSemicolon = rawAddress.split(";")[0].trim();
-    if (withoutSemicolon && !candidates.includes(withoutSemicolon)) {
-      candidates.push(withoutSemicolon);
-    }
-  }
-
-  try {
-    for (const candidate of candidates) {
-      try {
-        const coords = await geocodeAddress(candidate);
-        restaurantGeocodeCache.set(cacheKey, coords);
-        restaurant.coords = coords;
-        return coords;
-      } catch (candidateError) {
-        continue;
-      }
-    }
-    throw new Error("geocode-failed");
-  } catch (error) {
-    console.error("주소 지오코딩 실패:", cacheKey, error);
-    return null;
-  }
-};
-
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const downloadJsonFile = (data, filename) => {
@@ -937,52 +908,6 @@ const startGeocodeExport = async () => {
   isGeocodeExporting.value = false;
 };
 
-const renderMapMarkers = async (kakaoMaps) => {
-  if (!mapInstance.value) return;
-
-  mapMarkers.forEach((marker) => marker.setMap(null));
-  mapMarkers.length = 0;
-
-  const markerSvg =
-      "data:image/svg+xml;utf8," +
-      "<svg xmlns='http://www.w3.org/2000/svg' width='32' height='46' viewBox='0 0 32 46'>" +
-      "<path d='M16 1C8.8 1 3 6.8 3 14c0 9.3 13 30 13 30s13-20.7 13-30C29 6.8 23.2 1 16 1z' fill='%23ff6b4a' stroke='white' stroke-width='2'/>" +
-      "<circle cx='16' cy='14' r='5' fill='white'/>" +
-      "</svg>";
-  const markerImage = new kakaoMaps.MarkerImage(
-      markerSvg,
-      new kakaoMaps.Size(32, 46),
-      { offset: new kakaoMaps.Point(16, 46) }
-  );
-
-  const distanceLimit = selectedDistanceKm.value;
-
-  for (const restaurant of restaurants) {
-    const coords = await resolveRestaurantCoords(restaurant);
-    if (!isValidCoords(coords)) continue;
-    if (distanceLimit && !isWithinDistance(coords, distanceLimit)) {
-      continue;
-    }
-
-    const marker = new kakaoMaps.Marker({
-      position: new kakaoMaps.LatLng(coords.lat, coords.lng),
-      title: restaurant.name,
-      image: markerImage,
-    });
-
-    try {
-      marker.setMap(mapInstance.value);
-      kakaoMaps.event.addListener(marker, "click", () => {
-        updateSelectedMapRestaurant(restaurant);
-        ensureReviewSummary(restaurant);
-      });
-      mapMarkers.push(marker);
-    } catch (error) {
-      console.error("지도 마커 표시 실패:", restaurant?.name, error);
-    }
-  }
-};
-
 const fetchRestaurantImage = async (restaurantId) => {
   const key = String(restaurantId);
   if (restaurantImageCache.has(key)) return;
@@ -1003,211 +928,6 @@ const fetchRestaurantImage = async (restaurantId) => {
     restaurantImageCache.set(key, null);
   }
 };
-
-const levelForDistance = (stepIndex) => {
-  const step = mapDistanceSteps[stepIndex] ?? mapDistanceSteps[0];
-  return step.level;
-};
-
-let mapZoomRafId = 0;
-let mapZoomRetryId = 0;
-let mapZoomAttempts = 0;
-let pendingMapZoomLevel = null;
-const maxMapZoomAttempts = 3;
-const scheduleMapZoom = (force = false) => {
-  if (mapZoomRafId) {
-    cancelAnimationFrame(mapZoomRafId);
-  }
-  if (mapZoomRetryId) {
-    clearTimeout(mapZoomRetryId);
-    mapZoomRetryId = 0;
-  }
-  mapZoomAttempts = 0;
-  mapZoomRafId = requestAnimationFrame(() => {
-    mapZoomRafId = 0;
-    if (!mapInstance.value) return;
-    if (!force && !isMapReady.value) return;
-    if (isSearchOpen.value) return;
-    if (!mapContainer.value?.offsetWidth || !mapContainer.value?.offsetHeight) {
-      return;
-    }
-    if (!mapContainer.value?.isConnected || !mapContainer.value?.offsetParent) {
-      return;
-    }
-    const targetLevel =
-        pendingMapZoomLevel ?? levelForDistance(mapDistanceStepIndex.value);
-    const attemptZoom = () => {
-      if (!mapInstance.value) return;
-      try {
-        mapInstance.value.relayout?.();
-        if (typeof mapInstance.value.getBounds === "function") {
-          const bounds = mapInstance.value.getBounds();
-          if (!bounds) throw new Error("map-bounds-unavailable");
-        }
-        if (typeof mapInstance.value.getLevel === "function") {
-          const currentLevel = mapInstance.value.getLevel();
-          if (currentLevel === targetLevel) {
-            pendingMapZoomLevel = null;
-            return;
-          }
-        }
-        mapInstance.value.setLevel(targetLevel);
-        pendingMapZoomLevel = null;
-      } catch (error) {
-        mapZoomAttempts += 1;
-        if (mapZoomAttempts < maxMapZoomAttempts) {
-          mapZoomRetryId = setTimeout(attemptZoom, 120);
-        }
-      }
-    };
-    attemptZoom();
-  });
-};
-
-const applyHomeMapZoom = (force = false) => {
-  pendingMapZoomLevel = levelForDistance(mapDistanceStepIndex.value);
-  scheduleMapZoom(force);
-};
-
-const changeMapDistance = (delta) => {
-  const next = Math.min(
-      mapDistanceSteps.length - 1,
-      Math.max(0, mapDistanceStepIndex.value + delta)
-  );
-  mapDistanceStepIndex.value = next;
-};
-
-const resetMapToHome = () => {
-  if (!mapInstance.value) return;
-  const kakaoMaps = window?.kakao?.maps;
-  if (!kakaoMaps?.LatLng) return;
-
-  const targetCenter = new kakaoMaps.LatLng(
-      mapCenter.value.lat,
-      mapCenter.value.lng
-  );
-  mapInstance.value.panTo(targetCenter);
-  mapDistanceStepIndex.value =
-      defaultMapDistanceIndex === -1 ? 0 : defaultMapDistanceIndex;
-  applyHomeMapZoom();
-};
-
-const initializeMap = async () => {
-  if (!mapContainer.value) return;
-  try {
-    const kakaoMaps = await loadKakaoMaps();
-    kakaoMapsApi.value = kakaoMaps;
-    const center = new kakaoMaps.LatLng(
-        mapCenter.value.lat,
-        mapCenter.value.lng
-    );
-    mapInstance.value = new kakaoMaps.Map(mapContainer.value, {
-      center,
-      level: levelForDistance(mapDistanceStepIndex.value),
-    });
-    kakaoMaps.event.addListener(mapInstance.value, "idle", () => {
-      if (pendingMapZoomLevel != null) {
-        scheduleMapZoom(true);
-      }
-    });
-
-    await renderMapMarkers(kakaoMaps);
-    applyHomeMapZoom(true);
-    isMapReady.value = true;
-  } catch (error) {
-    console.error("카카오 지도 초기화에 실패했습니다.", error);
-  }
-};
-
-
-onMounted(async () => {
-  void restoreSearchState();
-  await applyUserMapCenter();
-  await initializeMap();
-  if (typeof window !== "undefined") {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("geocode") === "1") {
-      isGeocodeExportMode.value = true;
-      startGeocodeExport();
-    }
-  }
-  fetchSearchTags();
-  loadRecommendationsFromStorage();
-
-  const storedHomeState = sessionStorage.getItem(homeListStateStorageKey);
-  if (storedHomeState) {
-    try {
-      const parsed = JSON.parse(storedHomeState);
-      selectedSort.value = DEFAULT_SORT;
-      selectedPriceRange.value =
-          parsed.selectedPriceRange ?? selectedPriceRange.value;
-      selectedRecommendation.value =
-          parsed.selectedRecommendation ?? selectedRecommendation.value;
-      currentPage.value = parsed.currentPage ?? currentPage.value;
-      if (selectedRecommendation.value === RECOMMEND_BUDGET) {
-        selectedRecommendation.value = null;
-        clearBudgetRecommendations();
-      }
-      if (selectedRecommendation.value === RECOMMEND_TASTE) {
-        if (!isLoggedIn.value) {
-          selectedRecommendation.value = null;
-          persistHomeListState();
-        } else {
-          fetchTagMappingRecommendations();
-        }
-      }
-      if (
-          selectedRecommendation.value === RECOMMEND_CAFETERIA &&
-          !cafeteriaRecommendations.value.length
-      ) {
-        selectedRecommendation.value = null;
-        filterForm.recommendation = null;
-        persistHomeListState();
-      }
-      nextTick(() => {
-        if (Number.isFinite(parsed.scrollY)) {
-          window.scrollTo(0, parsed.scrollY);
-        }
-      });
-    } catch (error) {
-      console.error("홈 리스트 상태 복원 실패:", error);
-      sessionStorage.removeItem(homeListStateStorageKey);
-    }
-  }
-});
-
-onBeforeUnmount(() => {
-  mapMarkers.forEach((marker) => marker.setMap(null));
-  mapMarkers.length = 0;
-  mapInstance.value = null;
-  isMapReady.value = false;
-  if (mapRenderRafId) {
-    cancelAnimationFrame(mapRenderRafId);
-    mapRenderRafId = 0;
-  }
-  if (mapZoomRafId) {
-    cancelAnimationFrame(mapZoomRafId);
-    mapZoomRafId = 0;
-  }
-  if (mapZoomRetryId) {
-    clearTimeout(mapZoomRetryId);
-    mapZoomRetryId = 0;
-  }
-});
-
-watch(mapDistanceStepIndex, () => {
-  applyHomeMapZoom();
-});
-
-watch(isSearchOpen, (isOpen) => {
-  if (!isOpen) {
-    nextTick(() => {
-      setTimeout(() => {
-        applyHomeMapZoom(true);
-      }, 120);
-    });
-  }
-});
 
 // Static data (constants)
 const timeSlots = ["11:00", "12:00", "13:00", "14:00"];
@@ -1255,64 +975,6 @@ const resolveRestaurantPriceValue = (restaurant) => {
   const total = menuPrices.reduce((sum, value) => sum + value, 0);
   return Math.round(total / menuPrices.length);
 };
-
-const haversineDistance = (coordsA = {}, coordsB = {}) => {
-  if (!coordsA.lat || !coordsA.lng || !coordsB.lat || !coordsB.lng) {
-    return Number.POSITIVE_INFINITY;
-  }
-  const toRad = (value) => (value * Math.PI) / 180;
-  const earthRadius = 6371; // km
-  const dLat = toRad(coordsB.lat - coordsA.lat);
-  const dLng = toRad(coordsB.lng - coordsA.lng);
-  const lat1 = toRad(coordsA.lat);
-  const lat2 = toRad(coordsB.lat);
-
-  const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return earthRadius * c;
-};
-
-const isValidCoords = (coords) =>
-    Number.isFinite(coords?.lat) && Number.isFinite(coords?.lng);
-
-const isWithinDistance = (coords, limitKm) => {
-  if (!limitKm) return true;
-  if (!isValidCoords(coords)) return false;
-  return haversineDistance(coords, mapCenter.value) <= limitKm;
-};
-
-let mapRenderRafId = 0;
-const scheduleMapMarkerRender = () => {
-  if (mapRenderRafId) {
-    cancelAnimationFrame(mapRenderRafId);
-  }
-  mapRenderRafId = requestAnimationFrame(() => {
-    mapRenderRafId = 0;
-    if (!isMapReady.value || !kakaoMapsApi.value || !mapInstance.value) {
-      return;
-    }
-    if (!mapContainer.value?.offsetWidth || !mapContainer.value?.offsetHeight) {
-      return;
-    }
-    renderMapMarkers(kakaoMapsApi.value);
-  });
-};
-
-watch(selectedDistanceKm, (distanceLimit) => {
-  if (distanceLimit) {
-    const label = `${distanceLimit}km`;
-    const stepIndex = mapDistanceSteps.findIndex(
-        (step) => step.label === label
-    );
-    if (stepIndex !== -1) {
-      mapDistanceStepIndex.value = stepIndex;
-    }
-  }
-
-  scheduleMapMarkerRender();
-});
 
 // Event handlers
 const openFilterModal = () => {
@@ -1613,21 +1275,47 @@ const refreshCafeteriaRecommendationsIfNeeded = async () => {
 };
 
 onMounted(async () => {
+  void restoreSearchState();
+  await applyUserMapCenter();
+  await initializeMap();
+  if (typeof window !== "undefined") {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("geocode") === "1") {
+      isGeocodeExportMode.value = true;
+      startGeocodeExport();
+    }
+  }
+  fetchSearchTags();
   loadRecommendationsFromStorage();
 
-  const storedHomeState = sessionStorage.getItem(homeListStateStorageKey);
+  const storedHomeState = loadHomeListState();
   if (storedHomeState) {
     try {
-      const parsed = JSON.parse(storedHomeState);
+      const parsed = storedHomeState;
       selectedSort.value = DEFAULT_SORT;
       selectedPriceRange.value =
           parsed.selectedPriceRange ?? selectedPriceRange.value;
       selectedRecommendation.value =
           parsed.selectedRecommendation ?? selectedRecommendation.value;
+      filterForm.recommendation = selectedRecommendation.value;
+      if (Number.isFinite(Number(parsed.filterBudget))) {
+        filterBudget.value = Number(parsed.filterBudget);
+      }
+      if (Number.isFinite(Number(parsed.filterPartySize))) {
+        filterPartySize.value = Number(parsed.filterPartySize);
+      }
       currentPage.value = parsed.currentPage ?? currentPage.value;
+      if (selectedRecommendation.value === RECOMMEND_TASTE) {
+        if (!isLoggedIn.value) {
+          selectedRecommendation.value = null;
+          filterForm.recommendation = null;
+          persistHomeListState();
+        } else {
+          fetchTagMappingRecommendations();
+        }
+      }
       if (selectedRecommendation.value === RECOMMEND_BUDGET) {
-        selectedRecommendation.value = null;
-        clearBudgetRecommendations();
+        fetchBudgetRecommendations(filterPerPersonBudget.value);
       }
       if (selectedRecommendation.value === RECOMMEND_WEATHER) {
         fetchWeatherRecommendationsForCenter();
@@ -1648,7 +1336,7 @@ onMounted(async () => {
       });
     } catch (error) {
       console.error("홈 리스트 상태 복원 실패:", error);
-      sessionStorage.removeItem(homeListStateStorageKey);
+      clearHomeListState();
     }
   } else {
     await refreshCafeteriaRecommendationsIfNeeded();
@@ -1664,25 +1352,15 @@ watch(isTrendingSort, (isActive) => {
 });
 
 const persistHomeListState = () => {
-  sessionStorage.setItem(
-      homeListStateStorageKey,
-      JSON.stringify({
-        selectedSort: selectedSort.value,
-        selectedPriceRange: selectedPriceRange.value,
-        selectedRecommendation: selectedRecommendation.value,
-        currentPage: currentPage.value,
-        scrollY: window.scrollY,
-      })
-  );
-};
-
-const handleClearCafeteriaRecommendations = () => {
-  clearCafeteriaRecommendations();
-  if (selectedRecommendation.value === RECOMMEND_CAFETERIA) {
-    selectedRecommendation.value = null;
-    filterForm.recommendation = null;
-    persistHomeListState();
-  }
+  saveHomeListState({
+    selectedSort: selectedSort.value,
+    selectedPriceRange: selectedPriceRange.value,
+    selectedRecommendation: selectedRecommendation.value,
+    filterBudget: filterBudget.value,
+    filterPartySize: filterPartySize.value,
+    currentPage: currentPage.value,
+    scrollY: window.scrollY,
+  });
 };
 
 const fetchWeatherRecommendationsForCenter = () =>
@@ -1691,9 +1369,9 @@ const fetchWeatherRecommendationsForCenter = () =>
 const {
   applyFilters,
   clearTrendingRecommendation,
-  clearBudgetRecommendation,
   toggleRecommendationOption,
   handleRecommendationQuickSelect,
+  clearRecommendation,
 } = useHomeRecommendations({
   selectedSort,
   selectedPriceRange,
@@ -1722,6 +1400,7 @@ const {
   RECOMMEND_BUDGET,
   RECOMMEND_TASTE,
   RECOMMEND_WEATHER,
+  RECOMMEND_TRENDING,
 });
 
 watch([selectedSort, selectedPriceRange, selectedRecommendation], () => {
@@ -1885,145 +1564,57 @@ onBeforeUnmount(() => {
           {{ weatherError }}
         </div>
 
-        <div class="flex items-center gap-2 mb-2">
-          <button
-              @click="openFilterModal"
-              class="flex items-center gap-1.5 text-sm text-gray-700 hover:text-[#ff6b4a] transition-colors"
-          >
-            <SlidersHorizontal class="w-4 h-4" />
-            <span>필터</span>
-          </button>
-          <Button
-              variant="outline"
-              size="sm"
-              class="ml-auto h-8 px-3 text-xs border-[#dee2e6] text-gray-700 bg-white hover:bg-[#f8f9fa] hover:text-[#1e3a5f] rounded-lg flex items-center gap-1"
-              @click="openSearchModal"
-          >
-            <Search class="w-3.5 h-3.5" />
-            검색
-          </Button>
-        </div>
+        <HomeSearchBar
+            :onOpenFilter="openFilterModal"
+            :onOpenSearch="openSearchModal"
+        />
 
-        <div class="space-y-4">
-          <CafeteriaRecommendationSection
-              v-if="isLoggedIn"
-              :recommendations="cafeteriaRecommendations"
-              :recommendation-buttons="recommendationButtons"
-              :active-recommendation="selectedRecommendation"
-              :onSelectRecommendation="handleRecommendationQuickSelect"
-              :show-buttons="false"
-              :onOpenSearch="() => (isSearchOpen = true)"
-              :onClearRecommendations="handleClearCafeteriaRecommendations"
-              :isModalOpen="isCafeteriaModalOpen"
-              :isProcessing="isCafeteriaOcrLoading"
-              :ocrResult="cafeteriaOcrResult"
-              :days="cafeteriaDaysDraft"
-              :errorMessage="cafeteriaOcrError"
-              :initialImageUrl="cafeteriaImageUrl"
-              :onModalClose="() => (isCafeteriaModalOpen = false)"
-              :onFileChange="handleCafeteriaFileChange"
-              :onRunOcr="() => handleCafeteriaOcr(resolveCafeteriaBaseDate())"
-              :onConfirm="handleCafeteriaConfirmAndClose"
-          />
-          <div
-              v-if="!cafeteriaRecommendations.length && tagMappingNotice"
-              class="rounded-2xl border border-[#e9ecef] bg-white px-4 py-3 text-sm text-gray-700"
-          >
-            {{ tagMappingNotice }}
-          </div>
+        <HomeRecommendationContent
+            :isLoggedIn="isLoggedIn"
+            :cafeteriaRecommendations="cafeteriaRecommendations"
+            :recommendationButtons="recommendationButtons"
+            :selectedRecommendation="selectedRecommendation"
+            :recommendWeatherKey="RECOMMEND_WEATHER"
+            :recommendTasteKey="RECOMMEND_TASTE"
+            :recommendBudgetKey="RECOMMEND_BUDGET"
+            :isTrendingSort="isTrendingSort"
+            :isTrendingLoading="isTrendingLoading"
+            :trendingError="trendingError"
+            :trendingCards="trendingCards"
+            :isWeatherLoading="isWeatherLoading"
+            :tagMappingNotice="tagMappingNotice"
+            :tasteRecommendationSummary="tasteRecommendationSummary"
+            :filterPerPersonBudgetDisplay="filterPerPersonBudgetDisplay"
+            :paginatedRestaurants="paginatedRestaurants"
+            :onSelectRecommendation="handleRecommendationQuickSelect"
+            :onOpenSearch="() => (isSearchOpen = true)"
+            :onClearCafeteria="() => clearRecommendation(RECOMMEND_CAFETERIA)"
+            :onClearTrending="clearTrendingRecommendation"
+            :onClearWeather="() => clearRecommendation(RECOMMEND_WEATHER)"
+            :onClearTaste="() => clearRecommendation(RECOMMEND_TASTE)"
+            :onClearBudget="() => clearRecommendation(RECOMMEND_BUDGET)"
+            :isCafeteriaModalOpen="isCafeteriaModalOpen"
+            :isCafeteriaOcrLoading="isCafeteriaOcrLoading"
+            :cafeteriaOcrResult="cafeteriaOcrResult"
+            :cafeteriaDaysDraft="cafeteriaDaysDraft"
+            :cafeteriaOcrError="cafeteriaOcrError"
+            :cafeteriaImageUrl="cafeteriaImageUrl"
+            :onCafeteriaModalClose="() => (isCafeteriaModalOpen = false)"
+            :onCafeteriaFileChange="handleCafeteriaFileChange"
+            :onCafeteriaOcr="() => handleCafeteriaOcr(resolveCafeteriaBaseDate())"
+            :onCafeteriaConfirm="handleCafeteriaConfirmAndClose"
+        />
 
-          <TrendingRecommendationSection
-              :isActive="!cafeteriaRecommendations.length && isTrendingSort"
-              :isLoading="isTrendingLoading"
-              :error="trendingError"
-              :cards="trendingCards"
-              :onClear="clearTrendingRecommendation"
-          />
-
-          <div
-              v-if="!cafeteriaRecommendations.length && selectedRecommendation === RECOMMEND_BUDGET"
-              class="space-y-3"
-          >
-            <div class="flex items-center justify-between">
-              <h4 class="text-base font-semibold text-[#1e3a5f]">
-                예산 맞춤 추천
-                <span class="text-xs text-gray-700 font-normal ml-2">
-                  1인당 {{ filterPerPersonBudgetDisplay }}
-                </span>
-              </h4>
-              <Button
-                  variant="outline"
-                  size="sm"
-                  class="h-8 px-3 text-xs border-[#dee2e6] text-gray-700 bg-white hover:bg-[#f8f9fa] hover:text-[#1e3a5f] rounded-lg"
-                  @click="clearBudgetRecommendation"
-              >
-                추천 해제
-              </Button>
-            </div>
-          </div>
-
-          <div
-              v-if="!cafeteriaRecommendations.length && selectedRecommendation === RECOMMEND_WEATHER && isWeatherLoading"
-              class="px-4"
-          >
-            <RestaurantCardSkeletonList :count="3" />
-          </div>
-
-          <div
-              v-else-if="!cafeteriaRecommendations.length && !paginatedRestaurants.length"
-              class="w-full px-4 py-10 text-center text-sm text-gray-700"
-          >
-            해당 검색 결과가 없습니다.
-          </div>
-          <RestaurantCardList
-              v-else-if="!cafeteriaRecommendations.length"
-              :restaurants="paginatedRestaurants"
-          />
-        </div>
-
-        <div
-            v-if="!cafeteriaRecommendations.length && totalPages > 1"
-            class="mt-6"
-        >
-          <nav
-              class="flex flex-wrap items-center justify-center gap-2 text-sm"
-              aria-label="페이지네이션"
-          >
-            <button
-                type="button"
-                class="min-w-[56px] h-9 px-4 rounded-2xl border border-[#e9ecef] bg-white text-gray-700 font-medium transition-colors disabled:text-[#c7cdd3] disabled:border-[#f1f3f5] disabled:cursor-not-allowed"
-                :disabled="!canGoPrevious"
-                @click="goToPreviousPage"
-            >
-              이전
-            </button>
-
-            <button
-                v-for="page in pageNumbers"
-                :key="page"
-                type="button"
-                @click="goToPage(page)"
-                :aria-current="page === currentPage ? 'page' : undefined"
-                :class="[
-                'min-w-[36px] h-9 px-3 rounded-2xl border font-medium transition-colors',
-                page === currentPage
-                  ? 'bg-gradient-to-r from-[#ff6b4a] via-[#ff805f] to-[#ff987d] text-white border-transparent shadow-button-hover'
-                  : 'bg-white text-gray-700 border-[#e9ecef] hover:text-[#ff6b4a] hover:border-[#ff6b4a]',
-              ]"
-            >
-              {{ page }}
-            </button>
-
-            <button
-                type="button"
-                class="min-w-[56px] h-9 px-4 rounded-2xl border border-[#e9ecef] bg-white text-gray-700 font-medium transition-colors disabled:text-[#c7cdd3] disabled:border-[#f1f3f5] disabled:cursor-not-allowed"
-                :disabled="!canGoNext"
-                @click="goToNextPage"
-            >
-              다음
-            </button>
-          </nav>
-        </div>
+        <HomePagination
+            :show="!cafeteriaRecommendations.length && !isTrendingSort && totalPages > 1"
+            :pageNumbers="pageNumbers"
+            :currentPage="currentPage"
+            :canGoPrevious="canGoPrevious"
+            :canGoNext="canGoNext"
+            :onGoPrevious="goToPreviousPage"
+            :onGoNext="goToNextPage"
+            :onGoToPage="goToPage"
+        />
       </div>
 
       <div

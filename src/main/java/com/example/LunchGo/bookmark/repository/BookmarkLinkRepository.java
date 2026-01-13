@@ -36,7 +36,7 @@ public interface BookmarkLinkRepository extends JpaRepository<BookmarkLink, Long
     @Query("""
         SELECT new com.example.LunchGo.bookmark.dto.BookmarkLinkListItem(
             b.linkId, b.requesterId, b.receiverId, b.status, b.createdAt, b.respondedAt,
-            u.userId, u.email, u.nickname, u.name
+            u.userId, u.email, u.nickname, u.name, u.image
         )
         FROM BookmarkLink b
         JOIN User u ON b.receiverId = u.userId
@@ -48,7 +48,7 @@ public interface BookmarkLinkRepository extends JpaRepository<BookmarkLink, Long
     @Query("""
         SELECT new com.example.LunchGo.bookmark.dto.BookmarkLinkListItem(
             b.linkId, b.requesterId, b.receiverId, b.status, b.createdAt, b.respondedAt,
-            u.userId, u.email, u.nickname, u.name
+            u.userId, u.email, u.nickname, u.name, u.image
         )
         FROM BookmarkLink b
         JOIN User u ON b.requesterId = u.userId
@@ -60,7 +60,7 @@ public interface BookmarkLinkRepository extends JpaRepository<BookmarkLink, Long
     @Query("""
         SELECT new com.example.LunchGo.bookmark.dto.BookmarkLinkListItem(
             b.linkId, b.requesterId, b.receiverId, b.status, b.createdAt, b.respondedAt,
-            u.userId, u.email, u.nickname, u.name
+            u.userId, u.email, u.nickname, u.name, u.image
         )
         FROM BookmarkLink b
         JOIN User u ON b.receiverId = u.userId
@@ -72,7 +72,7 @@ public interface BookmarkLinkRepository extends JpaRepository<BookmarkLink, Long
     @Query("""
         SELECT new com.example.LunchGo.bookmark.dto.BookmarkLinkListItem(
             b.linkId, b.requesterId, b.receiverId, b.status, b.createdAt, b.respondedAt,
-            u.userId, u.email, u.nickname, u.name
+            u.userId, u.email, u.nickname, u.name, u.image
         )
         FROM BookmarkLink b
         JOIN User u ON b.requesterId = u.userId

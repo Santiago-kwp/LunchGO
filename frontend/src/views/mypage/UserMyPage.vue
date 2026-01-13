@@ -226,29 +226,29 @@ const isPhoneVerified = ref(false);
 
 //특이사항 list
 const preferenceOptions = [
-  { id: 1, label: '오이를 못 먹어요' },
-  { id: 2, label: '오이를 좋아해요' },
-  { id: 3, label: '고수를 못 먹어요' },
-  { id: 4, label: '고수를 좋아해요' },
-  { id: 5, label: '해물을 못 먹어요' },
-  { id: 6, label: '해물을 좋아해요' },
-  { id: 7, label: '치즈를 못 먹어요' },
-  { id: 8, label: '치즈를 좋아해요' },
-  { id: 9, label: '매운 음식을 좋아해요' },
-  { id: 10, label: '매운 음식을 못 먹어요' },
-  { id: 11, label: '느끼한 음식을 못 먹어요' },
-  { id: 12, label: '인스타 감성을 좋아해요' },
-  { id: 13, label: '땅콩을 못 먹어요' },
-  { id: 14, label: '견과류를 못 먹어요' },
-  { id: 15, label: '갑각류를 못 먹어요' },
-  { id: 16, label: '우유를 못 먹어요' },
-  { id: 17, label: '계란을 못 먹어요' },
-  { id: 18, label: '밀가루를 못 먹어요' },
-  { id: 19, label: '해산물을 못 먹어요' },
-  { id: 20, label: '비건 음식을 좋아해요' },
-  { id: 21, label: '돼지고기를 못 먹어요' },
-  { id: 22, label: '소고기를 못 먹어요' },
-  { id: 23, label: '김치 싫어해요' },
+  { id: 1, label: '오이를 못 먹어요', emoji: '🥒🚫' },
+  { id: 2, label: '오이를 좋아해요', emoji: '🥒🧡' },
+  { id: 3, label: '고수를 못 먹어요', emoji: '🌿🚫' },
+  { id: 4, label: '고수를 좋아해요', emoji: '🌿🧡' },
+  { id: 5, label: '해물을 못 먹어요', emoji: '🐟🚫' },
+  { id: 6, label: '해물을 좋아해요', emoji: '🐟🧡' },
+  { id: 7, label: '치즈를 못 먹어요', emoji: '🧀🚫' },
+  { id: 8, label: '치즈를 좋아해요', emoji: '🧀🧡' },
+  { id: 9, label: '매운 음식을 좋아해요', emoji: '🌶️🧡' },
+  { id: 10, label: '매운 음식을 못 먹어요', emoji: '🌶️🚫' },
+  { id: 11, label: '느끼한 음식을 못 먹어요', emoji: '🧈🚫' },
+  { id: 12, label: '인스타 감성을 좋아해요', emoji: '✨📸' },
+  { id: 13, label: '땅콩을 못 먹어요', emoji: '🥜🚫' },
+  { id: 14, label: '견과류를 못 먹어요', emoji: '🌰🚫' },
+  { id: 15, label: '갑각류를 못 먹어요', emoji: '🦐🚫' },
+  { id: 16, label: '우유를 못 먹어요', emoji: '🥛🚫' },
+  { id: 17, label: '계란을 못 먹어요', emoji: '🥚🚫' },
+  { id: 18, label: '밀가루를 못 먹어요', emoji: '🌾🚫' },
+  { id: 19, label: '해산물을 못 먹어요', emoji: '🐚🚫' },
+  { id: 20, label: '비건 음식을 좋아해요', emoji: '🥗🧡' },
+  { id: 21, label: '돼지고기를 못 먹어요', emoji: '🐷🚫' },
+  { id: 22, label: '소고기를 못 먹어요', emoji: '🐮🚫' },
+  { id: 23, label: '김치 싫어해요', emoji: '🥬🚫' },
 ];
 
 //ref
@@ -350,10 +350,9 @@ const getAvailableOptions = (currentIndex: number) => {
   });
 };
 
-const getSelectedLabel = (index: number) => {
+const getSelectedOption = (index: number) => {
   const selectedId = specialInterests.value[index];
-  const selected = preferenceOptions.find((option) => option.id === selectedId);
-  return selected ? selected.label : '특이사항을 선택해주세요.';
+  return preferenceOptions.find((option) => option.id === selectedId) || null;
 };
 
 const toggleInterestDropdown = (index: number) => {
@@ -890,8 +889,13 @@ const handleWithdraw = () => {
                         class="w-full h-11 px-4 border border-[#dee2e6] rounded-lg text-left text-sm text-[#1e3a5f] flex items-center justify-between hover:bg-white transition-colors"
                         @click.stop="toggleInterestDropdown(index)"
                     >
-                      <span :class="['truncate', interestId ? 'text-[#1e3a5f]' : 'text-[#1e3a5f]']">
-                        {{ getSelectedLabel(index) }}
+                      <span class="flex items-center gap-2 min-w-0">
+                        <span v-if="getSelectedOption(index)" class="interest-emoji-badge">
+                          {{ getSelectedOption(index)?.emoji }}
+                        </span>
+                        <span :class="['truncate', interestId ? 'text-[#1e3a5f]' : 'text-[#1e3a5f]']">
+                          {{ getSelectedOption(index)?.label || '특이사항을 선택해주세요' }}
+                        </span>
                       </span>
                       <ChevronDown class="w-4 h-4 text-[#1E3A5F]" />
                     </button>
@@ -907,7 +911,10 @@ const handleWithdraw = () => {
                           class="w-full text-left px-4 py-2 text-sm hover:bg-[#f8f9fa]"
                           @click.stop="selectInterest(index, option.id)"
                       >
-                        {{ option.label }}
+                        <span class="inline-flex items-center gap-2">
+                          <span class="interest-option-emoji">{{ option.emoji }}</span>
+                          <span>{{ option.label }}</span>
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -1032,6 +1039,31 @@ const handleWithdraw = () => {
 .interest-card {
   position: relative;
   z-index: 30;
+}
+
+.interest-emoji-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #ffe7df;
+  color: #1e3a5f;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.interest-option-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  font-size: 16px;
+  line-height: 1;
+  white-space: nowrap;
 }
 .card-title {
   padding: 16px 24px 0;

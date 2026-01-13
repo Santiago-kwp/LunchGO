@@ -1063,7 +1063,6 @@ const handleBack = () => {
             <template v-if="isDepositOnly">
               <li>• 예약금 결제 후 즉시 예약이 확정됩니다.</li>
               <li>• 결제창에서 오래 대기하면 결제 확인이 지연되거나 재시도가 필요할 수 있습니다.</li>
-              <li v-if="countdownText">• 결제 남은 시간: {{ countdownText }}</li>
               <li>• 예약금은 이용 완료 확인 시 돌려드립니다.</li>
               <li>
                 • 취소는 방문 1일 전까지 가능하며, 당일 취소 및 노쇼 시 환불
@@ -1075,7 +1074,6 @@ const handleBack = () => {
             <template v-else>
               <li>• 결제 후 즉시 예약이 확정됩니다.</li>
               <li>• 결제창에서 오래 대기하면 결제 확인이 지연되거나 재시도가 필요할 수 있습니다.</li>
-              <li v-if="countdownText">• 결제 남은 시간: {{ countdownText }}</li>
               <li>• 영업일 기준 3-5일 이내 환불 처리됩니다.</li>
               <li>• 문의사항은 고객센터로 연락 주시기 바랍니다.</li>
             </template>

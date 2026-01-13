@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterLink, useRouter } from 'vue-router';
-import { Calendar, Clock, Users, MapPin } from 'lucide-vue-next';
+import { Calendar, Clock, Users, MapPin, CheckCircle2 } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 
@@ -15,12 +15,14 @@ const getStatusInfo = (reservationStatus) => {
       bgColor: 'bg-rose-50',
       textColor: 'text-rose-600',
       borderColor: 'border-rose-200',
+      icon: Clock,
     },
     confirmed: {
       text: '예약확정',
       bgColor: 'bg-blue-50',
       textColor: 'text-blue-600',
       borderColor: 'border-blue-200',
+      icon: CheckCircle2,
     },
     cancelled: {
       text: '취소',
@@ -85,6 +87,11 @@ const shortConfirmationNumber = (value: unknown) => {
               getStatusInfo(reservation.reservationStatus).borderColor,
             ]"
           >
+            <component
+              v-if="getStatusInfo(reservation.reservationStatus).icon"
+              :is="getStatusInfo(reservation.reservationStatus).icon"
+              class="w-3.5 h-3.5 inline-block mr-1 -mt-0.5"
+            />
             {{ getStatusInfo(reservation.reservationStatus).text }}
           </span>
         </div>

@@ -1,5 +1,5 @@
 <script setup>
-import Button from "@/components/ui/Button.vue";
+import HomeRecommendationHeader from "@/components/ui/HomeRecommendationHeader.vue";
 import RestaurantCardList from "@/components/ui/RestaurantCardList.vue";
 import RestaurantCardSkeletonList from "@/components/ui/RestaurantCardSkeletonList.vue";
 
@@ -37,26 +37,16 @@ defineProps({
 
 <template>
   <section v-if="isActive" class="space-y-3">
-    <div class="flex items-center justify-between">
-      <h4 class="text-base font-semibold text-[#1e3a5f]">
-        이달의 회식 맛집 추천
-      </h4>
-      <div class="flex items-center gap-2">
-        <span v-if="isLoading" class="text-xs text-[#6c757d]">
-          불러오는 중...
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          class="h-8 px-3 text-xs border-[#dee2e6] text-[#495057] bg-white hover:bg-[#f8f9fa] hover:text-[#1e3a5f] rounded-lg"
-          @click="onClear"
-        >
-          추천 해제
-        </Button>
-      </div>
-    </div>
+    <HomeRecommendationHeader
+      title="이달의 회식 맛집 추천"
+      :isLoading="isLoading"
+      :onClear="onClear"
+    />
     <p v-if="error" class="text-xs text-[#e03131]">
       {{ error }}
+    </p>
+    <p v-else class="text-xs text-[#6c757d]">
+      최근 7일 조회/예약 기반 인기순 상위 {{ cards.length }}곳이에요.
     </p>
     <RestaurantCardSkeletonList v-if="isLoading" :count="3" />
     <RestaurantCardList

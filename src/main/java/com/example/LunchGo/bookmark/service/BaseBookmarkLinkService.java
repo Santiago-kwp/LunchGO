@@ -124,6 +124,7 @@ public class BaseBookmarkLinkService implements BookmarkLinkService {
             .email(user.getEmail())
             .nickname(user.getNickname())
             .name(user.getName())
+            .image(user.getImage())
             .build();
     }
 
@@ -139,6 +140,7 @@ public class BaseBookmarkLinkService implements BookmarkLinkService {
                 .email(user.getEmail())
                 .nickname(user.getNickname())
                 .name(user.getName())
+                .image(user.getImage())
                 .build())
             .toList();
     }

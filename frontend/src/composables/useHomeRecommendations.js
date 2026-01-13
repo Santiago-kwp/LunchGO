@@ -26,6 +26,7 @@ export const useHomeRecommendations = ({
   RECOMMEND_BUDGET,
   RECOMMEND_TASTE,
   RECOMMEND_WEATHER,
+  RECOMMEND_TRENDING,
 }) => {
   const applyFilters = () => {
     selectedSort.value = filterForm.sort || sortOptions[0];
@@ -55,14 +56,6 @@ export const useHomeRecommendations = ({
     selectedRecommendation.value = null;
     filterForm.recommendation = null;
     clearTrendingRestaurants();
-    currentPage.value = 1;
-    persistHomeListState();
-  };
-
-  const clearBudgetRecommendation = () => {
-    selectedRecommendation.value = null;
-    filterForm.recommendation = null;
-    clearBudgetRecommendations();
     currentPage.value = 1;
     persistHomeListState();
   };
@@ -99,11 +92,35 @@ export const useHomeRecommendations = ({
     applyFilters();
   };
 
+  const clearRecommendation = (option) => {
+    if (option === RECOMMEND_CAFETERIA) {
+      clearCafeteriaRecommendations();
+    }
+    if (option === RECOMMEND_BUDGET) {
+      clearBudgetRecommendations();
+    }
+    if (option === RECOMMEND_WEATHER) {
+      clearWeatherRecommendations();
+    }
+    if (option === RECOMMEND_TASTE) {
+      clearTagMappingRecommendations();
+    }
+    if (option === RECOMMEND_TRENDING) {
+      clearTrendingRestaurants();
+    }
+    if (selectedRecommendation.value === option) {
+      selectedRecommendation.value = null;
+      filterForm.recommendation = null;
+    }
+    currentPage.value = 1;
+    persistHomeListState();
+  };
+
   return {
     applyFilters,
     clearTrendingRecommendation,
-    clearBudgetRecommendation,
     toggleRecommendationOption,
     handleRecommendationQuickSelect,
+    clearRecommendation,
   };
 };

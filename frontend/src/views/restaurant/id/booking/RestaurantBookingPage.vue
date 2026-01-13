@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
-import { ArrowLeft, CalendarIcon, Users } from 'lucide-vue-next';
+import { ArrowLeft, CalendarIcon, Clock, Users } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import WaitingModal from '@/components/ui/WaitingModal.vue';
@@ -57,7 +57,7 @@ const onInputRequestNote = (e) => {
 };
 
 const dates = computed(() => {
-  return Array.from({ length: 30 }, (_, i) => {
+  return Array.from({ length: 14 }, (_, i) => {
     const date = new Date();
     date.setDate(date.getDate() + i);
     return {
@@ -67,6 +67,21 @@ const dates = computed(() => {
       isToday: i === 0,
     };
   });
+});
+
+const reservationDateRangeText = computed(() => {
+  const start = new Date();
+  const end = new Date();
+  end.setDate(start.getDate() + dates.value.length - 1);
+  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+  const formatShortDate = (date) => {
+    const year = String(date.getFullYear()).slice(-2);
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const weekday = weekdays[date.getDay()];
+    return `${year}.${month}.${day}.${weekday}`;
+  };
+  return `예약은 오늘(${formatShortDate(start)}) 부터 최대 2주 후(${formatShortDate(end)}) 까지 가능합니다`;
 });
 
 const timeSlots = ref(['11:00', '12:00', '13:00', '14:00']);
@@ -202,6 +217,9 @@ const selectDate = (idx) => {
           <CalendarIcon class="w-5 h-5 text-[#ff6b4a]" />
           <h2 class="text-base font-semibold text-[#1e3a5f]">날짜 선택</h2>
         </div>
+        <p class="text-xs text-[#6c757d] mb-4">
+          {{ reservationDateRangeText }}
+        </p>
 
         <div class="overflow-x-auto -mx-4 px-4">
           <div class="flex gap-2 pb-2">
@@ -230,7 +248,10 @@ const selectDate = (idx) => {
       </div>
 
       <div class="bg-white px-4 py-5 border-b border-[#e9ecef]">
-        <h2 class="text-base font-semibold text-[#1e3a5f] mb-4">시간 선택</h2>
+        <div class="flex items-center gap-2 mb-4">
+          <Clock class="w-5 h-5 text-[#ff6b4a]" />
+          <h2 class="text-base font-semibold text-[#1e3a5f]">시간 선택</h2>
+        </div>
 
         <div class="grid grid-cols-4 gap-2">
           <button

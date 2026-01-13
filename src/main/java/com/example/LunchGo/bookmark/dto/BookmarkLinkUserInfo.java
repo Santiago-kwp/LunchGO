@@ -12,4 +12,5 @@ public class BookmarkLinkUserInfo {
     private String email;
     private String nickname;
     private String name;
+    private String image;
 }

@@ -8,6 +8,7 @@ import lombok.Getter;
 
 @Getter
 @Builder
+@AllArgsConstructor
 public class BookmarkLinkListItem {
     private Long linkId;
     private Long requesterId;
@@ -19,5 +20,6 @@ public class BookmarkLinkListItem {
     private String counterpartEmail;
     private String counterpartNickname;
     private String counterpartName;
+    private String counterpartImage;
 
 }
