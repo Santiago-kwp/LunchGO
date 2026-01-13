@@ -80,4 +80,26 @@ public class RedisUtil {
     public RScoredSortedSet<String> getScoredSortedSet(String key) {
         return redissonClient.getScoredSortedSet(key);
     }
+
+    /**
+     * 키의 값을 1 증가시키고 증가된 값을 반환합니다.
+     */
+    public Long increment(String key) {
+        return template.opsForValue().increment(key);
+    }
+
+    /**
+     * 키의 값을 1 감소시키고 감소된 값을 반환합니다.
+     */
+    public Long decrement(String key) {
+        return template.opsForValue().decrement(key);
+    }
+
+    /**
+     * 키의 현재 값을 조회합니다.
+     */
+    public Long getCount(String key) {
+        String val = template.opsForValue().get(key);
+        return val == null ? 0L : Long.parseLong(val);
+    }
 }

@@ -8,6 +8,8 @@ export function useReservationQueue() {
   const modalType = ref('waiting'); // 'waiting' | 'error'
   const modalMessage = ref('');
   const queueErrorMessage = ref(''); // 컴포넌트의 에러 메시지와 구분하기 위해 이름 변경
+  const currentWaitingCount = ref(0);
+  const estimatedWaitTime = ref(0);
 
   const MAX_RETRIES = 10;
   
@@ -28,6 +30,7 @@ export function useReservationQueue() {
         if (onSuccess) onSuccess(result);
       } catch (e) {
         const msg = e.response?.data?.message || e?.message || '';
+        const waitingCount = e.response?.data?.waitingCount || 0;
 
         // 1. 중복 예약 등 에러 모달 ("대기 중" 없는 409)
         if (e.response?.status === 409 && !msg.includes('대기 중')) {
@@ -41,6 +44,10 @@ export function useReservationQueue() {
         if (e.response?.status === 409 && msg.includes('대기 중')) {
           if (retryCount < MAX_RETRIES) {
             retryCount++;
+            currentWaitingCount.value = waitingCount;
+            // 대기 시간 시뮬레이션: 인원당 약 3초 + 기본 2초
+            estimatedWaitTime.value = waitingCount > 0 ? (waitingCount * 3) : 5;
+            
             modalType.value = 'waiting';
             modalMessage.value = '예약 요청이 많아 대기 중입니다.\n잠시만 기다려주세요...';
             isWaiting.value = true;
@@ -80,6 +87,8 @@ export function useReservationQueue() {
     modalType,
     modalMessage,
     queueErrorMessage,
+    currentWaitingCount,
+    estimatedWaitTime,
     processQueue,
     handleQueueModalClose
   };

@@ -14,6 +14,14 @@ defineProps({
   message: {
     type: String,
     default: '예약 요청이 많아 대기 중입니다.\n잠시만 기다려주세요...',
+  },
+  waitingCount: {
+    type: Number,
+    default: 0
+  },
+  estimatedTime: {
+    type: Number,
+    default: 0
   }
 });
 
@@ -36,11 +44,22 @@ defineEmits(['close']);
           
           <h3 class="text-base font-bold text-[#1e3a5f] mb-2">접속 대기 중</h3>
           
-          <p class="text-sm text-[#495057] leading-relaxed whitespace-pre-line">
+          <p class="text-sm text-[#495057] leading-relaxed whitespace-pre-line mb-4">
             {{ message }}
           </p>
+
+          <div v-if="waitingCount > 0" class="flex flex-col gap-2 mb-4 w-full">
+            <div class="flex justify-between items-center bg-[#f8f9fa] rounded-lg px-4 py-2 border border-[#e9ecef]">
+              <span class="text-xs text-[#6c757d]">현재 접속 시도</span>
+              <span class="text-sm font-bold text-[#ff6b4a]">{{ waitingCount }}명</span>
+            </div>
+            <div class="flex justify-between items-center bg-[#f8f9fa] rounded-lg px-4 py-2 border border-[#e9ecef]">
+              <span class="text-xs text-[#6c757d]">예상 대기 시간</span>
+              <span class="text-sm font-bold text-[#1e3a5f]">약 {{ estimatedTime }}초</span>
+            </div>
+          </div>
           
-          <div class="mt-6 w-full bg-[#f8f9fa] rounded-lg p-4 text-left">
+          <div class="w-full bg-[#f8f9fa] rounded-lg p-3 text-left">
             <p class="text-[11px] text-[#868e96] leading-relaxed">
               • 페이지를 새로고침하거나 닫지 마세요.<br>
               • 순서가 되면 자동으로 넘어갑니다.

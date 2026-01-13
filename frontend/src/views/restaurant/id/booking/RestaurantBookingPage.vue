@@ -81,6 +81,8 @@ const {
   modalType, 
   modalMessage, 
   queueErrorMessage, 
+  currentWaitingCount,
+  estimatedWaitTime,
   processQueue, 
   handleQueueModalClose 
 } = useReservationQueue();
@@ -351,6 +353,8 @@ const selectDate = (idx) => {
       :isOpen="isWaiting" 
       :type="modalType"
       :message="modalMessage || undefined"
+      :waitingCount="currentWaitingCount"
+      :estimatedTime="estimatedWaitTime"
       @close="() => handleQueueModalClose(isCreatingReservation)"
     />
   </div>
