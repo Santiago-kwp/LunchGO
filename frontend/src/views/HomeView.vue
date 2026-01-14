@@ -1225,6 +1225,10 @@ const toggleFilterPriceRange = (range) => {
   filterForm.priceRange = range;
 };
 
+const selectSortOption = (option) => {
+  filterForm.sort = option;
+};
+
 const openSearchModal = () => {
   isSearchOpen.value = true;
 };
@@ -2005,7 +2009,7 @@ onBeforeUnmount(() => {
               <button
                   v-for="option in sortOptions"
                   :key="option"
-                  @click="filterForm.sort = option"
+                  @click="selectSortOption(option)"
                   :class="`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   filterForm.sort === option
                     ? 'gradient-primary text-white'
