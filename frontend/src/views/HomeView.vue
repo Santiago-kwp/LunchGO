@@ -599,6 +599,12 @@ const formatTemp = (value) =>
 const weatherDisplayLabel = computed(() => weatherThemeStyle.value?.label || "");
 const formatRouteDuration = formatRouteDurationDetailed;
 const isRecommendationLoading = computed(() => {
+  if (isHomeListRestoring.value) {
+    return selectedSort.value === "평점순";
+  }
+  if (selectedSort.value === "평점순" && isRatingSortPending.value) {
+    return true;
+  }
   if (selectedRecommendation.value === RECOMMEND_WEATHER) {
     return isWeatherLoading.value;
   }
@@ -607,6 +613,9 @@ const isRecommendationLoading = computed(() => {
   }
   if (selectedRecommendation.value === RECOMMEND_BUDGET) {
     return isBudgetLoading.value;
+  }
+  if (!selectedRecommendation.value) {
+    return isRatingSortPending.value;
   }
   return false;
 });
@@ -665,7 +674,10 @@ const restaurantIndexById = new Map(
 const restaurantImageCache = new Map();
 const restaurantImageOverrides = ref({});
 const reviewSummaryCache = ref({});
+const reviewSummarySortCache = ref({});
 const reviewSummaryInFlight = new Set();
+const isRatingSortPending = ref(false);
+const ratingSortPendingIds = new Set();
 const searchRestaurantIdSet = computed(() => {
   if (!Array.isArray(searchRestaurantIds.value)) return null;
   return new Set(searchRestaurantIds.value.map((id) => String(id)));
@@ -687,6 +699,13 @@ const getSortRating = (restaurant) => {
   }
   return restaurant?.rating ?? 0;
 };
+const getSortRatingSnapshot = (restaurant) => {
+  const summary = reviewSummarySortCache.value[String(restaurant?.id)];
+  if (summary && summary.rating != null) {
+    return summary.rating;
+  }
+  return restaurant?.rating ?? 0;
+};
 const getSortReviewCount = (restaurant) => {
   const summary = reviewSummaryCache.value[String(restaurant?.id)];
   if (summary && summary.reviews != null) {
@@ -702,6 +721,62 @@ const getSortRecommendScore = (restaurant) => {
 const getSortId = (restaurant) => {
   const value = Number(restaurant?.id);
   return Number.isFinite(value) ? value : 0;
+};
+const syncReviewSummarySortCache = () => {
+  reviewSummarySortCache.value = { ...reviewSummaryCache.value };
+};
+let reviewSummarySortSyncTimer = null;
+const scheduleReviewSummarySortSync = () => {
+  if (reviewSummarySortSyncTimer) {
+    clearTimeout(reviewSummarySortSyncTimer);
+  }
+  reviewSummarySortSyncTimer = setTimeout(() => {
+    syncReviewSummarySortCache();
+    reviewSummarySortSyncTimer = null;
+  }, 200);
+};
+const clearReviewSummarySortSyncTimer = () => {
+  if (!reviewSummarySortSyncTimer) return;
+  clearTimeout(reviewSummarySortSyncTimer);
+  reviewSummarySortSyncTimer = null;
+};
+const finishRatingSortPending = () => {
+  clearReviewSummarySortSyncTimer();
+  isRatingSortPending.value = false;
+};
+const resetRatingSortPendingIds = (restaurants) => {
+  ratingSortPendingIds.clear();
+  restaurants.forEach((restaurant) => {
+    const id = String(restaurant.id);
+    if (!reviewSummaryCache.value[id]) {
+      ratingSortPendingIds.add(id);
+    }
+  });
+};
+const markRatingSortReady = (restaurantId) => {
+  if (!isRatingSortPending.value) return;
+  ratingSortPendingIds.delete(String(restaurantId));
+  if (ratingSortPendingIds.size === 0) {
+    syncReviewSummarySortCache();
+    finishRatingSortPending();
+  }
+};
+const startRatingSortPending = (restaurants) => {
+  isRatingSortPending.value = true;
+  syncReviewSummarySortCache();
+  setTimeout(() => {
+    resetRatingSortPendingIds(restaurants);
+    if (ratingSortPendingIds.size === 0) {
+      finishRatingSortPending();
+    }
+  }, 0);
+};
+const finalizeRatingSortPending = () => {
+  if (!isRatingSortPending.value) return;
+  if (ratingSortPendingIds.size === 0) {
+    syncReviewSummarySortCache();
+    finishRatingSortPending();
+  }
 };
 const handleCheckRoute = async (restaurant) => {
   if (!restaurant) return;
@@ -818,7 +893,7 @@ const processedRestaurants = computed(() => {
       return getSortId(a) - getSortId(b);
     },
     평점순: (a, b) => {
-      const ratingDiff = getSortRating(b) - getSortRating(a);
+      const ratingDiff = getSortRatingSnapshot(b) - getSortRatingSnapshot(a);
       if (ratingDiff !== 0) return ratingDiff;
       return getSortId(a) - getSortId(b);
     },
@@ -1063,15 +1138,39 @@ watch(
     [selectedSort, availableRestaurants],
     ([sortValue, list]) => {
       if (sortValue !== "평점순") return;
-      list.forEach((restaurant) => {
-        fetchReviewSummary(restaurant.id);
-      });
+      startRatingSortPending(list);
+      setTimeout(() => {
+        list.forEach((restaurant) => {
+          fetchReviewSummary(restaurant.id, restaurant);
+        });
+        finalizeRatingSortPending();
+      }, 0);
     },
     { immediate: true }
 );
 
 watch(selectedPriceRange, () => {
   currentPage.value = 1;
+});
+
+watch(selectedSort, (nextSort) => {
+  if (nextSort === "평점순") {
+    return;
+  }
+  finishRatingSortPending();
+});
+
+watch(reviewSummaryCache, () => {
+  if (selectedSort.value !== "평점순") return;
+  if (!isRatingSortPending.value) return;
+  scheduleReviewSummarySortSync();
+  finalizeRatingSortPending();
+});
+
+watch(paginatedRestaurantsRaw, () => {
+  if (selectedSort.value !== "평점순") return;
+  if (!isRatingSortPending.value) return;
+  finalizeRatingSortPending();
 });
 
 const goToPage = (page) => {
@@ -1089,7 +1188,7 @@ const goToNextPage = () => {
   goToPage(currentPageGroupStart.value + pageGroupSize);
 };
 
-const fetchReviewSummary = async (restaurantId) => {
+const fetchReviewSummary = async (restaurantId, fallback = null) => {
   const key = String(restaurantId);
   if (reviewSummaryCache.value[key] || reviewSummaryInFlight.has(key)) return;
   reviewSummaryInFlight.add(key);
@@ -1107,11 +1206,28 @@ const fetchReviewSummary = async (restaurantId) => {
           reviews: summary.reviewCount ?? 0,
         },
       };
+    } else if (fallback) {
+      reviewSummaryCache.value = {
+        ...reviewSummaryCache.value,
+        [key]: {
+          rating: fallback.rating ?? 0,
+          reviews: fallback.reviews ?? 0,
+        },
+      };
     }
   } catch (error) {
-    // ignore summary failures for list rendering
+    if (fallback) {
+      reviewSummaryCache.value = {
+        ...reviewSummaryCache.value,
+        [key]: {
+          rating: fallback.rating ?? 0,
+          reviews: fallback.reviews ?? 0,
+        },
+      };
+    }
   } finally {
     reviewSummaryInFlight.delete(key);
+    markRatingSortReady(restaurantId);
   }
 };
 
@@ -1150,7 +1266,7 @@ const formatRating = (value) => {
 const ensureReviewSummary = async (restaurant) => {
   const key = String(restaurant.id);
   if (!reviewSummaryCache.value[key]) {
-    await fetchReviewSummary(restaurant.id);
+    await fetchReviewSummary(restaurant.id, restaurant);
   }
   if (selectedMapRestaurants.value.some((item) => item.id === restaurant.id)) {
     refreshSelectedMapRestaurants();
@@ -1161,7 +1277,7 @@ watch(
     paginatedRestaurantsRaw,
     (restaurants) => {
       restaurants.forEach((restaurant) => {
-        fetchReviewSummary(restaurant.id);
+        fetchReviewSummary(restaurant.id, restaurant);
       });
     },
     { immediate: true }
@@ -1282,6 +1398,45 @@ const recommendationButtons = computed(() => [
 ]);
 const distances = ["1km 이내", "2km 이내", "3km 이내"];
 const sortOptions = [DEFAULT_SORT, "추천순", "거리순", "평점순", "낮은 가격순"];
+const storedHomeState = loadHomeListState();
+const isHomeListRestoring = ref(Boolean(storedHomeState));
+
+const resolveStoredHomeSelection = (state) => {
+  const restoredSort = sortOptions.includes(state.selectedSort)
+    ? state.selectedSort
+    : selectedSort.value;
+  const restoredPriceRange = priceRanges.includes(state.selectedPriceRange)
+    ? state.selectedPriceRange
+    : selectedPriceRange.value;
+  const restoredRecommendation = recommendationOptions.includes(
+    state.selectedRecommendation
+  )
+    ? state.selectedRecommendation
+    : selectedRecommendation.value;
+  return {
+    restoredSort,
+    restoredPriceRange,
+    restoredRecommendation,
+  };
+};
+
+if (storedHomeState) {
+  const { restoredSort, restoredPriceRange, restoredRecommendation } =
+    resolveStoredHomeSelection(storedHomeState);
+  selectedSort.value = restoredSort;
+  selectedPriceRange.value = restoredPriceRange;
+  selectedRecommendation.value = restoredRecommendation;
+  filterForm.sort = selectedSort.value;
+  filterForm.priceRange = selectedPriceRange.value;
+  filterForm.recommendation = selectedRecommendation.value;
+  if (Number.isFinite(Number(storedHomeState.filterBudget))) {
+    filterBudget.value = Number(storedHomeState.filterBudget);
+  }
+  if (Number.isFinite(Number(storedHomeState.filterPartySize))) {
+    filterPartySize.value = Number(storedHomeState.filterPartySize);
+  }
+  currentPage.value = storedHomeState.currentPage ?? currentPage.value;
+}
 
 
 const resolveRestaurantPriceValue = (restaurant) => {
@@ -1359,16 +1514,10 @@ const runCafeteriaRecommendations = async (baseDate) => {
 };
 
 const closeFilterModal = () => {
-  resetFilters();
-  selectedSort.value = sortOptions[0];
-  selectedPriceRange.value = null;
-  selectedRecommendation.value = null;
-  clearTrendingRestaurants();
-  clearTagMappingRecommendations();
-  clearWeatherRecommendations();
-  currentPage.value = 1;
+  filterForm.sort = selectedSort.value;
+  filterForm.priceRange = selectedPriceRange.value;
+  filterForm.recommendation = selectedRecommendation.value;
   isFilterOpen.value = false;
-  persistHomeListState();
 };
 
 const handleCafeteriaMenuEdit = () => {
@@ -1628,23 +1777,17 @@ onMounted(async () => {
   fetchSearchTags();
   loadRecommendationsFromStorage();
 
-  const storedHomeState = loadHomeListState();
   if (storedHomeState) {
     try {
       const parsed = storedHomeState;
-      selectedSort.value = DEFAULT_SORT;
-      selectedPriceRange.value =
-          parsed.selectedPriceRange ?? selectedPriceRange.value;
-      selectedRecommendation.value =
-          parsed.selectedRecommendation ?? selectedRecommendation.value;
+      const { restoredSort, restoredPriceRange, restoredRecommendation } =
+        resolveStoredHomeSelection(parsed);
+      selectedSort.value = restoredSort;
+      selectedPriceRange.value = restoredPriceRange;
+      selectedRecommendation.value = restoredRecommendation;
+      filterForm.sort = selectedSort.value;
+      filterForm.priceRange = selectedPriceRange.value;
       filterForm.recommendation = selectedRecommendation.value;
-      if (Number.isFinite(Number(parsed.filterBudget))) {
-        filterBudget.value = Number(parsed.filterBudget);
-      }
-      if (Number.isFinite(Number(parsed.filterPartySize))) {
-        filterPartySize.value = Number(parsed.filterPartySize);
-      }
-      currentPage.value = parsed.currentPage ?? currentPage.value;
       if (selectedRecommendation.value === RECOMMEND_TASTE) {
         if (!isLoggedIn.value) {
           selectedRecommendation.value = null;
@@ -1681,6 +1824,7 @@ onMounted(async () => {
   } else {
     await refreshCafeteriaRecommendationsIfNeeded();
   }
+  isHomeListRestoring.value = false;
 });
 
 watch(isTrendingSort, (isActive) => {
@@ -1765,6 +1909,7 @@ watch(
 
 onBeforeUnmount(() => {
   persistHomeListState();
+  clearReviewSummarySortSyncTimer();
 });
 </script>
 
