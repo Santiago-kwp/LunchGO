@@ -10,6 +10,8 @@ export const useHomeMap = ({
   resolveRestaurantCoords,
   onMarkerClick,
   favoriteIdSet,
+  sharedFavoriteIdSet,
+  sharedFavoriteNameMap,
   restaurants,
 }) => {
   const mapContainer = ref(null);
@@ -17,6 +19,7 @@ export const useHomeMap = ({
   const kakaoMapsApi = ref(null);
   const isMapReady = ref(false);
   const markerRegistry = new Map();
+  const overlayRegistry = new Map();
   const isMapInteracting = ref(false);
   const needsMarkerRender = ref(false);
   const fallbackMapCenter = {
@@ -109,6 +112,14 @@ export const useHomeMap = ({
       marker.setMap(null);
     }
   };
+  const setOverlayVisible = (overlay, visible) => {
+    if (!overlay) return;
+    if (visible) {
+      overlay.setMap(mapInstance.value);
+      return;
+    }
+    overlay.setMap(null);
+  };
 
   const renderMapMarkers = async (kakaoMaps, shouldClear = true) => {
     if (!mapInstance.value) return;
@@ -126,6 +137,8 @@ export const useHomeMap = ({
     if (shouldClear) {
       markerRegistry.forEach((entry) => entry.marker.setMap(null));
       markerRegistry.clear();
+      overlayRegistry.forEach((overlay) => overlay.setMap(null));
+      overlayRegistry.clear();
       if (routeOriginMarker.value) {
         routeOriginMarker.value.setMap(null);
         routeOriginMarker.value = null;
@@ -148,6 +161,14 @@ export const useHomeMap = ({
       '<path d="M16 1C8.8 1 3 6.8 3 14c0 9.3 13 30 13 30s13-20.7 13-30C29 6.8 23.2 1 16 1z" fill="#007bff" stroke="white" stroke-width="2"/>' +
         '<path d="M16 8.5l2.1 4.3 4.7.7-3.4 3.3.8 4.7-4.2-2.2-4.2 2.2.8-4.7-3.4-3.3 4.7-.7z" fill="white"/>'
     );
+    const sharedMarkerSvg = buildMarkerSvg(
+      '<path d="M16 1C8.8 1 3 6.8 3 14c0 9.3 13 30 13 30s13-20.7 13-30C29 6.8 23.2 1 16 1z" fill="#ffc107" stroke="white" stroke-width="2"/>' +
+        '<path d="M16 8.5l2.1 4.3 4.7.7-3.4 3.3.8 4.7-4.2-2.2-4.2 2.2.8-4.7-3.4-3.3 4.7-.7z" fill="white"/>'
+    );
+    const sharedFavoriteMarkerSvg = buildMarkerSvg(
+      '<path d="M16 1C8.8 1 3 6.8 3 14c0 9.3 13 30 13 30s13-20.7 13-30C29 6.8 23.2 1 16 1z" fill="#007bff" stroke="white" stroke-width="2"/>' +
+        '<path d="M16 8.5l2.1 4.3 4.7.7-3.4 3.3.8 4.7-4.2-2.2-4.2 2.2.8-4.7-3.4-3.3 4.7-.7z" fill="#ffc107"/>'
+    );
     const markerImage = new kakaoMaps.MarkerImage(
       markerSvg,
       new kakaoMaps.Size(32, 46),
@@ -155,6 +176,16 @@ export const useHomeMap = ({
     );
     const favoriteMarkerImage = new kakaoMaps.MarkerImage(
       favoriteMarkerSvg,
+      new kakaoMaps.Size(32, 46),
+      { offset: new kakaoMaps.Point(16, 46) }
+    );
+    const sharedMarkerImage = new kakaoMaps.MarkerImage(
+      sharedMarkerSvg,
+      new kakaoMaps.Size(32, 46),
+      { offset: new kakaoMaps.Point(16, 46) }
+    );
+    const sharedFavoriteMarkerImage = new kakaoMaps.MarkerImage(
+      sharedFavoriteMarkerSvg,
       new kakaoMaps.Size(32, 46),
       { offset: new kakaoMaps.Point(16, 46) }
     );
@@ -172,18 +203,53 @@ export const useHomeMap = ({
 
     const distanceLimit = selectedDistanceKm.value;
     const favoriteIds = favoriteIdSet?.value ?? new Set();
-    const applyMarkerStyle = (key, marker, restaurantId) => {
+    const sharedFavoriteIds = sharedFavoriteIdSet?.value ?? new Set();
+    const sharedNameLookup = sharedFavoriteNameMap?.value || {};
+    const resolveGroupFlags = (groupRestaurants = []) => {
+      const hasFavorite = groupRestaurants.some((item) =>
+        favoriteIds.has(Number(item.id ?? item.restaurantId))
+      );
+      const hasSharedFavorite = groupRestaurants.some((item) =>
+        sharedFavoriteIds.has(Number(item.id ?? item.restaurantId))
+      );
+      return { hasFavorite, hasSharedFavorite };
+    };
+    const resolveSharedLabel = (groupRestaurants = []) => {
+      const names = new Set();
+      groupRestaurants.forEach((item) => {
+        const id = Number(item.id ?? item.restaurantId);
+        const entry = sharedNameLookup?.[id];
+        if (Array.isArray(entry)) {
+          entry.forEach((name) => {
+            if (name) names.add(String(name));
+          });
+          return;
+        }
+        if (entry) {
+          names.add(String(entry));
+        }
+      });
+      const list = Array.from(names);
+      if (!list.length) return "";
+      if (list.length === 1) return list[0];
+      return `${list[0]} 외 ${list.length - 1}`;
+    };
+    const applyMarkerStyle = (key, marker, flags) => {
       if (!marker) return;
       if (key && selectedMarkerKey.value === key) {
         marker.setImage(selectedMarkerImage);
         return;
       }
-      if (
-        restaurantId !== undefined &&
-        restaurantId !== null &&
-        favoriteIds.has(Number(restaurantId))
-      ) {
+      if (flags?.hasFavorite && flags?.hasSharedFavorite) {
+        marker.setImage(sharedFavoriteMarkerImage);
+        return;
+      }
+      if (flags?.hasFavorite) {
         marker.setImage(favoriteMarkerImage);
+        return;
+      }
+      if (flags?.hasSharedFavorite) {
+        marker.setImage(sharedMarkerImage);
         return;
       }
       marker.setImage(markerImage);
@@ -191,6 +257,7 @@ export const useHomeMap = ({
 
     if (routeFocus.value && isValidCoords(routeFocus.value)) {
       markerRegistry.forEach((entry) => setMarkerVisible(entry.marker, false));
+      overlayRegistry.forEach((overlay) => setOverlayVisible(overlay, false));
       if (routeFocusMarker.value) {
         routeFocusMarker.value.setMap(null);
         routeFocusMarker.value = null;
@@ -215,77 +282,124 @@ export const useHomeMap = ({
       return;
     }
 
-    const nextKeys = new Set();
+    const markerGroups = new Map();
     for (const restaurant of getRestaurants()) {
       const coords = await resolveRestaurantCoords(restaurant);
       if (!isValidCoords(coords)) continue;
       if (distanceLimit && !isWithinDistance(coords, distanceLimit)) {
         continue;
       }
+      const coordKey = `${coords.lat.toFixed(6)},${coords.lng.toFixed(6)}`;
+      const group = markerGroups.get(coordKey) ?? {
+        coords,
+        restaurants: [],
+      };
+      group.restaurants.push(restaurant);
+      group.coords = coords;
+      markerGroups.set(coordKey, group);
+    }
 
-      const key = getRestaurantKey(restaurant);
-      nextKeys.add(key);
-      const coordsKey = `${coords.lat},${coords.lng}`;
+    const nextKeys = new Set(markerGroups.keys());
+    markerGroups.forEach((group, key) => {
+      const coords = group.coords;
+      const flags = resolveGroupFlags(group.restaurants);
+      const labelText = flags.hasSharedFavorite
+        ? resolveSharedLabel(group.restaurants)
+        : "";
       const existing = markerRegistry.get(key);
-
       try {
         if (existing) {
-          existing.restaurant = restaurant;
-          if (existing.coordsKey !== coordsKey) {
+          existing.restaurants = group.restaurants;
+          if (existing.coordsKey !== key) {
+            existing.coordsKey = key;
+          }
+          if (coords && isValidCoords(coords)) {
             existing.marker.setPosition(
               new kakaoMaps.LatLng(coords.lat, coords.lng)
             );
-            existing.coordsKey = coordsKey;
           }
           if (typeof existing.marker.setVisible === "function") {
             existing.marker.setVisible(true);
           } else if (!existing.marker.getMap()) {
             existing.marker.setMap(mapInstance.value);
           }
-          applyMarkerStyle(key, existing.marker, restaurant?.id);
+          applyMarkerStyle(key, existing.marker, flags);
         } else {
           const marker = new kakaoMaps.Marker({
             position: new kakaoMaps.LatLng(coords.lat, coords.lng),
-            title: restaurant.name,
+            title: group.restaurants[0]?.name ?? "",
             image: markerImage,
           });
           marker.setMap(mapInstance.value);
           if (onMarkerClick) {
             const clickHandler = () => {
               const entry = markerRegistry.get(key);
-              if (entry?.restaurant) {
+              if (entry?.restaurants?.length) {
                 selectedMarkerKey.value = key;
                 markerRegistry.forEach((value, entryKey) => {
-                  applyMarkerStyle(
-                    entryKey,
-                    value.marker,
-                    value.restaurant?.id
-                  );
+                  const entryFlags = resolveGroupFlags(value.restaurants);
+                  applyMarkerStyle(entryKey, value.marker, entryFlags);
                 });
-                onMarkerClick(entry.restaurant);
+                onMarkerClick(entry.restaurants);
               }
             };
             kakaoMaps.event.addListener(marker, "click", clickHandler);
             markerRegistry.set(key, {
               marker,
-              restaurant,
-              coordsKey,
+              restaurants: group.restaurants,
+              coordsKey: key,
               clickHandler,
             });
           } else {
-            markerRegistry.set(key, { marker, restaurant, coordsKey });
+            markerRegistry.set(key, {
+              marker,
+              restaurants: group.restaurants,
+              coordsKey: key,
+            });
           }
-          applyMarkerStyle(key, marker, restaurant?.id);
+          applyMarkerStyle(key, marker, flags);
+        }
+
+        if (flags.hasSharedFavorite && labelText) {
+          const existingOverlay = overlayRegistry.get(key);
+          if (existingOverlay) {
+            existingOverlay.setContent(
+              `<div style="transform: translate(14px, -36px); background: #ffc107; color: #1e3a5f; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 999px; border: 1px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.15); white-space: nowrap; pointer-events: none;">${labelText}</div>`
+            );
+            existingOverlay.setPosition(
+              new kakaoMaps.LatLng(coords.lat, coords.lng)
+            );
+            setOverlayVisible(existingOverlay, true);
+          } else {
+            const overlay = new kakaoMaps.CustomOverlay({
+              position: new kakaoMaps.LatLng(coords.lat, coords.lng),
+              content: `<div style="transform: translate(14px, -36px); background: #ffc107; color: #1e3a5f; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 999px; border: 1px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.15); white-space: nowrap; pointer-events: none;">${labelText}</div>`,
+              yAnchor: 1,
+              xAnchor: 0,
+            });
+            overlay.setMap(mapInstance.value);
+            overlayRegistry.set(key, overlay);
+          }
+        } else if (overlayRegistry.has(key)) {
+          const overlay = overlayRegistry.get(key);
+          setOverlayVisible(overlay, false);
+          overlayRegistry.delete(key);
         }
       } catch (error) {
-        console.error("지도 마커 표시 실패:", restaurant?.name, error);
+        console.error("지도 마커 표시 실패:", group?.restaurants?.[0]?.name, error);
       }
-    }
+    });
 
     markerRegistry.forEach((entry, key) => {
       if (!nextKeys.has(key)) {
         entry.marker.setMap(null);
         markerRegistry.delete(key);
+      }
+    });
+    overlayRegistry.forEach((overlay, key) => {
+      if (!nextKeys.has(key)) {
+        overlay.setMap(null);
+        overlayRegistry.delete(key);
       }
     });
   };
@@ -502,10 +616,24 @@ export const useHomeMap = ({
       scheduleMapMarkerRender();
     }
   );
+  watch(
+    () => sharedFavoriteIdSet?.value,
+    () => {
+      scheduleMapMarkerRender();
+    }
+  );
+  watch(
+    () => sharedFavoriteNameMap?.value,
+    () => {
+      scheduleMapMarkerRender();
+    }
+  );
 
   onBeforeUnmount(() => {
     markerRegistry.forEach((entry) => entry.marker.setMap(null));
     markerRegistry.clear();
+    overlayRegistry.forEach((overlay) => overlay.setMap(null));
+    overlayRegistry.clear();
     mapInstance.value = null;
     isMapReady.value = false;
     if (routePolyline.value) {
