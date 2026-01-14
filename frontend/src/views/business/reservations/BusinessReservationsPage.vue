@@ -350,9 +350,9 @@ const downloadWeeklyReport = async () => {
 
   try {
     const response = await httpRequest.get(
-      `/api/business/restaurants/${rid}/stats/weekly.pdf`,
-      null,
-      { responseType: 'blob' }
+        `/api/business/restaurants/${rid}/stats/weekly.pdf`,
+        null,
+        { responseType: 'blob' }
     );
 
     const blob = response.data;
@@ -493,43 +493,43 @@ const settlementChartOptions = {
 
 
       <main class="flex-1 overflow-y-auto p-8">
+        <div class="max-w-7xl mx-auto space-y-8">
           <div class="flex flex-wrap items-center justify-between gap-4">
             <h2 class="text-3xl font-bold text-[#1e3a5f]">전체 예약 관리</h2>
             <button
-              v-if="userRole === 'owner'"
-              type="button"
-              @click="downloadWeeklyReport"
-              class="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-[#6366F1] via-[#EC4899] to-[#F97316] hover:opacity-90 cursor-pointer"
+                type="button"
+                @click="downloadWeeklyReport"
+                class="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-[#6366F1] via-[#EC4899] to-[#F97316] hover:opacity-90 cursor-pointer"
             >
               주간 예약 통계 AI 요약 분석서
             </button>
           </div>
 
-            <div class="max-w-7xl mx-auto space-y-8">
-              <!-- 정산(최근 30일) 요약 + 추이 -->
-              <div v-if="settlement" class="space-y-6">
-                <!-- Summary Cards (기존 Stats Cards 톤 그대로) -->
-                <div class="grid grid-cols-4 gap-6">
-                  <div class="bg-white rounded-xl border border-[#e9ecef] p-6">
-                    <p class="text-sm text-[#6c757d] mb-2">최근 30일 예약</p>
-                    <p class="text-4xl font-bold text-[#1e3a5f]">{{ settlement.reservationCount }}건</p>
-                  </div>
+        <div class="max-w-7xl mx-auto space-y-8">
+          <!-- 정산(최근 30일) 요약 + 추이 -->
+          <div v-if="settlement" class="space-y-6">
+            <!-- Summary Cards (기존 Stats Cards 톤 그대로) -->
+            <div class="grid grid-cols-4 gap-6">
+              <div class="bg-white rounded-xl border border-[#e9ecef] p-6">
+                <p class="text-sm text-[#6c757d] mb-2">최근 30일 예약</p>
+                <p class="text-4xl font-bold text-[#1e3a5f]">{{ settlement.reservationCount }}건</p>
+              </div>
 
-                  <div class="bg-white rounded-xl border border-[#e9ecef] p-6">
-                    <p class="text-sm text-[#6c757d] mb-2">최근 30일 매출</p>
-                    <p class="text-4xl font-bold text-[#1e3a5f]">{{ Number(settlement.totalSales).toLocaleString() }}원</p>
-                  </div>
+              <div class="bg-white rounded-xl border border-[#e9ecef] p-6">
+                <p class="text-sm text-[#6c757d] mb-2">최근 30일 매출</p>
+                <p class="text-4xl font-bold text-[#1e3a5f]">{{ Number(settlement.totalSales).toLocaleString() }}원</p>
+              </div>
 
-                  <div class="bg-white rounded-xl border border-[#e9ecef] p-6">
-                    <p class="text-sm text-[#6c757d] mb-2">예약율</p>
-                    <p class="text-4xl font-bold text-[#1e3a5f]">{{ settlement.reservationRate }}%</p>
-                  </div>
+              <div class="bg-white rounded-xl border border-[#e9ecef] p-6">
+                <p class="text-sm text-[#6c757d] mb-2">예약율</p>
+                <p class="text-4xl font-bold text-[#1e3a5f]">{{ settlement.reservationRate }}%</p>
+              </div>
 
-                  <div class="bg-white rounded-xl border border-[#e9ecef] p-6">
-                    <p class="text-sm text-[#6c757d] mb-2">총 수용 인원</p>
-                    <p class="text-4xl font-bold text-[#1e3a5f]">{{ settlement.totalCapacity }}명</p>
-                  </div>
-                </div>
+              <div class="bg-white rounded-xl border border-[#e9ecef] p-6">
+                <p class="text-sm text-[#6c757d] mb-2">총 수용 인원</p>
+                <p class="text-4xl font-bold text-[#1e3a5f]">{{ settlement.totalCapacity }}명</p>
+              </div>
+            </div>
 
 
             <!-- Chart Card (기존 섹션 카드 톤 그대로) -->
