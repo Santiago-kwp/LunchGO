@@ -6,12 +6,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.Executor;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class RestaurantCacheScheduler {
 
     private final PublicRestaurantService publicRestaurantService;
+    private final Executor taskExecutor;
 
     /**
      * 캐시 만료 시간(1시간)보다 짧은 주기로 캐시를 갱신합니다. (55분)
@@ -27,18 +30,20 @@ public class RestaurantCacheScheduler {
     /**
      * 애플리케이션 시작 직후에 캐시를 즉시 로드합니다.
      * 첫 번째 사용자가 느린 응답을 겪는 것을 방지합니다.
+     * 
+     * [개선] new Thread() 대신 Spring의 TaskExecutor를 사용하여 스레드를 효율적으로 관리합니다.
      */
     @PostConstruct
     public void initCache() {
         log.debug("Initializing restaurant summaries cache on startup...");
-        // 별도 스레드에서 실행하여 서버 부팅 지연 방지 (선택 사항이나 권장됨)
-        new Thread(() -> {
+        // Spring 관리 스레드 풀에 작업을 위임하여 실행
+        taskExecutor.execute(() -> {
             try {
                 publicRestaurantService.refreshRestaurantSummaries();
                 log.debug("Cache initialization completed.");
             } catch (Exception e) {
                 log.error("Failed to initialize cache", e);
             }
-        }).start();
+        });
     }
 }

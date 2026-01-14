@@ -74,9 +74,11 @@ public class PublicRestaurantService {
                     KakaoGeoService.GeoCoordinate coords = kakaoGeoService.getCoordinateByAddress(entity.getRoadAddress());
                     
                     if (coords != null) {
-                        response.setLatitude(coords.latitude());
-                        response.setLongitude(coords.longitude());
-                        return response;
+                        // 불변 객체이므로 toBuilder()를 사용하여 좌표가 설정된 새로운 객체 생성
+                        return response.toBuilder()
+                                .latitude(coords.latitude())
+                                .longitude(coords.longitude())
+                                .build();
                     }
                     return null; // 좌표 없으면 제외 대상
                 })
