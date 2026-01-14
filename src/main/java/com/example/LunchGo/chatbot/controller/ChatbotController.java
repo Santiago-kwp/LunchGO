@@ -24,7 +24,7 @@ public class ChatbotController {
     ) {
         String message = request == null ? null : request.getMessage();
         String userId = request == null ? null : request.getUserId();
-        String userIp = httpServletRequest == null ? null : httpServletRequest.getRemoteAddr();
+        String userIp = httpServletRequest.getRemoteAddr();
         String response = chatbotService.open(message, userId, userIp);
         return ResponseEntity.ok(response);
     }
