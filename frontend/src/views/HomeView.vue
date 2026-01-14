@@ -470,6 +470,11 @@ const tagMappingNotice = computed(() => {
 const goToSpeciality = () => {
   router.push({ path: "/mypage", hash: "#speciality-section" });
 };
+
+const openChatbot = async () => {
+  router.push("/chatbot");
+};
+
 const tasteRecommendationSummary = computed(() => {
   if (selectedRecommendation.value !== RECOMMEND_TASTE) {
     return "";
@@ -2149,7 +2154,7 @@ onBeforeUnmount(() => {
 
     </main>
 
-    <BottomNav @home="resetMapToHome" />
+    <BottomNav @home="resetMapToHome" @chatbot="openChatbot" />
 
     <!-- Filter Modal -->
     <div

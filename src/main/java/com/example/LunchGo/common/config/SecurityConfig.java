@@ -93,6 +93,7 @@ public class SecurityConfig {
                         .hasAnyAuthority("ROLE_USER", "ROLE_OWNER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/images/presign").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.POST, "/api/ocr/receipt").hasAuthority("ROLE_USER")
+                        .requestMatchers(HttpMethod.POST, "/api/chatbot/**").hasAuthority("ROLE_USER")
 
                         .requestMatchers(HttpMethod.POST, "/api/reservations/*/payments").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.PATCH, "/api/reservations/*/complete").hasAuthority("ROLE_OWNER")
