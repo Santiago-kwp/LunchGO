@@ -2,6 +2,7 @@ package com.example.LunchGo.restaurant.controller;
 
 import com.example.LunchGo.restaurant.dto.RestaurantDetailResponse;
 import com.example.LunchGo.restaurant.dto.RestaurantSearchParameter;
+import com.example.LunchGo.restaurant.dto.RestaurantSummaryResponse;
 import com.example.LunchGo.restaurant.service.PublicRestaurantService;
 import com.example.LunchGo.restaurant.service.RestaurantSearchService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +24,12 @@ public class PublicRestaurantController {
 
     private final PublicRestaurantService publicRestaurantService;
     private final RestaurantSearchService restaurantSearchService;
+
+    @GetMapping
+    public ResponseEntity<List<RestaurantSummaryResponse>> getRestaurantSummaries() {
+        List<RestaurantSummaryResponse> summaries = publicRestaurantService.getRestaurantSummaries();
+        return ResponseEntity.ok(summaries);
+    }
 
     @GetMapping("/search")
     public ResponseEntity<List<Long>> searchRestaurants(

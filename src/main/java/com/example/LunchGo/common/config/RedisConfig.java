@@ -12,10 +12,18 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.repository.configuration.EnableRedisRepositories;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.util.StringUtils;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.data.redis.cache.RedisCacheConfiguration;
+import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.RedisSerializationContext;
+import java.time.Duration;
 
 @RequiredArgsConstructor
 @Configuration
 @EnableRedisRepositories
+@EnableCaching
 public class RedisConfig {
     private final RedisProperties redisProperties;
 
@@ -41,5 +49,23 @@ public class RedisConfig {
         template.setKeySerializer(new StringRedisSerializer());
         template.setValueSerializer(new StringRedisSerializer());
         return template;
+    }
+
+    /**
+     * Spring Cache(@Cacheable 등)를 관리하는 CacheManager 빈 등록.
+     * - 기본 RedisTemplate은 String 값만 처리하므로, 복잡한 객체(DTO List)를 저장하기 위해
+     *   JSON 직렬화(GenericJackson2JsonRedisSerializer)를 사용하는 설정을 추가함.
+     * - 기본 만료 시간(TTL)은 1시간으로 설정하여 데이터의 최신성을 적절히 유지.
+     */
+    @Bean
+    public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
+        RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
+                .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
+                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer()))
+                .entryTtl(Duration.ofHours(1));
+
+        return RedisCacheManager.builder(connectionFactory)
+                .cacheDefaults(config)
+                .build();
     }
 }

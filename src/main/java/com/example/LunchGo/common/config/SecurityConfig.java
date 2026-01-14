@@ -68,6 +68,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/email/*").hasAuthority("ROLE_USER")
 
                         .requestMatchers(HttpMethod.GET,
+                                "/api/restaurants",
                                 "/api/restaurants/{id}",
                                 "/api/restaurants/*/menus",
                                 "/api/restaurants/search"
