@@ -2,7 +2,7 @@ package com.example.LunchGo.reservation.service;
 
 import com.example.LunchGo.reservation.mapper.ReservationMapper;
 import com.example.LunchGo.reservation.mapper.row.ReminderSendRow;
-import com.example.LunchGo.sms.service.SmsService;
+import com.example.LunchGo.sms.event.SystemSmsSendEvent;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
@@ -11,6 +11,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,7 +23,7 @@ public class ReservationReminderService {
     private static final SecureRandom RND = new SecureRandom();
 
     private final ReservationMapper reservationMapper;
-    private final SmsService smsService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${app.public-base-url:http://localhost:8080}")
     private String publicBaseUrl;
@@ -35,7 +36,6 @@ public class ReservationReminderService {
         for (ReminderSendRow t : targets) {
             String token = newToken();
 
-            // 중복 발송 방지(동시성 방어)
             int marked = reservationMapper.tryMarkReminderSent(t.getReservationId(), token);
             if (marked != 1) continue;
 
@@ -51,8 +51,7 @@ public class ReservationReminderService {
                             "방문 확인: " + visitUrl + "\n" +
                             "미응답 시 메뉴 준비가 늦어질 수 있습니다. 위 링크를 통해 응답해주세요.";
 
-            // CoolSMS
-            smsService.sendSystemSms(t.getUserPhone(), content);
+            eventPublisher.publishEvent(new SystemSmsSendEvent(t.getUserPhone(), content));
             sent++;
         }
 
