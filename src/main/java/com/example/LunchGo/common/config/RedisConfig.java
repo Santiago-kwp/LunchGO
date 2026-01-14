@@ -51,6 +51,12 @@ public class RedisConfig {
         return template;
     }
 
+    /**
+     * Spring Cache(@Cacheable 등)를 관리하는 CacheManager 빈 등록.
+     * - 기본 RedisTemplate은 String 값만 처리하므로, 복잡한 객체(DTO List)를 저장하기 위해
+     *   JSON 직렬화(GenericJackson2JsonRedisSerializer)를 사용하는 설정을 추가함.
+     * - 기본 만료 시간(TTL)은 1시간으로 설정하여 데이터의 최신성을 적절히 유지.
+     */
     @Bean
     public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
         RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()

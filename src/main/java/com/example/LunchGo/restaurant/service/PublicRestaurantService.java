@@ -41,9 +41,10 @@ public class PublicRestaurantService {
     private final ModelMapper modelMapper;
 
     /**
-     * 식당 전체 목록을 조회합니다. (캐싱 적용)
-     * - Cache Hit: Redis에서 즉시 반환
-     * - Cache Miss: DB 조회 + 좌표 변환 수행 후 Redis 저장
+     * 식당 전체 목록을 조회합니다. (캐싱 적용 - Cache Aside 패턴)
+     * - @Cacheable: Redis에 'restaurantSummaries::all' 키로 데이터가 있으면 즉시 반환(DB 조회 생략).
+     * - 데이터가 없으면(Cache Miss) DB 조회 및 Kakao API 로직 수행 후 결과를 Redis에 저장.
+     * - unless = "#result == null": 만약 결과가 null이면(API 오류 등) 캐싱하지 않음.
      */
     @Cacheable(value = "restaurantSummaries", key = "'all'", unless = "#result == null")
     public List<RestaurantSummaryResponse> getRestaurantSummaries() {
@@ -51,9 +52,10 @@ public class PublicRestaurantService {
     }
 
     /**
-     * 식당 전체 목록 캐시를 강제로 갱신합니다. (캐시 웜업용)
-     * - @CachePut: 메서드 실행 결과를 무조건 캐시에 덮어씌웁니다.
-     * - 스케줄러에 의해 주기적으로 호출되어 캐시 만료를 방지하고 최신 데이터를 유지합니다.
+     * 식당 전체 목록 캐시를 강제로 갱신합니다. (Cache Warming)
+     * - @CachePut: 메서드 실행 결과를 무조건 캐시에 덮어씁니다. (기존 캐시 무시)
+     * - 스케줄러(RestaurantCacheScheduler)에 의해 55분마다 호출되어, 
+     *   사용자가 만료된 캐시로 인해 느린 응답을 겪는 것을 방지합니다.
      */
     @CachePut(value = "restaurantSummaries", key = "'all'", unless = "#result == null")
     public List<RestaurantSummaryResponse> refreshRestaurantSummaries() {
