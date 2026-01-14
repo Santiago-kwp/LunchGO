@@ -214,6 +214,12 @@ const router = createRouter({
       meta: { requiredAuth: true, roles: ['ROLE_USER']},
     },
     {
+      path: '/chatbot',
+      name: 'chatbot',
+      component: () => import('../views/chatbot/ChatBotPage.vue'),
+      meta: { requiredAuth: true, roles: ['ROLE_USER'] },
+    },
+    {
       path: '/business/mypage',
       name: 'business-mypage',
       component: () => import('../views/mypage/OwnerMyPage.vue'),
