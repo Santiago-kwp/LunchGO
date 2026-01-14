@@ -22,6 +22,8 @@ import java.util.stream.Collectors;
 import com.example.LunchGo.restaurant.dto.RestaurantSummaryResponse;
 import com.example.LunchGo.restaurant.repository.RestaurantSummaryRepository;
 import com.example.LunchGo.map.service.KakaoGeoService;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 
 @Slf4j
 @Service
@@ -38,7 +40,29 @@ public class PublicRestaurantService {
     private final KakaoGeoService kakaoGeoService;
     private final ModelMapper modelMapper;
 
+    /**
+     * 식당 전체 목록을 조회합니다. (캐싱 적용)
+     * - Cache Hit: Redis에서 즉시 반환
+     * - Cache Miss: DB 조회 + 좌표 변환 수행 후 Redis 저장
+     */
+    @Cacheable(value = "restaurantSummaries", key = "'all'", unless = "#result == null")
     public List<RestaurantSummaryResponse> getRestaurantSummaries() {
+        return fetchSummariesFromDb();
+    }
+
+    /**
+     * 식당 전체 목록 캐시를 강제로 갱신합니다. (캐시 웜업용)
+     * - @CachePut: 메서드 실행 결과를 무조건 캐시에 덮어씌웁니다.
+     * - 스케줄러에 의해 주기적으로 호출되어 캐시 만료를 방지하고 최신 데이터를 유지합니다.
+     */
+    @CachePut(value = "restaurantSummaries", key = "'all'", unless = "#result == null")
+    public List<RestaurantSummaryResponse> refreshRestaurantSummaries() {
+        log.debug("Refreshing restaurant summaries cache...");
+        return fetchSummariesFromDb();
+    }
+
+    // 실제 비즈니스 로직 (DB 조회 + 좌표 변환) 추출
+    private List<RestaurantSummaryResponse> fetchSummariesFromDb() {
         return restaurantSummaryRepository.findAll().parallelStream()
                 .map(entity -> {
                     // 1. 엔티티를 DTO로 변환

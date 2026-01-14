@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -60,6 +62,7 @@ public class BusinessRestaurantService {
 
 
     @Transactional
+    @CacheEvict(value = "restaurantSummaries", allEntries = true)
     public Long createRestaurant(Long ownerId, RestaurantCreateRequest request) {
         // 1. Restaurant 엔티티 생성 및 저장
         Restaurant restaurant = modelMapper.map(request, Restaurant.class);
@@ -82,6 +85,7 @@ public class BusinessRestaurantService {
     }
 
     @Transactional
+    @CacheEvict(value = "restaurantSummaries", allEntries = true)
     public RestaurantDetailResponse updateRestaurant(Long id, Long ownerId, RestaurantUpdateRequest request) {
         // 1. 식당 정보 조회 및 소유권 검증
         Restaurant restaurant = restaurantRepository.findByRestaurantIdAndOwnerId(id, ownerId)
