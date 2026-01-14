@@ -685,3 +685,19 @@ WHERE r.content LIKE '추가 리뷰 %'
   AND r.review_id <= @review_seed_end
   AND RAND(r.review_id + t.seed) < 0.45;
 
+/* ==================================================
+   15. 카페 리뷰 샘플 (restaurant_id 126, 127)
+   ================================================== */
+INSERT INTO reviews (restaurant_id, user_id, receipt_id, rating, content, created_at, updated_at, status) VALUES
+    (126, 1, NULL, 5, '회식 끝나고 2차로 들렀는데 아메리카노가 깔끔하고 자리도 편했습니다. 대화하기 좋아요.', DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY), 'PUBLIC'),
+    (126, 2, NULL, 4, '회식 후 마무리로 아포가또 먹었어요. 달달하고 진해서 디저트 대신 딱입니다.', DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY), 'PUBLIC'),
+    (126, 3, NULL, 5, '회식하고 이동하기 좋은 위치라 자주 올 듯해요. 라떼 고소하고 분위기 조용해요.', DATE_SUB(NOW(), INTERVAL 6 DAY), DATE_SUB(NOW(), INTERVAL 6 DAY), 'PUBLIC'),
+    (126, 4, NULL, 4, '퇴근 후 회식팀이랑 갔는데 자리 넉넉하고 음악이 적당했습니다. 커피 맛도 안정적이에요.', DATE_SUB(NOW(), INTERVAL 8 DAY), DATE_SUB(NOW(), INTERVAL 8 DAY), 'PUBLIC'),
+    (126, 5, NULL, 3, '회식 뒤라 피곤했는데 카페모카가 당 충전에 도움 됐어요. 다만 늦은 시간엔 조금 붐볐습니다.', DATE_SUB(NOW(), INTERVAL 9 DAY), DATE_SUB(NOW(), INTERVAL 9 DAY), 'PUBLIC'),
+    (126, 6, NULL, 5, '원두향이 좋아서 회식 마무리로 들르기 딱이에요. 바닐라라떼 추천합니다.', DATE_SUB(NOW(), INTERVAL 11 DAY), DATE_SUB(NOW(), INTERVAL 11 DAY), 'PUBLIC'),
+    (127, 7, NULL, 5, '회식 후 가볍게 들렀는데 원두 선택이 가능해서 좋았어요. 아인슈페너 만족!', DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY), 'PUBLIC'),
+    (127, 8, NULL, 4, '회식 2차로 갔습니다. 콜드브루라떼 깔끔하고 매장도 쾌적했어요.', DATE_SUB(NOW(), INTERVAL 4 DAY), DATE_SUB(NOW(), INTERVAL 4 DAY), 'PUBLIC'),
+    (127, 9, NULL, 5, '회식 끝나고 디저트 찾다가 방문했는데 말차딸기라떼가 포인트 있어요. 사진도 잘 나옵니다.', DATE_SUB(NOW(), INTERVAL 6 DAY), DATE_SUB(NOW(), INTERVAL 6 DAY), 'PUBLIC'),
+    (127, 10, NULL, 4, '단체로 들렀는데 회전이 빨라서 좋았어요. 카페라떼 무난합니다.', DATE_SUB(NOW(), INTERVAL 7 DAY), DATE_SUB(NOW(), INTERVAL 7 DAY), 'PUBLIC'),
+    (127, 11, NULL, 5, '회식 마무리로 레몬에이드랑 디저트 먹었어요. 상큼하고 깔끔합니다.', DATE_SUB(NOW(), INTERVAL 10 DAY), DATE_SUB(NOW(), INTERVAL 10 DAY), 'PUBLIC'),
+    (127, 12, NULL, 4, '회식 후 늦게 갔는데 좌석이 넉넉하고 조명이 아늑했어요. 스윗라떼 괜찮네요.', DATE_SUB(NOW(), INTERVAL 12 DAY), DATE_SUB(NOW(), INTERVAL 12 DAY), 'PUBLIC');

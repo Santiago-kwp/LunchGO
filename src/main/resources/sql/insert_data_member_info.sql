@@ -45,6 +45,14 @@ INSERT INTO owners (login_id, password, business_num, name, phone, status, role,
                                                                                      ('owner_japan', '1234', '444-55-66666', '최현석', '010-7777-8888', 'ACTIVE', 'OWNER', '2003-01-01'),
                                                                                      ('owner_new', '1234', '777-88-99999', '새내기', '010-0000-0000', 'PENDING', 'OWNER', '2004-01-01');
 
+-- [1-2-1] Owners (카페 추가)
+INSERT INTO owners (owner_id, login_id, password, business_num, name, phone, status, role, start_at)
+VALUES (127, 'owner_coffeemihak_127', '1234', '127-12-71234', '커피미학 판교점', '010-8126-0723', 'ACTIVE', 'OWNER', '2016-01-01');
+
+-- [1-2-2] Owners (카페 추가)
+INSERT INTO owners (owner_id, login_id, password, business_num, name, phone, status, role, start_at)
+VALUES (128, 'owner_crestown_128', '1234', '128-12-81234', '크레스타운 판교점', '010-8128-3323', 'ACTIVE', 'OWNER', '2018-01-01');
+
 -- [1-3] Managers (관리자) - last_login_at NOT NULL 주의
 INSERT INTO managers (login_id, password, role, last_login_at) VALUES
                                                                    ('admin_master', '1234', 'SUPER_ADMIN', NOW()),
