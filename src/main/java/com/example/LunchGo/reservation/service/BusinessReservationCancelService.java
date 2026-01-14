@@ -12,20 +12,31 @@ import com.example.LunchGo.restaurant.service.BusinessRestaurantService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.example.LunchGo.reservation.mapper.ReservationMapper;
+import com.example.LunchGo.reservation.mapper.row.ReminderSendRow;
+import com.example.LunchGo.sms.service.SmsService;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import lombok.extern.slf4j.Slf4j;
+
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class BusinessReservationCancelService {
     private static final String CANCELLED_BY_OWNER = "OWNER";
     private static final String DEFAULT_REASON = "Owner cancellation";
     private static final int REASON_MAX_LENGTH = 255;
+
+    private static final DateTimeFormatter DT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private final ReservationRepository reservationRepository;
     private final ReservationSlotRepository reservationSlotRepository;
     private final BusinessRestaurantService businessRestaurantService;
     private final ReservationCancellationRepository reservationCancellationRepository;
     private final ReservationRefundService reservationRefundService;
-
+    private final ReservationMapper reservationMapper;
+    private final SmsService smsService;
 
     @Transactional
     public void cancel(Long reservationId, Long ownerId, BusinessCancelReservationRequest request) {
@@ -64,6 +75,24 @@ public class BusinessReservationCancelService {
         reservationCancellationRepository.save(cancellation);
 
         reservationRefundService.cancelByOwner(reservationId, reason);
+
+        try {
+            ReminderSendRow t = reservationMapper.selectCancelNoticeTarget(reservationId);
+            if (t != null && t.getUserPhone() != null) {
+                LocalDateTime slotDt = LocalDateTime.of(t.getSlotDate(), t.getSlotTime());
+                String when = slotDt.format(DT);
+
+                String text =
+                        "[LunchGo] 예약이 취소되었습니다\n" +
+                                t.getRestaurantName() + " (" + when + ")\n" +
+                                "식당 사정으로 예약이 취소되었습니다.\n" +
+                                "사유: " + reason;
+
+                smsService.sendSystemSms(t.getUserPhone(), text);
+            }
+        } catch (Exception e) {
+            log.warn("[BusinessReservationCancelService] owner-cancel SMS failed. reservationId={}", reservationId, e);
+        }
     }
 
     private void ensureCancellable(ReservationStatus status) {

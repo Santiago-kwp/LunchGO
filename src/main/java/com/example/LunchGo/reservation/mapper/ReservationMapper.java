@@ -83,6 +83,10 @@ public interface ReservationMapper {
     // --- reminder ---
     List<com.example.LunchGo.reservation.mapper.row.ReminderSendRow> selectReminderTargets();
 
+    com.example.LunchGo.reservation.mapper.row.ReminderSendRow selectCancelNoticeTarget(
+            @Param("reservationId") Long reservationId
+    );
+
     int tryMarkReminderSent(
             @Param("reservationId") Long reservationId,
             @Param("reminderToken") String reminderToken

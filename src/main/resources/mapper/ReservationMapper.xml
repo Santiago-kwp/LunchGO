@@ -298,6 +298,24 @@
             ]]>
     </select>
 
+    <!-- 점주 강제 취소 시 사용자에게 발송할 문자 대상 조회 -->
+    <select id="selectCancelNoticeTarget" resultType="com.example.LunchGo.reservation.mapper.row.ReminderSendRow">
+      <![CDATA[
+            SELECT
+                r.reservation_id    AS reservationId,
+                u.phone             AS userPhone,
+                res.name            AS restaurantName,
+                s.slot_date         AS slotDate,
+                s.slot_time         AS slotTime
+            FROM reservations r
+                     JOIN users u ON u.user_id = r.user_id
+                     JOIN restaurant_reservation_slots s ON s.slot_id = r.slot_id
+                     JOIN restaurants res ON res.restaurant_id = s.restaurant_id
+            WHERE r.reservation_id = #{reservationId}
+            ]]>
+    </select>
+
+
 
     <!-- 리마인더 발송 마킹(동시성 방어: 아직 안 보냈을 때만 1회 업데이트) -->
     <update id="tryMarkReminderSent">
