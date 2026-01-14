@@ -272,10 +272,11 @@ public class ReservationPaymentService {
         Payment payment = paymentRepository.findByMerchantUid(paymentId)
             .orElseThrow(() -> new IllegalArgumentException("결제 정보를 찾을 수 없습니다."));
 
+        Reservation reservation = getReservationForUpdate(payment.getReservationId());
+
         payment.setStatus("CANCELLED");
         payment.setCancelledAt(LocalDateTime.now());
 
-        Reservation reservation = getReservation(payment.getReservationId());
         if (ReservationStatus.TEMPORARY.equals(reservation.getStatus()) && !isPastPaymentDeadline(reservation)) {
             log.info("웹훅 취소: 결제 마감 전이므로 TEMPORARY 유지 (reservationId={})",
                 reservation.getReservationId());
@@ -427,6 +428,11 @@ public class ReservationPaymentService {
 
     private Reservation getReservation(Long reservationId) {
         return reservationRepository.findById(reservationId)
+            .orElseThrow(() -> new IllegalArgumentException("예약 정보를 찾을 수 없습니다."));
+    }
+
+    private Reservation getReservationForUpdate(Long reservationId) {
+        return reservationRepository.findByIdForUpdate(reservationId)
             .orElseThrow(() -> new IllegalArgumentException("예약 정보를 찾을 수 없습니다."));
     }
 

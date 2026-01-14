@@ -56,6 +56,8 @@ public class ReservationCancelService {
         // TEMPORARY(미결제)면 그냥 취소 처리만
         if (paidPayment == null) {
             reservation.setStatus(ReservationStatus.CANCELLED);
+            reservation.setHoldExpiresAt(null);
+            reservation.setPaymentDeadlineAt(null);
             // 좌석 복원은 이 프로젝트 구조상 status 집계에서 빠지면서 자동 반영
             return;
         }
@@ -69,6 +71,8 @@ public class ReservationCancelService {
         // 노쇼(0%)면 결제취소(환불) 호출 안 함. 예약만 취소 처리.
         if (refundAmount <= 0) {
             reservation.setStatus(ReservationStatus.CANCELLED);
+            reservation.setHoldExpiresAt(null);
+            reservation.setPaymentDeadlineAt(null);
             return;
         }
 
@@ -88,6 +92,8 @@ public class ReservationCancelService {
         paidPayment.setCancelledAt(LocalDateTime.now());
 
         reservation.setStatus(ReservationStatus.REFUNDED);
+        reservation.setHoldExpiresAt(null);
+        reservation.setPaymentDeadlineAt(null);
 
         // 좌석 복원: status가 집계 대상에서 빠지므로 자동 복원
     }
