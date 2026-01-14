@@ -29,11 +29,7 @@ export const useHomeRecommendations = ({
   RECOMMEND_TRENDING,
 }) => {
   const applyFilters = () => {
-    const nextSort =
-      filterForm.sort === "추천순"
-        ? selectedSort.value
-        : filterForm.sort || sortOptions[0];
-    selectedSort.value = nextSort;
+    selectedSort.value = filterForm.sort || sortOptions[0];
     selectedPriceRange.value = filterForm.priceRange || null;
     selectedRecommendation.value = filterForm.recommendation || null;
     if (selectedRecommendation.value === RECOMMEND_BUDGET) {

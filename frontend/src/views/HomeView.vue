@@ -605,9 +605,9 @@ const weatherDisplayLabel = computed(() => weatherThemeStyle.value?.label || "")
 const formatRouteDuration = formatRouteDurationDetailed;
 const isRecommendationLoading = computed(() => {
   if (isHomeListRestoring.value) {
-    return selectedSort.value === "평점순";
+    return isScoreSort(selectedSort.value);
   }
-  if (selectedSort.value === "평점순" && isRatingSortPending.value) {
+  if (isScoreSort(selectedSort.value) && isRatingSortPending.value) {
     return true;
   }
   if (selectedRecommendation.value === RECOMMEND_WEATHER) {
@@ -683,6 +683,7 @@ const reviewSummarySortCache = ref({});
 const reviewSummaryInFlight = new Set();
 const isRatingSortPending = ref(false);
 const ratingSortPendingIds = new Set();
+const isScoreSort = (value) => value === "평점순" || value === "추천순";
 const searchRestaurantIdSet = computed(() => {
   if (!Array.isArray(searchRestaurantIds.value)) return null;
   return new Set(searchRestaurantIds.value.map((id) => String(id)));
@@ -718,9 +719,21 @@ const getSortReviewCount = (restaurant) => {
   }
   return restaurant?.reviews ?? 0;
 };
+const getSortReviewCountSnapshot = (restaurant) => {
+  const summary = reviewSummarySortCache.value[String(restaurant?.id)];
+  if (summary && summary.reviews != null) {
+    return summary.reviews;
+  }
+  return restaurant?.reviews ?? 0;
+};
 const getSortRecommendScore = (restaurant) => {
   const rating = getSortRating(restaurant);
   const reviews = getSortReviewCount(restaurant);
+  return rating * 20 + Math.log10(reviews + 1) * 10;
+};
+const getSortRecommendScoreSnapshot = (restaurant) => {
+  const rating = getSortRatingSnapshot(restaurant);
+  const reviews = getSortReviewCountSnapshot(restaurant);
   return rating * 20 + Math.log10(reviews + 1) * 10;
 };
 const getSortId = (restaurant) => {
@@ -768,7 +781,6 @@ const markRatingSortReady = (restaurantId) => {
 };
 const startRatingSortPending = (restaurants) => {
   isRatingSortPending.value = true;
-  syncReviewSummarySortCache();
   setTimeout(() => {
     resetRatingSortPendingIds(restaurants);
     if (ratingSortPendingIds.size === 0) {
@@ -888,7 +900,8 @@ const processedRestaurants = computed(() => {
       return getSortId(a) - getSortId(b);
     },
     추천순: (a, b) => {
-      const scoreDiff = getSortRecommendScore(b) - getSortRecommendScore(a);
+      const scoreDiff =
+        getSortRecommendScoreSnapshot(b) - getSortRecommendScoreSnapshot(a);
       if (scoreDiff !== 0) return scoreDiff;
       return getSortId(a) - getSortId(b);
     },
@@ -1142,7 +1155,7 @@ watch(selectedSort, () => {
 watch(
     [selectedSort, availableRestaurants],
     ([sortValue, list]) => {
-      if (sortValue !== "평점순") return;
+      if (!isScoreSort(sortValue)) return;
       startRatingSortPending(list);
       setTimeout(() => {
         list.forEach((restaurant) => {
@@ -1159,21 +1172,21 @@ watch(selectedPriceRange, () => {
 });
 
 watch(selectedSort, (nextSort) => {
-  if (nextSort === "평점순") {
+  if (isScoreSort(nextSort)) {
     return;
   }
   finishRatingSortPending();
 });
 
 watch(reviewSummaryCache, () => {
-  if (selectedSort.value !== "평점순") return;
+  if (!isScoreSort(selectedSort.value)) return;
   if (!isRatingSortPending.value) return;
   scheduleReviewSummarySortSync();
   finalizeRatingSortPending();
 });
 
 watch(paginatedRestaurantsRaw, () => {
-  if (selectedSort.value !== "평점순") return;
+  if (!isScoreSort(selectedSort.value)) return;
   if (!isRatingSortPending.value) return;
   finalizeRatingSortPending();
 });
