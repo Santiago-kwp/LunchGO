@@ -25,4 +25,7 @@ public interface RegularHolidayRepository extends JpaRepository<RegularHoliday, 
     @Modifying
     @Query("DELETE FROM RegularHoliday rh WHERE rh.restaurantId = :restaurantId")
     void deleteAllByRestaurantId(@Param("restaurantId") Long restaurantId);
+
+    @Query("SELECT rh.restaurantId FROM RegularHoliday rh WHERE rh.dayOfWeek = :dayOfWeek")
+    List<Long> findRestaurantIdsByDayOfWeek(@Param("dayOfWeek") int dayOfWeek);
 }
