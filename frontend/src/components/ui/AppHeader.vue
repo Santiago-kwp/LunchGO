@@ -108,6 +108,13 @@ const handleLogout = async () => {
                 >
                   마이페이지
                 </RouterLink>
+                <RouterLink
+                  to="/chatbot"
+                  class="block px-4 py-2 text-sm text-center text-gray-700 hover:bg-gray-50 hover:text-[#ff6b4a] transition-colors"
+                  @click="isMenuOpen = false"
+                >
+                  고객센터
+                </RouterLink>
 
                 <button
                   @click="handleLogout"

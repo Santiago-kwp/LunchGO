@@ -49,6 +49,8 @@ const closeLocationPolicy = () => {
         <button type="button" class="hover:underline" @click="openPrivacy">
           개인정보 처리방침
         </button>
+        |
+        <RouterLink to="/chatbot" class="hover:underline">고객센터</RouterLink>
       </p>
     </div>
   </footer>

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import { RouterLink, useRouter } from "vue-router";
-import { Bot, Calendar, Home, User } from "lucide-vue-next";
+import { Calendar, Home, User } from "lucide-vue-next";
 import { useAccountStore } from "@/stores/account";
 import LoginRequiredModal from "@/components/ui/LoginRequiredModal.vue";
 
@@ -77,20 +77,6 @@ const handleMyPageClick = () => {
         <User class="w-6 h-6" />
       </button>
     </div>
-    <button
-      v-if="isLoggedIn"
-      type="button"
-      class="group fixed bottom-20 right-4 w-12 h-12 rounded-full border border-[#d7dbe0] bg-[#f7f8fa] text-[#4b4f56] shadow-lg flex items-center justify-center transition hover:border-[#c3c8ce] hover:bg-[#eef1f3] active:border-[#b9bec0] active:bg-[#e6eaee]"
-      @click="$emit('chatbot')"
-      aria-label="CS 챗봇 열기"
-    >
-      <Bot class="w-6 h-6" />
-      <span
-        class="pointer-events-none absolute -top-7 right-1/2 translate-x-1/2 whitespace-nowrap rounded-full bg-[#6b7077] px-2.5 py-1 text-[10px] font-semibold text-white opacity-0 transition group-hover:opacity-100 group-active:opacity-100"
-      >
-        고객센터
-      </span>
-    </button>
     <LoginRequiredModal
       :is-open="isLoginModalOpen"
       :redirect-path="redirectPath"

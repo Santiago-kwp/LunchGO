@@ -1,11 +1,11 @@
-﻿# Naver Clova Chatbot 구현 방법
+﻿# 🤖 Naver Clova Chatbot 구현
 
 ## 개요
 - 네이버 클로바 챗봇 API와 연동하여 웹에서 사용자 CS 제공
 - 프론트는 `/chatbot` 전용 페이지에서 채팅 UI 제공
 - 백엔드는 `open/send` 이벤트 분리 호출 및 서명 처리
 
-## 백엔드 변경 사항
+## 백엔드
 
 ### 1) 챗봇 API 연동 서비스
 - 경로: `src/main/java/com/example/LunchGo/chatbot/service/NcpChatbotService.java`
