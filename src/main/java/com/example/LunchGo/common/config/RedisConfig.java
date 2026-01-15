@@ -1,13 +1,16 @@
 package com.example.LunchGo.common.config;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisPassword;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettucePoolingClientConfiguration;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.repository.configuration.EnableRedisRepositories;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
@@ -18,6 +21,7 @@ import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
+import io.lettuce.core.api.StatefulConnection;
 import java.time.Duration;
 
 @RequiredArgsConstructor
@@ -29,16 +33,33 @@ public class RedisConfig {
 
     @Bean
     public RedisConnectionFactory redisConnectionFactory(){
-        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
-        config.setHostName(redisProperties.getHost());
-        config.setPort(redisProperties.getPort());
+        // Redis Standalone Configuration
+        RedisStandaloneConfiguration standaloneConfig = new RedisStandaloneConfiguration();
+        standaloneConfig.setHostName(redisProperties.getHost());
+        standaloneConfig.setPort(redisProperties.getPort());
         if (StringUtils.hasText(redisProperties.getUsername())) {
-            config.setUsername(redisProperties.getUsername());
+            standaloneConfig.setUsername(redisProperties.getUsername());
         }
         if (StringUtils.hasText(redisProperties.getPassword())) {
-            config.setPassword(RedisPassword.of(redisProperties.getPassword()));
+            standaloneConfig.setPassword(RedisPassword.of(redisProperties.getPassword()));
         }
-        return new LettuceConnectionFactory(config);
+
+        // Lettuce Pool Configuration
+        GenericObjectPoolConfig<StatefulConnection<?, ?>> poolConfig = new GenericObjectPoolConfig<>();
+        RedisProperties.Lettuce lettuce = redisProperties.getLettuce();
+        if (lettuce != null && lettuce.getPool() != null) {
+            RedisProperties.Pool pool = lettuce.getPool();
+            poolConfig.setMaxTotal(pool.getMaxActive());
+            poolConfig.setMaxIdle(pool.getMaxIdle());
+            poolConfig.setMinIdle(pool.getMinIdle());
+            poolConfig.setMaxWait(pool.getMaxWait());
+        }
+
+        LettuceClientConfiguration clientConfig = LettucePoolingClientConfiguration.builder()
+                .poolConfig(poolConfig)
+                .build();
+
+        return new LettuceConnectionFactory(standaloneConfig, clientConfig);
     }
 
     //redis에 데이터를 저장/조회할 때 사용하는 템플릿으로 Key와 Value 모두 String으로 직렬화
