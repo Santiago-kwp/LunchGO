@@ -36,6 +36,12 @@ const router = createRouter({
         import('../views/business/reservations/BusinessReservationsPage.vue'),
     },
     {
+      path: '/business/ai-insights',
+      name: 'business-ai-insights',
+      component: () =>
+        import('../views/business/insights/BusinessAiInsightsPage.vue'),
+    },
+    {
       path: '/business/restaurant-info/resolve',
       name: 'resolve-restaurant-info',
       meta: { requiredAuth: true, roles: ['ROLE_OWNER'] },
@@ -456,5 +462,4 @@ router.beforeEach((to, from) => {
 });
 
 export default router;
-
 

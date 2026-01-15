@@ -1,6 +1,17 @@
 <script setup>
 import { RouterLink, useRoute } from 'vue-router';
 import { computed } from 'vue';
+import {
+  CalendarCheck,
+  ClipboardList,
+  BarChart3,
+  Bell,
+  Store,
+  Users,
+  MessageSquare,
+  Megaphone,
+  UserCircle,
+} from 'lucide-vue-next';
 
 // 'activeMenu' 라는 이름의 prop을 정의합니다.
 defineProps({
@@ -46,7 +57,10 @@ const toWithRestaurantId = (path) => {
                 : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
             ]"
           >
-            오늘의 예약 현황
+            <span class="nav-item-content">
+              <CalendarCheck class="nav-icon" />
+              오늘의 예약 현황
+            </span>
           </RouterLink>
         </li>
         <li>
@@ -59,7 +73,26 @@ const toWithRestaurantId = (path) => {
                 : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
             ]"
           >
-            전체 예약 관리
+            <span class="nav-item-content">
+              <ClipboardList class="nav-icon" />
+              전체 예약 관리
+            </span>
+          </RouterLink>
+        </li>
+        <li>
+          <RouterLink
+              :to="toWithRestaurantId('/business/ai-insights')"
+              :class="[
+              'block px-4 py-3 rounded-lg transition-colors',
+              activeMenu === 'ai-insights'
+                ? 'text-white bg-gradient-to-r from-[#FF6B4A] to-[#FFC4B8] font-semibold'
+                : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
+            ]"
+          >
+            <span class="nav-item-content">
+              <BarChart3 class="nav-icon" />
+              AI 인사이트/예측
+            </span>
           </RouterLink>
         </li>
         <li>
@@ -72,7 +105,10 @@ const toWithRestaurantId = (path) => {
                 : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
             ]"
           >
-            알림 내역
+            <span class="nav-item-content">
+              <Bell class="nav-icon" />
+              알림 내역
+            </span>
           </RouterLink>
         </li>
         <li>
@@ -85,7 +121,10 @@ const toWithRestaurantId = (path) => {
                 : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
             ]"
           >
-            식당 정보
+            <span class="nav-item-content">
+              <Store class="nav-icon" />
+              식당 정보
+            </span>
           </RouterLink>
         </li>
         <li>
@@ -98,7 +137,10 @@ const toWithRestaurantId = (path) => {
                 : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
             ]"
           >
-            임직원 현황
+            <span class="nav-item-content">
+              <Users class="nav-icon" />
+              임직원 현황
+            </span>
           </RouterLink>
         </li>
         <li>
@@ -111,7 +153,10 @@ const toWithRestaurantId = (path) => {
                 : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
             ]"
           >
-            리뷰 관리
+            <span class="nav-item-content">
+              <MessageSquare class="nav-icon" />
+              리뷰 관리
+            </span>
           </RouterLink>
         </li>
         <li>
@@ -124,7 +169,10 @@ const toWithRestaurantId = (path) => {
                 : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
             ]"
           >
-            프로모션 관리
+            <span class="nav-item-content">
+              <Megaphone class="nav-icon" />
+              프로모션 관리
+            </span>
           </RouterLink>
         </li>
         <li>
@@ -137,10 +185,26 @@ const toWithRestaurantId = (path) => {
                 : 'text-[#1e3a5f] hover:bg-[#f8f9fa]',
             ]"
           >
-            마이페이지
+            <span class="nav-item-content">
+              <UserCircle class="nav-icon" />
+              마이페이지
+            </span>
           </RouterLink>
         </li>
       </ul>
     </nav>
   </aside>
 </template>
+
+<style scoped>
+.nav-item-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-icon {
+  width: 18px;
+  height: 18px;
+}
+</style>
