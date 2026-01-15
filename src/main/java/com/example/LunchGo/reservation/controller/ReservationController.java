@@ -8,7 +8,7 @@ import com.example.LunchGo.reservation.dto.ReservationCreateResponse;
 import com.example.LunchGo.reservation.dto.ReservationHistoryItem;
 import com.example.LunchGo.reservation.dto.UserReservationDetailResponse;
 import com.example.LunchGo.reservation.dto.UserReservationResponse;
-import com.example.LunchGo.reservation.service.*;
+import com.example.LunchGo.reservation.service.*; // Removed specific ReservationService import as Facade will be used
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -25,7 +25,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/reservations")
 public class ReservationController {
 
-    private final ReservationService reservationService;
+    // Facade 패턴 적용: ReservationService 대신 ReservationFacade를 주입받아 예약 생성 로직을 처리합니다.
+    private final ReservationFacade reservationFacade; // 기존 reservationService 대신 Facade 주입
+    private final ReservationService reservationService; // slotTimes 메서드 때문에 필요
     private final UserReservationQueryService userReservationQueryService;
     private final ReservationHistoryService reservationHistoryService;
     private final ReservationCompletionService reservationCompletionService;
@@ -34,23 +36,24 @@ public class ReservationController {
     private final ReservationRefundService reservationRefundService;
 
 
-
-
     // 예약 생성
     @PostMapping
     public ResponseEntity<ReservationCreateResponse> create(@RequestBody ReservationCreateRequest request) {
         try {
-            ReservationCreateResponse response = reservationService.create(request);
+            // Facade를 통해 예약 생성 로직 호출
+            ReservationCreateResponse response = reservationFacade.createReservation(request); // reservationService.create() 대신 Facade 메서드 호출
             if (response == null) {
+                // Facade에서 null을 반환할 일은 없겠지만, 방어적인 코드 유지
                 return ResponseEntity.notFound().build();
             }
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            // 요청 데이터 유효성 검증 실패 시
+            return ResponseEntity.badRequest().body(null); // HTTP 400 Bad Request와 함께 null 반환
         }
     }
 
-    // 슬롯 시간 조회
+    // 슬롯 시간 조회 - 이 메서드는 ReservationService의 slotTimes를 직접 사용하므로 그대로 유지
     @GetMapping("/slots")
     public ResponseEntity<List<LocalTime>> slotTimes(
             @RequestParam Long restaurantId,
