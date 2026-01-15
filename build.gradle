@@ -37,6 +37,7 @@ dependencies {
 
 	// Redis 의존성 추가(lettuce)
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	implementation 'org.apache.commons:commons-pool2'
 	implementation 'org.redisson:redisson-spring-boot-starter:3.43.0'
 
 	//이메일 의존성 추가
