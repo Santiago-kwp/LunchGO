@@ -170,8 +170,8 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:5173",
                 "http://localhost:8080",
-                "http://lunchgo-test-bucket.s3-website.kr.object.ncloudstorage.com",
-                "https://lunchgo-test-bucket.s3-website.kr.object.ncloudstorage.com"
+                "http://lunchgo.s3-website.kr.object.ncloudstorage.com",
+                "https://lunchgo.s3-website.kr.object.ncloudstorage.com"
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-type", "X-Requested-With"));
