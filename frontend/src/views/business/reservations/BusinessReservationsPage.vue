@@ -335,6 +335,7 @@ const selectDay = (day) => {
   selectedDate.value = new Date(currentMonth.value.getFullYear(), currentMonth.value.getMonth(), day);
 };
 
+const isWeeklyReportLoading = ref(false);
 
 const downloadWeeklyReport = async () => {
   const rid = await ensureRestaurantId();
@@ -347,6 +348,9 @@ const downloadWeeklyReport = async () => {
   }
 
   if(userRole.value === 'ROLE_STAFF') return alert("사업자만 요약서 확인이 가능합니다.");
+
+  if (isWeeklyReportLoading.value) return;
+  isWeeklyReportLoading.value = true;
 
   try {
     const response = await httpRequest.get(
@@ -367,6 +371,8 @@ const downloadWeeklyReport = async () => {
   } catch (error) {
     const status = error?.response?.status ?? 'unknown';
     window.alert(`문제가 발생했습니다. code: ${status}`);
+  } finally {
+    isWeeklyReportLoading.value = false;
   }
 };
 
@@ -499,9 +505,17 @@ const settlementChartOptions = {
             <button
                 type="button"
                 @click="downloadWeeklyReport"
-                class="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-[#6366F1] via-[#EC4899] to-[#F97316] hover:opacity-90 cursor-pointer"
+                :disabled="isWeeklyReportLoading"
+                :class="[
+                  'px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-[#6366F1] via-[#EC4899] to-[#F97316] transition-opacity',
+                  isWeeklyReportLoading ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90 cursor-pointer',
+                ]"
             >
-              주간 예약 통계 AI 요약 분석서
+              <span v-if="isWeeklyReportLoading" class="inline-flex items-center gap-2">
+                <span class="loading-spinner"></span>
+                AI 요약 생성 중...
+              </span>
+              <span v-else>주간 예약 통계 AI 요약 분석서</span>
             </button>
           </div>
         </div>
@@ -804,3 +818,20 @@ const settlementChartOptions = {
     </div>
   </div>
 </template>
+
+<style scoped>
+.loading-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+</style>
