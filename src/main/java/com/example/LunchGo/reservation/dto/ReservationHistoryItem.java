@@ -22,6 +22,7 @@ public class ReservationHistoryItem {
     private PaymentInfo payment;
     private String reservationStatus;
     private String cancelledBy;
+    private String cancelledReason;
     private LocalDateTime cancelledAt;
     private ReviewInfo review;
 

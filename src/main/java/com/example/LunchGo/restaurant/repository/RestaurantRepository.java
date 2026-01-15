@@ -26,6 +26,24 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, Long> {
     @Query(value = "SELECT tag_id FROM restaurant_tag_maps WHERE restaurant_id = :restaurantId", nativeQuery = true)
     List<Long> findTagIdsByRestaurantId(@Param("restaurantId") Long restaurantId);
 
+    @Query(
+            value = "SELECT COUNT(DISTINCT tm.tag_id) " +
+                    "FROM speciality_mappings sm " +
+                    "JOIN tag_maps tm ON tm.specialty_id = sm.speciality_id " +
+                    "WHERE sm.user_id = :userId AND tm.weight = 1",
+            nativeQuery = true
+    )
+    int countLikedTagsByUserId(@Param("userId") Long userId);
+
+    @Query(
+            value = "SELECT COUNT(DISTINCT tm.tag_id) " +
+                    "FROM speciality_mappings sm " +
+                    "JOIN tag_maps tm ON tm.specialty_id = sm.speciality_id " +
+                    "WHERE sm.user_id = :userId AND tm.weight = 0",
+            nativeQuery = true
+    )
+    int countDislikedTagsByUserId(@Param("userId") Long userId);
+
     @Modifying
     @Query(value = "INSERT INTO restaurant_tag_maps (restaurant_id, tag_id) VALUES (:restaurantId, :tagId)", nativeQuery = true)
     void saveRestaurantTagMapping(@Param("restaurantId") Long restaurantId, @Param("tagId") Long tagId);
@@ -45,32 +63,38 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, Long> {
                     "FROM user_specialities us " +
                     "JOIN tag_maps tm ON tm.specialty_id = us.speciality_id " +
                     "WHERE tm.weight = 0" +
-                    ") , liked_count AS (" +
-                    "SELECT COUNT(*) AS cnt FROM liked_tags" +
-                    ") , disliked_count AS (" +
-                    "SELECT COUNT(*) AS cnt FROM disliked_tags" +
-                    ") " +
-                    "SELECT r.restaurant_id AS restaurantId, " +
-                    "COALESCE(1.0 * COUNT(DISTINCT lt.tag_id) / " +
-                    "NULLIF(lc.cnt + COUNT(DISTINCT rtm.tag_id) - COUNT(DISTINCT lt.tag_id), 0), 0) AS likeScore, " +
-                    "COALESCE(1.0 * COUNT(DISTINCT dt.tag_id) / NULLIF(dc.cnt, 0), 0) AS dislikePenalty, " +
-                    "COALESCE(1.0 * COUNT(DISTINCT lt.tag_id) / " +
-                    "NULLIF(lc.cnt + COUNT(DISTINCT rtm.tag_id) - COUNT(DISTINCT lt.tag_id), 0), 0) " +
-                    "- 0.4 * COALESCE(1.0 * COUNT(DISTINCT dt.tag_id) / NULLIF(dc.cnt, 0), 0) AS finalScore " +
-                    "FROM restaurants r " +
-                    "LEFT JOIN restaurant_tag_maps rtm ON r.restaurant_id = rtm.restaurant_id " +
+                    ") , restaurant_tag_agg AS (" +
+                    "SELECT " +
+                    "rtm.restaurant_id, " +
+                    "COUNT(*) AS restaurant_tag_count, " +
+                    "SUM(CASE WHEN lt.tag_id IS NOT NULL THEN 1 ELSE 0 END) AS liked_match_count, " +
+                    "SUM(CASE WHEN dt.tag_id IS NOT NULL THEN 1 ELSE 0 END) AS disliked_match_count " +
+                    "FROM restaurant_tag_maps rtm " +
+                    "JOIN restaurants r ON r.restaurant_id = rtm.restaurant_id " +
                     "LEFT JOIN liked_tags lt ON lt.tag_id = rtm.tag_id " +
                     "LEFT JOIN disliked_tags dt ON dt.tag_id = rtm.tag_id " +
-                    "CROSS JOIN liked_count lc " +
-                    "CROSS JOIN disliked_count dc " +
                     "WHERE r.status = 'OPEN' " +
-                    "AND (lc.cnt + dc.cnt) > 0 " +
-                    "GROUP BY r.restaurant_id, lc.cnt, dc.cnt " +
-                    "ORDER BY finalScore DESC",
+                    "GROUP BY rtm.restaurant_id" +
+                    ") " +
+                    "SELECT r.restaurant_id AS restaurantId, " +
+                    "COALESCE(1.0 * rta.liked_match_count / " +
+                    "NULLIF(:likedCount + rta.restaurant_tag_count - rta.liked_match_count, 0), 0) AS likeScore, " +
+                    "COALESCE(1.0 * rta.disliked_match_count / NULLIF(:dislikedCount, 0), 0) AS dislikePenalty, " +
+                    "100 * POW(COALESCE(1.0 * rta.liked_match_count / " +
+                    "NULLIF(:likedCount + rta.restaurant_tag_count - rta.liked_match_count, 0), 0), 2) " +
+                    "- CASE WHEN rta.disliked_match_count > 0 THEN 30 ELSE 0 END " +
+                    "- 80 * COALESCE(1.0 * rta.disliked_match_count / NULLIF(:dislikedCount, 0), 0) AS finalScore " +
+                    "FROM restaurants r " +
+                    "JOIN restaurant_tag_agg rta ON rta.restaurant_id = r.restaurant_id " +
+                    "WHERE (:likedCount + :dislikedCount) > 0 " +
+                    "ORDER BY finalScore DESC " +
+                    "LIMIT 50",
             nativeQuery = true
     )
     List<RestaurantSimilarityProjection> findRestaurantsByUserTagSimilarity(
-            @Param("userId") Long userId
+            @Param("userId") Long userId,
+            @Param("likedCount") int likedCount,
+            @Param("dislikedCount") int dislikedCount
     );
 
 

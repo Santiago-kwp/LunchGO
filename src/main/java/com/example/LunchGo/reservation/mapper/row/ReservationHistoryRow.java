@@ -30,6 +30,7 @@ public class ReservationHistoryRow {
     private Integer totalAmount;
 
     private String cancelledBy;
+    private String cancelledReason;
     private LocalDateTime cancelledAt;
 
     private Long reviewId;

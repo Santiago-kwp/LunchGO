@@ -126,6 +126,7 @@ const mapReservation = (item) => {
     payment: item.payment?.amount ? { amount: item.payment.amount } : null,
     reservationStatus,
     cancelledBy: item.cancelledBy,
+    cancelledReason: item.cancelledReason || null,
     cancelledAt: item.cancelledAt || null,
     review: item.review
       ? {

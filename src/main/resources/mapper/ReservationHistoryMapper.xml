@@ -16,6 +16,7 @@
             r.party_size AS partySize,
             r.status AS reservationStatus,
             cxl.cancelled_by AS cancelledBy,
+            cxl.reason AS cancelledReason,
             cxl.cancelled_at AS cancelledAt,
             CASE
                 WHEN r.status = 'COMPLETED' THEN rvs.visit_number
@@ -75,6 +76,7 @@
             r.party_size,
             r.status,
             cxl.cancelled_by,
+            cxl.reason,
             cxl.cancelled_at,
             rvs.visit_number,
             rvs.days_since_last_visit,

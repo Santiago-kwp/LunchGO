@@ -119,6 +119,17 @@ const shortConfirmationNumber = (value: unknown) => {
           </div>
         </div>
 
+        <div
+          v-if="
+            reservation.cancelledReason &&
+            (reservation.reservationStatus === 'cancelled' ||
+              reservation.reservationStatus === 'restaurant_cancelled')
+          "
+          class="text-sm text-[#6c757d] bg-[#f8f9fa] border border-[#e9ecef] rounded-lg px-3 py-2 mb-4"
+        >
+          취소 사유: {{ reservation.cancelledReason }}
+        </div>
+
         <div class="flex gap-2">
           <RouterLink
             :to="{

@@ -201,6 +201,17 @@ const handleDeleteReview = (reservation) => {
           </div>
         </div>
 
+        <div
+          v-if="
+            reservation.cancelledReason &&
+            (reservation.reservationStatus === 'cancelled' ||
+              reservation.reservationStatus === 'restaurant_cancelled')
+          "
+          class="text-sm text-[#6c757d] bg-[#f8f9fa] border border-[#e9ecef] rounded-lg px-3 py-2 mb-3"
+        >
+          취소 사유: {{ reservation.cancelledReason }}
+        </div>
+
         <!-- 다시 예약 / 예약 내역 버튼 -->
         <div class="flex gap-2">
           <RouterLink

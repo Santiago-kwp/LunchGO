@@ -8,6 +8,7 @@ import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import Input from '@/components/ui/Input.vue';
 import TERMS_POLICY_TEXT from '@/content/서비스 이용 약관.md?raw';
 import PRIVACY_POLICY_TEXT from '@/content/privacyPolicy.md?raw';
+import MARKETING_POLICY_TEXT from '@/content/marketingPolicy.md?raw';
 import { marked } from 'marked';
 import httpRequest from '@/router/httpRequest';
 
@@ -363,7 +364,7 @@ const openModal = (type) => {
     modalContent.value = PRIVACY_POLICY_TEXT;
   } else if (type === 'marketing') {
     modalTitle.value = '마케팅 정보 수신 동의';
-    modalContent.value = '이벤트 및 혜택 정보를 받아보실 수 있습니다...';
+    modalContent.value = MARKETING_POLICY_TEXT;
   } else {
     modalTitle.value = '취소 및 환불 정책';
     modalContent.value = '예약 시간 1시간 전까지 취소 가능하며...';

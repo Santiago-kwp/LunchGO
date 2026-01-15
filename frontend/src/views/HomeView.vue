@@ -1146,6 +1146,7 @@ watch(totalPages, (newTotal) => {
 });
 
 watch(selectedSort, () => {
+  if (isHomeListRestoring.value) return;
   currentPage.value = 1;
 });
 
@@ -1165,6 +1166,7 @@ watch(
 );
 
 watch(selectedPriceRange, () => {
+  if (isHomeListRestoring.value) return;
   currentPage.value = 1;
 });
 

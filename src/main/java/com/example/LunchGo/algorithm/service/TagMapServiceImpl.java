@@ -16,7 +16,9 @@ public class TagMapServiceImpl implements TagMapService {
 
     @Override
     public List<TagMapDTO> getTagSimilarityByUser(Long userId) {
-        return restaurantRepository.findRestaurantsByUserTagSimilarity(userId).stream()
+        int likedCount = restaurantRepository.countLikedTagsByUserId(userId);
+        int dislikedCount = restaurantRepository.countDislikedTagsByUserId(userId);
+        return restaurantRepository.findRestaurantsByUserTagSimilarity(userId, likedCount, dislikedCount).stream()
             .map(TagMapDTO::fromProjection)
             .toList();
     }
