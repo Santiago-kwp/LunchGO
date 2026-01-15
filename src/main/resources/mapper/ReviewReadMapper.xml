@@ -81,11 +81,28 @@
             r.status AS status,
             CASE WHEN r.status = 'BLINDED' THEN 1 ELSE 0 END AS isBlinded,
             NULL AS blindReason,
-            r.blind_request_tag_id AS blindRequestTagId,
-            brt.name AS blindRequestTagName,
-            r.blind_request_reason AS blindRequestReason,
-            r.blind_requested_at AS blindRequestedAt
+          r.blind_request_tag_id AS blindRequestTagId,
+          brt.name AS blindRequestTagName,
+          r.blind_request_reason AS blindRequestReason,
+          r.blind_requested_at AS blindRequestedAt,
+          slot.slot_date AS visitDate,
+          rs.party_size AS visitPartySize,
+          COALESCE(rc.confirmed_amount, rmi.menu_total, rs.total_amount, 0) AS visitTotalAmount,
+          COALESCE(c_count.cnt, 0) AS commentCount
         FROM reviews r
+        LEFT JOIN receipts rc ON rc.receipt_id = r.receipt_id
+        LEFT JOIN reservations rs ON rs.reservation_id = COALESCE(r.reservation_id, rc.reservation_id)
+        LEFT JOIN restaurant_reservation_slots slot ON slot.slot_id = rs.slot_id
+        LEFT JOIN (
+            SELECT reservation_id, SUM(line_amount) AS menu_total
+            FROM reservation_menu_items
+            GROUP BY reservation_id
+        ) rmi ON rmi.reservation_id = rs.reservation_id
+        LEFT JOIN (
+            SELECT review_id, COUNT(*) AS cnt
+            FROM comments
+            GROUP BY review_id
+        ) c_count ON c_count.review_id = r.review_id
         JOIN users u ON u.user_id = r.user_id
         LEFT JOIN restaurant_user_stats rus
             ON rus.restaurant_id = r.restaurant_id
@@ -145,7 +162,8 @@
             r.blind_request_tag_id AS blindRequestTagId,
             brt.name AS blindRequestTagName,
             r.blind_request_reason AS blindRequestReason,
-            r.blind_requested_at AS blindRequestedAt
+            r.blind_requested_at AS blindRequestedAt,
+            COALESCE(c_count.cnt, 0) AS commentCount
         FROM reviews r
         JOIN (
             SELECT DISTINCT
@@ -187,6 +205,11 @@
             </choose>
             LIMIT #{size} OFFSET #{offset}
         ) page ON page.review_id = r.review_id
+        LEFT JOIN (
+            SELECT review_id, COUNT(*) AS cnt
+            FROM comments
+            GROUP BY review_id
+        ) c_count ON c_count.review_id = r.review_id
         JOIN users u ON u.user_id = r.user_id
         LEFT JOIN restaurant_user_stats rus
             ON rus.restaurant_id = r.restaurant_id
@@ -318,7 +341,6 @@
           <if test="includeBlinded == false">
             AND r.status != 'BLINDED'
           </if>
-          AND (r.reservation_id IS NOT NULL OR r.receipt_id IS NOT NULL)
     </select>
 
     <select id="selectReviewTags" parameterType="long" resultType="com.example.LunchGo.review.dto.TagResponse">
@@ -465,7 +487,7 @@
             COALESCE(rc.confirmed_amount, 0) AS totalAmount,
             r.created_at AS createdAt,
             r.status AS status,
-            (SELECT COUNT(*) FROM comments c WHERE c.review_id = r.review_id) AS commentCount,
+            COALESCE(c_count.cnt, 0) AS commentCount,
             r.blind_request_tag_id AS blindRequestTagId,
             brt.name AS blindRequestTagName,
             r.blind_request_reason AS blindRequestReason,
@@ -474,6 +496,11 @@
         JOIN users u ON u.user_id = r.user_id
         JOIN restaurants res ON res.restaurant_id = r.restaurant_id
         LEFT JOIN receipts rc ON rc.receipt_id = r.receipt_id
+        LEFT JOIN (
+            SELECT review_id, COUNT(*) AS cnt
+            FROM comments
+            GROUP BY review_id
+        ) c_count ON c_count.review_id = r.review_id
         LEFT JOIN review_tags brt ON brt.tag_id = r.blind_request_tag_id
         ORDER BY r.created_at DESC
     </select>

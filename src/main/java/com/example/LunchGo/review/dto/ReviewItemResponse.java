@@ -25,4 +25,5 @@ public class ReviewItemResponse {
     private String blindRequestTagName;
     private String blindRequestReason;
     private LocalDateTime blindRequestedAt;
+    private Integer commentCount;
 }
