@@ -138,16 +138,7 @@ public class RestaurantStatsService {
         LocalDate weekStart = LocalDate.now().with(DayOfWeek.MONDAY);
         LocalDate weekEnd = weekStart.plusDays(6);
         
-        // 1월 10일이 포함된 주를 찾기 위해 추가 조회
-        // 1월 10일이 포함된 주의 월요일은 2026-01-06
-        LocalDate targetDate = LocalDate.of(2026, 1, 10);
-        LocalDate targetWeekStart = targetDate.with(DayOfWeek.MONDAY);
-        
-        // 현재 주와 1월 10일이 포함된 주가 다르면, 1월 10일 주의 데이터도 조회
-        if (!weekStart.equals(targetWeekStart)) {
-            log.info("1월 10일이 포함된 주 조회: targetWeekStart={}, currentWeekStart={}", 
-                targetWeekStart, weekStart);
-        }
+
         
         // Redis 캐시 키 생성 (하루에 한 번만 AI 추론 호출)
         String cacheKey = REDIS_CACHE_KEY_PREFIX + restaurantId + ":" + weekStart.toString();
@@ -223,21 +214,7 @@ public class RestaurantStatsService {
         List<WeeklyPrediction> savedPredictions = weeklyPredictionRepository
             .findByRestaurantIdAndWeekStartDate(restaurantId, weekStart);
         
-        // 1월 10일이 포함된 주의 데이터도 조회 (테스트용)
-        LocalDate targetDate = LocalDate.of(2026, 1, 10);
-        LocalDate targetWeekStart = targetDate.with(DayOfWeek.MONDAY);
-        if (!weekStart.equals(targetWeekStart) && targetWeekStart.isBefore(weekStart.plusDays(14))) {
-            List<WeeklyPrediction> targetWeekPredictions = weeklyPredictionRepository
-                .findByRestaurantIdAndWeekStartDate(restaurantId, targetWeekStart);
-            if (!targetWeekPredictions.isEmpty()) {
-                log.info("1월 10일이 포함된 주의 예측 데이터 발견: targetWeekStart={}, count={}", 
-                    targetWeekStart, targetWeekPredictions.size());
-                // 1월 10일이 포함된 주의 데이터를 사용
-                savedPredictions = targetWeekPredictions;
-                weekStart = targetWeekStart;
-                weekEnd = weekStart.plusDays(6);
-            }
-        }
+
         
         log.info("현재 주 예측 데이터 조회 시도: restaurantId={}, weekStart={}, DB 조회 결과 개수={}", 
             restaurantId, weekStart, savedPredictions.size());
