@@ -65,33 +65,35 @@ const loadInsights = async () => {
     );
     insight.value = response.data;
 
-    // 디버깅: 예측 데이터 확인
-    console.log("=== AI 인사이트 데이터 디버깅 ===");
-    console.log("예측 주 시작일:", insight.value?.predictionWeekStart);
-    console.log("예측 주 종료일:", insight.value?.predictionWeekEnd);
-    console.log("예측 데이터 개수:", insight.value?.predictions?.length || 0);
-    console.log("예측 데이터 상세:", insight.value?.predictions);
+    // [MEDIUM] 디버깅 목적으로 사용된 console.log 문입니다.
+    // 프로덕션 코드에 포함되지 않도록 병합 전에 제거하는 것이 좋습니다.
+    // 브라우저 콘솔에 불필요한 로그가 출력되는 것을 방지하고 코드를 깔끔하게 유지할 수 있습니다.
+    // console.log("=== AI 인사이트 데이터 디버깅 ===");
+    // console.log("예측 주 시작일:", insight.value?.predictionWeekStart);
+    // console.log("예측 주 종료일:", insight.value?.predictionWeekEnd);
+    // console.log("예측 데이터 개수:", insight.value?.predictions?.length || 0);
+    // console.log("예측 데이터 상세:", insight.value?.predictions);
 
-    // 각 예측 데이터의 날짜 확인
-    if (insight.value?.predictions && insight.value?.predictionWeekStart) {
-      const weekStart = new Date(insight.value.predictionWeekStart);
-      console.log("예측 주 시작일 (Date 객체):", weekStart);
-      insight.value.predictions.forEach((pred) => {
-        const mondayIndex = 2;
-        const offset = pred.weekday === 1 ? 6 : pred.weekday - mondayIndex;
-        const date = new Date(weekStart);
-        date.setDate(date.getDate() + offset);
-        const dateStr = `${date.getFullYear()}-${String(
-          date.getMonth() + 1
-        ).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-        console.log(
-          `요일 ${pred.weekday} (${formatWeekday(
-            pred.weekday
-          )}): ${dateStr}, 예측: ${pred.expectedMin}~${pred.expectedMax}`
-        );
-      });
-    }
-    console.log("================================");
+    // // 각 예측 데이터의 날짜 확인
+    // if (insight.value?.predictions && insight.value?.predictionWeekStart) {
+    //   const weekStart = new Date(insight.value.predictionWeekStart);
+    //   console.log("예측 주 시작일 (Date 객체):", weekStart);
+    //   insight.value.predictions.forEach((pred) => {
+    //     const mondayIndex = 2;
+    //     const offset = pred.weekday === 1 ? 6 : pred.weekday - mondayIndex;
+    //     const date = new Date(weekStart);
+    //     date.setDate(date.getDate() + offset);
+    //     const dateStr = `${date.getFullYear()}-${String(
+    //       date.getMonth() + 1
+    //     ).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    //     console.log(
+    //       `요일 ${pred.weekday} (${formatWeekday(
+    //         pred.weekday
+    //       )}): ${dateStr}, 예측: ${pred.expectedMin}~${pred.expectedMax}`
+    //     );
+    //   });
+    // }
+    // console.log("================================");
   } catch (error) {
     console.error("AI 인사이트 조회 실패:", error);
     errorMessage.value = "AI 인사이트를 불러오지 못했습니다.";
