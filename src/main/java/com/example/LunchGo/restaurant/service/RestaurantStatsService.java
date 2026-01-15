@@ -132,123 +132,89 @@ public class RestaurantStatsService {
         }
     }
 
+    /**
+     * 주간 AI 인사이트 데이터를 조회합니다. 캐싱 로직을 포함하고 있으며, 캐시가 없을 경우 새로운 데이터를 생성하고 캐시에 저장합니다.
+     * @param restaurantId 식당 ID
+     * @return 주간 AI 인사이트 응답
+     */
     public WeeklyAiInsightsResponse getWeeklyStatsInsight(Long restaurantId) {
+        LocalDate weekStart = LocalDate.now().with(DayOfWeek.MONDAY);
+        String cacheKey = REDIS_CACHE_KEY_PREFIX + restaurantId + ":" + weekStart.toString();
+
+        // 1. 캐시에서 데이터 조회 시도
+        Optional<WeeklyAiInsightsResponse> cachedInsights = getCachedInsights(cacheKey, restaurantId, weekStart);
+        if (cachedInsights.isPresent()) {
+            return cachedInsights.get();
+        }
+
+        // 2. 캐시가 없으면 새로 생성하고 캐시에 저장
+        return generateAndCacheInsights(restaurantId, weekStart, cacheKey);
+    }
+
+    /**
+     * 캐시된 주간 AI 인사이트 데이터를 조회하고, 필요한 경우 예측 데이터를 업데이트합니다.
+     * @param cacheKey Redis 캐시 키
+     * @param restaurantId 식당 ID
+     * @param weekStart 주의 시작일
+     * @return 캐시된 데이터가 있으면 WeeklyAiInsightsResponse를 포함하는 Optional, 그렇지 않으면 빈 Optional
+     */
+    private Optional<WeeklyAiInsightsResponse> getCachedInsights(String cacheKey, Long restaurantId, LocalDate weekStart) {
+        String cachedData = redisUtil.getData(cacheKey);
+        if (cachedData == null || cachedData.isBlank()) {
+            return Optional.empty();
+        }
+
+        try {
+            WeeklyAiInsightsResponse cached = objectMapper.readValue(cachedData, WeeklyAiInsightsResponse.class);
+            List<WeeklyDemandPrediction> predictions = getOrGenerateWeeklyPredictions(restaurantId, weekStart, null, true);
+
+            // 캐시된 예측 데이터와 DB의 예측 데이터를 조합
+            List<WeeklyDemandPrediction> finalPredictions = !predictions.isEmpty() ? predictions : cached.getPredictions();
+
+            List<WeeklyAiInsightsResponse.WeeklyPredictionPoint> lastWeekPredictions = getLastWeekPredictions(restaurantId, weekStart);
+
+            return Optional.of(WeeklyAiInsightsResponse.builder()
+                .startDate(cached.getStartDate())
+                .endDate(cached.getEndDate())
+                .predictionWeekStart(cached.getPredictionWeekStart())
+                .predictionWeekEnd(cached.getPredictionWeekEnd())
+                .aiSummary(cached.getAiSummary())
+                .aiFallbackUsed(cached.isAiFallbackUsed())
+                .reservations(cached.getReservations())
+                .stats(cached.getStats())
+                .predictions(finalPredictions)
+                .lastWeekPredictions(lastWeekPredictions)
+                .signalSummary(cached.getSignalSummary())
+                .build());
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to deserialize cached AI insights for restaurantId={}", restaurantId, e);
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * 새로운 주간 AI 인사이트를 생성하고 Redis에 캐시합니다.
+     * @param restaurantId 식당 ID
+     * @param weekStart 주의 시작일
+     * @param cacheKey Redis 캐시 키
+     * @return 생성된 주간 AI 인사이트 응답
+     */
+    private WeeklyAiInsightsResponse generateAndCacheInsights(Long restaurantId, LocalDate weekStart, String cacheKey) {
         LocalDate end = LocalDate.now();
         LocalDate start = end.minusDays(6);
-        LocalDate weekStart = LocalDate.now().with(DayOfWeek.MONDAY);
         LocalDate weekEnd = weekStart.plusDays(6);
-        
 
-        
-        // Redis 캐시 키 생성 (하루에 한 번만 AI 추론 호출)
-        String cacheKey = REDIS_CACHE_KEY_PREFIX + restaurantId + ":" + weekStart.toString();
-        
-        // Redis에서 캐시된 데이터 확인
-        String cachedData = redisUtil.getData(cacheKey);
-        if (cachedData != null && !cachedData.isBlank()) {
-            try {
-                WeeklyAiInsightsResponse cached = objectMapper.readValue(cachedData, WeeklyAiInsightsResponse.class);
-                
-                // 현재 주 예측 데이터를 DB에서 조회 (시드 데이터가 있으면 사용)
-                List<WeeklyPrediction> savedPredictions = weeklyPredictionRepository
-                    .findByRestaurantIdAndWeekStartDate(restaurantId, weekStart);
-                
-                log.info("캐시된 응답에서 현재 주 예측 데이터 조회: restaurantId={}, weekStart={}, DB 조회 결과 개수={}", 
-                    restaurantId, weekStart, savedPredictions.size());
-                
-                List<WeeklyDemandPrediction> predictions;
-                if (!savedPredictions.isEmpty()) {
-                    predictions = savedPredictions.stream()
-                        .map(pred -> WeeklyDemandPrediction.builder()
-                            .weekday(pred.getId().getWeekday())
-                            .expectedMin(pred.getExpectedMin())
-                            .expectedMax(pred.getExpectedMax())
-                            .confidence(pred.getConfidence())
-                            .evidence(parseEvidenceJson(pred.getEvidence()))
-                            .build())
-                        .toList();
-                    log.info("캐시된 응답에서 DB 예측 데이터 사용: restaurantId={}, weekStart={}, count={}", 
-                        restaurantId, weekStart, predictions.size());
-                } else {
-                    log.info("캐시된 응답에서 DB 예측 데이터 없음, 캐시된 예측 데이터 사용");
-                    predictions = cached.getPredictions();
-                }
-                
-                // 저번 주 예측 데이터 추가
-                List<WeeklyAiInsightsResponse.WeeklyPredictionPoint> lastWeekPredictions = 
-                    getLastWeekPredictions(restaurantId, weekStart);
-                return WeeklyAiInsightsResponse.builder()
-                    .startDate(cached.getStartDate())
-                    .endDate(cached.getEndDate())
-                    .predictionWeekStart(cached.getPredictionWeekStart())
-                    .predictionWeekEnd(cached.getPredictionWeekEnd())
-                    .aiSummary(cached.getAiSummary())
-                    .aiFallbackUsed(cached.isAiFallbackUsed())
-                    .reservations(cached.getReservations())
-                    .stats(cached.getStats())
-                    .predictions(predictions)
-                    .lastWeekPredictions(lastWeekPredictions)
-                    .signalSummary(cached.getSignalSummary())
-                    .build();
-            } catch (JsonProcessingException e) {
-                log.warn("Failed to deserialize cached AI insights for restaurantId={}", restaurantId, e);
-                // 캐시 파싱 실패 시 새로 생성
-            }
-        }
-        
-        // 캐시가 없거나 파싱 실패 시 새로 생성
-        List<BusinessReservationItemResponse> allReservations =
-            businessReservationQueryService.getList(restaurantId);
-
-        List<BusinessReservationItemResponse> weeklyReservations = allReservations.stream()
+        // 데이터 수집
+        List<BusinessReservationItemResponse> weeklyReservations = businessReservationQueryService.getList(restaurantId).stream()
             .filter(item -> isWithinLast7Days(item.getDatetime(), start, end))
             .toList();
+        List<DailyRestaurantStats> dailyStats = dailyRestaurantStatsRepository.findLast7DaysByRestaurantId(restaurantId);
+        WeeklyDemandSignalResponse signal = weeklyDemandSignalService.buildWeeklySignal(restaurantId, weekStart, weekEnd);
 
-        List<DailyRestaurantStats> dailyStats =
-            dailyRestaurantStatsRepository.findLast7DaysByRestaurantId(restaurantId);
+        // 예측 데이터 생성 또는 조회
+        List<WeeklyDemandPrediction> predictions = getOrGenerateWeeklyPredictions(restaurantId, weekStart, signal, false);
 
-        WeeklyDemandSignalResponse signal =
-            weeklyDemandSignalService.buildWeeklySignal(restaurantId, weekStart, weekEnd);
-        
-        // 현재 주 예측 데이터를 DB에서 먼저 조회
-        List<WeeklyPrediction> savedPredictions = weeklyPredictionRepository
-            .findByRestaurantIdAndWeekStartDate(restaurantId, weekStart);
-        
-
-        
-        log.info("현재 주 예측 데이터 조회 시도: restaurantId={}, weekStart={}, DB 조회 결과 개수={}", 
-            restaurantId, weekStart, savedPredictions.size());
-        
-        if (!savedPredictions.isEmpty()) {
-            // DB 조회 결과 상세 로그
-            savedPredictions.forEach(pred -> {
-                log.info("DB 예측 데이터: weekday={}, expectedMin={}, expectedMax={}, confidence={}", 
-                    pred.getId().getWeekday(), pred.getExpectedMin(), pred.getExpectedMax(), pred.getConfidence());
-            });
-        }
-        
-        List<WeeklyDemandPrediction> predictions;
-        if (!savedPredictions.isEmpty()) {
-            // DB에 저장된 예측 데이터가 있으면 사용
-            predictions = savedPredictions.stream()
-                .map(pred -> WeeklyDemandPrediction.builder()
-                    .weekday(pred.getId().getWeekday())
-                    .expectedMin(pred.getExpectedMin())
-                    .expectedMax(pred.getExpectedMax())
-                    .confidence(pred.getConfidence())
-                    .evidence(parseEvidenceJson(pred.getEvidence()))
-                    .build())
-                .toList();
-            log.info("DB에서 현재 주 예측 데이터 사용: restaurantId={}, weekStart={}, count={}", 
-                restaurantId, weekStart, predictions.size());
-        } else {
-            // DB에 없으면 새로 생성
-            log.info("DB에 예측 데이터 없음, 새로 생성: restaurantId={}, weekStart={}", 
-                restaurantId, weekStart);
-            predictions = ruleBasedForecastService.forecast(signal, weekStart, weekEnd);
-            log.info("새로 생성된 예측 데이터 개수: {}", predictions.size());
-        }
-
+        // AI 요약 생성
         String prompt = buildPrompt(restaurantId, start, end, weekStart, weekEnd, weeklyReservations, dailyStats, signal);
         String aiSummary;
         boolean aiFallbackUsed = false;
@@ -265,9 +231,10 @@ public class RestaurantStatsService {
             aiSummary = buildFallbackSummary();
         }
 
-        // 예측 데이터를 MySQL에 저장
+        // 예측 데이터를 DB에 저장
         savePredictionsToDatabase(restaurantId, weekStart, predictions);
 
+        // 최종 응답 객체 생성
         WeeklyAiInsightsResponse response = WeeklyAiInsightsResponse.builder()
             .startDate(start.toString())
             .endDate(end.toString())
@@ -282,7 +249,7 @@ public class RestaurantStatsService {
             .signalSummary(buildSignalSummaryPayload(signal, weekStart, weekEnd))
             .build();
 
-        // Redis에 캐싱 (24시간 TTL)
+        // Redis에 캐싱
         try {
             String responseJson = objectMapper.writeValueAsString(response);
             redisUtil.setDataExpire(cacheKey, responseJson, CACHE_TTL_MILLIS);
@@ -291,6 +258,43 @@ public class RestaurantStatsService {
         }
 
         return response;
+    }
+
+    /**
+     * DB에서 주간 예측 데이터를 조회하거나, 없을 경우 새로 생성합니다.
+     * @param restaurantId 식당 ID
+     * @param weekStart 주의 시작일
+     * @param signal 수요 예측 시그널
+     * @param fromCache 캐시 조회 로직에서 호출되었는지 여부
+     * @return 주간 수요 예측 리스트
+     */
+    private List<WeeklyDemandPrediction> getOrGenerateWeeklyPredictions(Long restaurantId, LocalDate weekStart, WeeklyDemandSignalResponse signal, boolean fromCache) {
+        List<WeeklyPrediction> savedPredictions = weeklyPredictionRepository.findByRestaurantIdAndWeekStartDate(restaurantId, weekStart);
+
+        if (!savedPredictions.isEmpty()) {
+            log.info("DB에서 현재 주 예측 데이터 사용: restaurantId={}, weekStart={}, count={}",
+                restaurantId, weekStart, savedPredictions.size());
+            return savedPredictions.stream()
+                .map(pred -> WeeklyDemandPrediction.builder()
+                    .weekday(pred.getId().getWeekday())
+                    .expectedMin(pred.getExpectedMin())
+                    .expectedMax(pred.getExpectedMax())
+                    .confidence(pred.getConfidence())
+                    .evidence(parseEvidenceJson(pred.getEvidence()))
+                    .build())
+                .toList();
+        }
+
+        if (fromCache) {
+            // 캐시 로직에서는 DB에 데이터가 없으면 빈 리스트를 반환하여 캐시된 예측을 사용하도록 함
+            return Collections.emptyList();
+        }
+
+        log.info("DB에 예측 데이터 없음, 새로 생성: restaurantId={}, weekStart={}", restaurantId, weekStart);
+        LocalDate weekEnd = weekStart.plusDays(6);
+        List<WeeklyDemandPrediction> newPredictions = ruleBasedForecastService.forecast(signal, weekStart, weekEnd);
+        log.info("새로 생성된 예측 데이터 개수: {}", newPredictions.size());
+        return newPredictions;
     }
 
     private boolean isWithinLast7Days(String datetime, LocalDate start, LocalDate end) {
