@@ -33,6 +33,12 @@ reservation:
 kakao:
   rest-api-key: ${KAKAO_REST_API_KEY:}
 
+login:
+  queue:
+    enabled: ${LOGIN_QUEUE_ENABLED:true}
+    capacity: ${LOGIN_QUEUE_CAPACITY:20}
+    token-ttl-ms: ${LOGIN_QUEUE_TOKEN_TTL_MS:120000}
+
 logging:
   level:
     org.hibernate.SQL: off

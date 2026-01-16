@@ -4,10 +4,22 @@ import { RouterLink, useRouter, useRoute } from 'vue-router';
 import httpRequest from '@/router/httpRequest';
 import { ArrowLeft } from 'lucide-vue-next';
 import { useAccountStore } from '@/stores/account';
+import WaitingModal from '@/components/ui/WaitingModal.vue';
+import { useLoginQueue } from '@/composables/useLoginQueue';
 
 const router = useRouter();
 const route = useRoute();
 const accountStore = useAccountStore();
+const {
+  isWaiting: isQueueWaiting,
+  modalType: queueModalType,
+  modalMessage: queueModalMessage,
+  waitingCount: queueWaitingCount,
+  formattedWaitTime: queueWaitTime,
+  waitForTurn,
+  handleQueueModalClose,
+  resetQueueState,
+} = useLoginQueue();
 
 const username = ref('');
 const password = ref('');
@@ -37,10 +49,12 @@ const handleLogin = async () => {
   }
 
   try {
+    const queueToken = await waitForTurn();
     const payload = {
       email: username.value,
       password: password.value,
       userType: 'MANAGER',
+      queueToken,
     };
 
     const response = await httpRequest.post('/api/login', payload, { skipAuth: true });
@@ -65,17 +79,25 @@ const handleLogin = async () => {
 
     router.push('/admin/dashboard');
   } catch (error) {
+    if (queueModalType.value === 'error') {
+      return;
+    }
     const statusCode = error?.response?.status;
     password.value = '';
     if (statusCode === 401) {
       errorMessage.value = '아이디 또는 비밀번호가 올바르지 않습니다.';
     } else if (statusCode === 400) {
       errorMessage.value = '로그인 정보가 올바르지 않습니다.';
+    } else if (statusCode === 429) {
+      errorMessage.value = '로그인 대기열에 진입했습니다. 잠시만 기다려주세요.';
     } else {
       errorMessage.value = '로그인 중 오류가 발생했습니다.';
     }
   } finally {
     isLoading.value = false;
+    if (queueModalType.value !== 'error' && !isQueueWaiting.value) {
+      resetQueueState();
+    }
   }
 };
 </script>
@@ -142,6 +164,14 @@ const handleLogin = async () => {
         </form>
       </div>
     </main>
+    <WaitingModal
+      :is-open="isQueueWaiting"
+      :type="queueModalType"
+      :message="queueModalMessage"
+      :waiting-count="queueWaitingCount"
+      :estimated-time="queueWaitTime"
+      @close="handleQueueModalClose"
+    />
   </div>
 </template>
 

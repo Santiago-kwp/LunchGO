@@ -56,7 +56,7 @@ public class SecurityConfig {
                         .requestMatchers("/reminders/**").permitAll()
                         .requestMatchers("/api/reminders/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/reminders/**", "/api/reminders/**").permitAll()
-                        .requestMatchers("/api/join/**", "/api/auth/**", "/api/sms/**", "/api/login").permitAll()
+                        .requestMatchers("/api/join/**", "/api/auth/**", "/api/sms/**", "/api/login", "/api/login/queue").permitAll()
                         .requestMatchers("/api/refresh").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/reminders/**", "/reminders/**").permitAll()

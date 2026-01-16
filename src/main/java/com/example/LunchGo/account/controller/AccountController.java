@@ -2,6 +2,7 @@ package com.example.LunchGo.account.controller;
 
 import com.example.LunchGo.account.dto.*;
 import com.example.LunchGo.account.helper.AccountHelper;
+import com.example.LunchGo.account.service.LoginQueueService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ import java.util.Map;
 @RequestMapping("/api")
 public class AccountController {
     private final AccountHelper accountHelper;
+    private final LoginQueueService loginQueueService;
 
     @PostMapping("/join/user")
     public ResponseEntity<?> userJoin(@RequestBody UserJoinRequest userReq) {
@@ -127,6 +129,15 @@ public class AccountController {
         if(!StringUtils.hasLength(loginReq.getEmail()) || !StringUtils.hasLength(loginReq.getPassword()) ||
         !StringUtils.hasLength(loginReq.getUserType())) return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
 
+        LoginQueueStatusResponse queueStatus = null;
+        if (loginQueueService.isEnabled()) {
+            queueStatus = loginQueueService.getStatus(loginReq.getQueueToken());
+            if (!queueStatus.isAllowed()) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(queueStatus);
+            }
+        }
+
+        boolean shouldReleaseQueue = queueStatus != null && queueStatus.isAllowed();
         try {
             MemberLogin memberLogin = accountHelper.login(loginReq, request, response);
             return new ResponseEntity<>(memberLogin, HttpStatus.OK);
@@ -135,7 +146,27 @@ public class AccountController {
             return new ResponseEntity<>(HttpStatus.UNAUTHORIZED); //401 return
         }catch(Exception e){ //그 외의 오류
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("로그인 중 오류가 발생했습니다.");
+        } finally {
+            if (shouldReleaseQueue) {
+                loginQueueService.release(loginReq.getQueueToken());
+            }
         }
+    }
+
+    @PostMapping("/login/queue")
+    public ResponseEntity<LoginQueueStatusResponse> joinLoginQueue() {
+        return ResponseEntity.ok(loginQueueService.joinQueue());
+    }
+
+    @GetMapping("/login/queue")
+    public ResponseEntity<LoginQueueStatusResponse> loginQueueStatus(@RequestParam("token") String token) {
+        return ResponseEntity.ok(loginQueueService.getStatus(token));
+    }
+
+    @DeleteMapping("/login/queue")
+    public ResponseEntity<?> leaveLoginQueue(@RequestParam("token") String token) {
+        loginQueueService.release(token);
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 
     @GetMapping("/auth/check")

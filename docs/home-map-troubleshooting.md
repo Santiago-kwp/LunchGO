@@ -100,3 +100,25 @@
 - `frontend/src/components/ui/HomeRecommendationContent.vue`
 - `frontend/src/components/ui/CafeteriaRecommendationSection.vue`
 - `frontend/src/components/ui/TrendingRecommendationSection.vue`
+
+---
+
+## 문제 5: 개발자 모드(디바이스 툴바)에서 지도 드래그 불가
+
+### 증상
+- 일반 브라우저에서는 마우스 스크롤/드래그로 지도 이동 가능
+- Chrome DevTools 디바이스 모드에서는 줌은 되지만 드래그 이동이 되지 않음
+
+### 원인
+- 디바이스 모드에서는 입력이 터치 이벤트로 에뮬레이트됨
+- 페이지 스크롤이 터치 드래그를 우선 처리해 지도 드래그가 차단됨
+
+### 해결
+- 터치 드래그를 지도에 전달하기 위해 `touch-action: none` 적용
+- 데스크톱 드래그를 유지하기 위해 터치 가능 여부(`maxTouchPoints`, media query)로 조건 적용
+- DevTools 디바이스 모드 전환은 새로고침 시점 기준으로 반영
+- 줌 동작은 기존처럼 유지(휠 줌)
+
+### 적용 파일
+- `frontend/src/views/HomeView.vue`
+- `frontend/src/composables/useHomeMap.js`

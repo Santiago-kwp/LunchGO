@@ -33,7 +33,7 @@ const closeLocationPolicy = () => {
   <footer class="bg-white border-t border-[#e9ecef] px-4 py-6 mt-8">
     <div class="text-xs text-[#6c757d] space-y-1 leading-relaxed">
       <p class="font-semibold text-[#1e3a5f]">(주) 런치고</p>
-      <p>주소 : 경기도 성남시 분당구 대왕판교로 ~~</p>
+      <p>주소 : 경기 성남시 분당구 판교동 621 1501호</p>
       <p>
         <RouterLink to="/intro" class="hover:underline">서비스 소개</RouterLink> |
         서비스 이용약관 |

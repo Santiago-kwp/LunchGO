@@ -11,6 +11,7 @@ import {
 } from "lucide-vue-next";
 import Card from "@/components/ui/Card.vue";
 import axios from "axios";
+import { formatReviewTag } from "@/utils/reviewTagEmojis";
 
 const route = useRoute();
 const restaurantId = route.params.id || "1"; // Default ID
@@ -325,7 +326,7 @@ onMounted(() => {
               <span
                 class="px-4 py-2 text-sm rounded-full bg-gradient-to-r from-[#ff6b4a] to-[#ff8e72] text-white font-semibold shadow-sm flex-1 text-center"
               >
-                {{ tag }}
+                {{ formatReviewTag(tag) }}
               </span>
               <span class="text-base font-semibold text-[#1e3a5f] ml-3">{{
                 count
@@ -481,7 +482,7 @@ onMounted(() => {
                       :key="idx"
                       class="inline-flex items-center px-2.5 py-1 text-xs rounded-full bg-gradient-to-r from-[#ff6b4a] to-[#ff8e72] text-white font-semibold shadow-sm"
                     >
-                      {{ tag }}
+                      {{ formatReviewTag(tag) }}
                     </span>
                   </div>
                 </RouterLink>

@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button.vue";
 import Card from "@/components/ui/Card.vue";
 import httpRequest from "@/router/httpRequest";
 import { useAccountStore } from "@/stores/account";
+import { formatReviewTag } from "@/utils/reviewTagEmojis";
 
 const route = useRoute();
 const router = useRouter();
@@ -1050,7 +1051,7 @@ onMounted(async () => {
                         : 'bg-white text-[#495057] border-[#dee2e6] hover:border-rose-200',
                     ]"
                   >
-                    {{ tag }}
+                    {{ formatReviewTag(tag) }}
                   </button>
                 </div>
               </div>
@@ -1083,7 +1084,7 @@ onMounted(async () => {
               :key="tag"
               class="px-3 py-1.5 rounded-full text-xs font-medium bg-rose-50 text-rose-600 border border-rose-200"
             >
-              {{ tag }}
+              {{ formatReviewTag(tag) }}
             </span>
           </div>
         </div>

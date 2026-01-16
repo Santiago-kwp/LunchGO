@@ -24,6 +24,7 @@ import {
   formatRouteDistance,
   formatRouteDurationMinutes,
 } from '@/utils/formatters';
+import { formatReviewTag } from "@/utils/reviewTagEmojis";
 import { useAccountStore } from '@/stores/account';
 import httpRequest from "@/router/httpRequest.js";
 import axios from "axios";
@@ -638,7 +639,7 @@ watch(detailMapDistanceStepIndex, () => {
                     :key="idx"
                     class="inline-flex items-center px-2.5 py-1 text-xs rounded-full bg-gradient-to-r from-[#ff6b4a] to-[#ff8e72] text-white font-semibold shadow-sm"
                   >
-                    {{ tag.trim() }}
+                    {{ formatReviewTag(tag) }}
                   </span>
                 </div>
               </div>
@@ -902,7 +903,7 @@ watch(detailMapDistanceStepIndex, () => {
                         :key="idx"
                         class="inline-flex items-center px-2.5 py-1 text-xs rounded-full bg-gradient-to-r from-[#ff6b4a] to-[#ff8e72] text-white font-semibold shadow-sm"
                       >
-                        {{ tag }}
+                        {{ formatReviewTag(tag) }}
                       </span>
                     </div>
                   </RouterLink>

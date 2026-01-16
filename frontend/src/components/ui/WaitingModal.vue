@@ -48,7 +48,7 @@ defineEmits(['close']);
             {{ message }}
           </p>
 
-          <div v-if="waitingCount > 0" class="flex flex-col gap-2 mb-4 w-full">
+          <div class="flex flex-col gap-2 mb-4 w-full">
             <div class="flex justify-between items-center bg-[#f8f9fa] rounded-lg px-4 py-2 border border-[#e9ecef]">
               <span class="text-xs text-[#6c757d]">현재 접속 시도</span>
               <span class="text-sm font-bold text-[#ff6b4a]">{{ waitingCount }}명</span>

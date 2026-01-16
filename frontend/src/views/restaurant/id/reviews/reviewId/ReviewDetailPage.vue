@@ -12,6 +12,7 @@ import {
 import Card from "@/components/ui/Card.vue";
 import Button from "@/components/ui/Button.vue";
 import httpRequest from "@/router/httpRequest";
+import { formatReviewTag } from "@/utils/reviewTagEmojis";
 
 const route = useRoute();
 const router = useRouter();
@@ -342,7 +343,7 @@ onMounted(() => {
               :key="idx"
               class="inline-flex items-center px-3 py-1.5 text-sm rounded-full bg-gradient-to-r from-[#ff6b4a] to-[#ff8e72] text-white font-semibold shadow-sm"
             >
-              {{ tag }}
+              {{ formatReviewTag(tag) }}
             </span>
           </div>
 

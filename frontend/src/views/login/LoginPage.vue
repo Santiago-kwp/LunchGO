@@ -7,11 +7,23 @@ import FindIdModal from '@/components/ui/FindIdModal.vue';
 import FindEmailModal from '@/components/ui/FindEmailModal.vue';
 import FindPwdModal from '@/components/ui/FindPwdModal.vue';
 import UserDormantModal from '@/components/ui/UserDormantModal.vue';
+import WaitingModal from '@/components/ui/WaitingModal.vue';
 import { useAccountStore } from '@/stores/account';
+import { useLoginQueue } from '@/composables/useLoginQueue';
 
 const router = useRouter();
 const route = useRoute();
 const accountStore = useAccountStore();
+const {
+  isWaiting: isQueueWaiting,
+  modalType: queueModalType,
+  modalMessage: queueModalMessage,
+  waitingCount: queueWaitingCount,
+  formattedWaitTime: queueWaitTime,
+  waitForTurn,
+  handleQueueModalClose,
+  resetQueueState,
+} = useLoginQueue();
 
 type UserType = 'user' | 'staff' | 'owner';
 
@@ -84,6 +96,7 @@ const handleLogin = async () => {
   }
 
   try {
+    const queueToken = await waitForTurn();
     const userTypeMap: Record<UserType, string> = {
       user: 'USER',
       staff: 'STAFF',
@@ -94,6 +107,7 @@ const handleLogin = async () => {
       email: isEmailLogin.value ? email.value : username.value,
       password: password.value,
       userType: userTypeMap[currentTab.value],
+      queueToken,
     };
 
     const response = await httpRequest.post('/api/login', payload, { skipAuth: true });
@@ -133,17 +147,25 @@ const handleLogin = async () => {
 
     router.push(targetPath);
   } catch (error) {
+    if (queueModalType.value === 'error') {
+      return;
+    }
     const statusCode = error?.response?.status;
     password.value = '';
     if (statusCode === 401) {
       errorMessage.value = '아이디 또는 비밀번호가 올바르지 않습니다.';
     } else if (statusCode === 400) {
       errorMessage.value = '로그인 정보가 올바르지 않습니다.';
+    } else if (statusCode === 429) {
+      errorMessage.value = '로그인 대기열에 진입했습니다. 잠시만 기다려주세요.';
     } else {
       errorMessage.value = '로그인 중 오류가 발생했습니다.';
     }
   } finally {
     isLoading.value = false;
+    if (queueModalType.value !== 'error' && !isQueueWaiting.value) {
+      resetQueueState();
+    }
   }
 };
 
@@ -286,6 +308,14 @@ const handleDormantUnlocked = () => {
       @close="showDormantModal = false"
       :user-email="email"
       @unlocked="handleDormantUnlocked"
+    />
+    <WaitingModal
+      :is-open="isQueueWaiting"
+      :type="queueModalType"
+      :message="queueModalMessage"
+      :waiting-count="queueWaitingCount"
+      :estimated-time="queueWaitTime"
+      @close="handleQueueModalClose"
     />
   </div>
 </template>
