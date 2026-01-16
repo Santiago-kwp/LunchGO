@@ -10,6 +10,8 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.concurrent.TimeUnit;
 
 @RequiredArgsConstructor
@@ -117,5 +119,16 @@ public class RedisUtil {
             log.error("Redis key [{}] has invalid numeric value: [{}]. Returning 0L.", key, val);
             return 0L;
         }
+    }
+
+    /**
+     * 예약 슬롯의 Redis 키를 생성합니다.
+     * @param restaurantId 식당 ID
+     * @param slotDate 예약 날짜
+     * @param slotTime 예약 시간
+     * @return 생성된 Redis 키 문자열 (예: "seats:1:2023-01-01:12:00")
+     */
+    public static String generateSeatKey(Long restaurantId, LocalDate slotDate, LocalTime slotTime) {
+        return "seats:" + restaurantId + ":" + slotDate.toString() + ":" + slotTime.toString();
     }
 }

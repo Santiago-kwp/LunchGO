@@ -142,7 +142,7 @@ public class ReservationRefundService {
             @Override
             public void afterCommit() {
                 // 예약 슬롯 정보 (restaurantId, slotDate, slotTime) 및 partySize를 가져와 Redis 키 생성
-                String redisSeatKey = "seats:" + slot.getRestaurantId() + ":" + slot.getSlotDate() + ":" + slot.getSlotTime();
+                String redisSeatKey = RedisUtil.generateSeatKey(slot.getRestaurantId(), slot.getSlotDate(), slot.getSlotTime());
                 int partySize = reservation.getPartySize() != null ? reservation.getPartySize() : 0;
 
                 // Redis 좌석 카운터에 partySize만큼 좌석 반환 (증가)

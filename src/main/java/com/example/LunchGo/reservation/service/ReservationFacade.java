@@ -35,6 +35,8 @@ public class ReservationFacade {
     private static final int DEPOSIT_PER_PERSON_DEFAULT = 5000;
     private static final int DEPOSIT_PER_PERSON_LARGE = 10000;
     private static final int DEPOSIT_LARGE_THRESHOLD = 7;
+    private static final int DEFAULT_MAX_CAPACITY = 20; // ReservationFacade 내부에서 사용할 기본 최대 정원
+    private static final long REDIS_SEAT_KEY_TTL_MILLIS = Duration.ofDays(1).toMillis(); // Redis 좌석 키의 TTL (24시간)
 
     private final ReservationService reservationService; // 수정된 ReservationService (락 핵심 로직 담당)
     private final MenuRepository menuRepository; // 메뉴 정보 조회 (선주문 처리용)
@@ -60,14 +62,14 @@ public class ReservationFacade {
         // Just-in-Time Redis Counter Initialization & Pre-Check
         // 1. 이 슬롯의 최대 정원을 DB에서 조회 (락 없이)
         Integer maxCapacity = restaurantRepository.findReservationLimitByRestaurantId(request.getRestaurantId())
-                .orElse(20); // 기본값 20 (ReservationSlotService와 동일하게)
+                .orElse(DEFAULT_MAX_CAPACITY); // 기본값 DEFAULT_MAX_CAPACITY (ReservationFacade 내부에 정의)
 
         // 2. Redis 키 정의
-        String redisSeatKey = "seats:" + request.getRestaurantId() + ":" + request.getSlotDate() + ":" + request.getSlotTime();
+        String redisSeatKey = RedisUtil.generateSeatKey(request.getRestaurantId(), request.getSlotDate(), request.getSlotTime());
 
         // 3. SETNX를 사용한 원자적 초기화 (키가 없을 때만 실행)
         // TTL은 24시간으로 넉넉하게 설정
-        redisUtil.setIfAbsent(redisSeatKey, String.valueOf(maxCapacity), 24 * 60 * 60 * 1000L);
+        redisUtil.setIfAbsent(redisSeatKey, String.valueOf(maxCapacity), REDIS_SEAT_KEY_TTL_MILLIS);
 
         // 4. Redis 좌석 사전 검증 (빠른 Fail-Fast)
         Long remainingSeats = redisUtil.decrement(redisSeatKey, request.getPartySize());
