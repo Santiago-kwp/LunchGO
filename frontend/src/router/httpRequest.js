@@ -57,7 +57,6 @@ instance.interceptors.response.use(
                     accountStore.clearAccount?.();
                     localStorage.removeItem('accessToken');
                     localStorage.removeItem('member');
-                    window.location.replace('/login');
                 }
                 return Promise.reject(refreshError);
             }

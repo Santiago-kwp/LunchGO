@@ -493,6 +493,9 @@ export const useHomeMap = ({
         center,
         level: levelForDistance(mapDistanceStepIndex.value),
       });
+      if (typeof mapInstance.value.setDraggable === "function") {
+        mapInstance.value.setDraggable(true);
+      }
       kakaoMaps.event.addListener(mapInstance.value, "zoom_start", () => {
         isMapInteracting.value = true;
       });
