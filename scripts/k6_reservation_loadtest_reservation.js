@@ -1,10 +1,16 @@
 import http from "k6/http";
-import { check } from "k6";
+import { check, sleep } from "k6";
 
 const baseUrl = __ENV.BASE_URL || "http://10.0.2.6:8080";
 const emailPrefix = __ENV.EMAIL_PREFIX || "loadtest.user";
 const emailDomain = __ENV.EMAIL_DOMAIN || "example.com";
 const password = __ENV.PASSWORD || "Passw0rd!123";
+const useLoginQueue =
+  String(__ENV.USE_LOGIN_QUEUE || "").toLowerCase() === "true" ||
+  String(__ENV.USE_LOGIN_QUEUE || "") === "1";
+const queuePollIntervalMs = Number(__ENV.LOGIN_QUEUE_POLL_MS || 1000);
+const queueMaxWaitMs = Number(__ENV.LOGIN_QUEUE_MAX_WAIT_MS || 60000);
+const setupTimeout = __ENV.SETUP_TIMEOUT || "30m";
 
 const restaurantId = Number(__ENV.RESTAURANT_ID || 4);
 const slotDate = __ENV.SLOT_DATE || "2026-01-16";
@@ -27,7 +33,7 @@ export const options = {
   thresholds: {
     http_req_failed: ["rate<0.01"],
   },
-  setupTimeout: '10m',
+  setupTimeout,
 };
 
 function buildEmail(vu) {
@@ -35,29 +41,103 @@ function buildEmail(vu) {
   return `${emailPrefix}${seq}@${emailDomain}`;
 }
 
+function waitForLoginTurn() {
+  const joinRes = http.post(`${baseUrl}/api/login/queue`, JSON.stringify({}), {
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (joinRes.status !== 200) {
+    return { ok: false, queueToken: null, reason: "join_failed" };
+  }
+
+  const joinData = joinRes.json() || {};
+  const queueToken = joinData.queueToken || null;
+  if (joinData.allowed) {
+    return { ok: true, queueToken, reason: "allowed" };
+  }
+
+  if (!queueToken) {
+    return { ok: false, queueToken: null, reason: "token_missing" };
+  }
+
+  const startTime = Date.now();
+  while (Date.now() - startTime < queueMaxWaitMs) {
+    sleep(queuePollIntervalMs / 1000);
+    const statusRes = http.get(
+      `${baseUrl}/api/login/queue?token=${encodeURIComponent(queueToken)}`
+    );
+    if (statusRes.status !== 200) {
+      return { ok: false, queueToken, reason: "status_failed" };
+    }
+    const statusData = statusRes.json() || {};
+    if (statusData.allowed) {
+      return { ok: true, queueToken, reason: "allowed" };
+    }
+    if (statusData.expired) {
+      return { ok: false, queueToken, reason: "expired" };
+    }
+  }
+
+  return { ok: false, queueToken, reason: "timeout" };
+}
+
+function loginUser(email) {
+  let queueToken = null;
+  if (useLoginQueue) {
+    const queueResult = waitForLoginTurn();
+    if (!queueResult.ok) {
+      console.error(
+        `Queue failed for user ${email}: ${queueResult.reason || "unknown"}`
+      );
+      return null;
+    }
+    queueToken = queueResult.queueToken;
+  }
+
+  const loginPayload = JSON.stringify({
+    email,
+    password,
+    userType: "USER",
+    ...(queueToken ? { queueToken } : {}),
+  });
+
+  const loginRes = http.post(`${baseUrl}/api/login`, loginPayload, {
+    headers: { "Content-Type": "application/json" },
+  });
+
+  check(loginRes, {
+    "login status 200": (r) => r.status === 200,
+  });
+
+  if (loginRes.status !== 200) {
+    console.error(`Login failed for user ${email}: ${loginRes.status} ${loginRes.body}`);
+    return null;
+  }
+
+  const loginBody = loginRes.json() || {};
+  if (!loginBody.accessToken || !loginBody.id) {
+    console.error(`Login response missing token for user ${email}`);
+    return null;
+  }
+
+  return {
+    token: loginBody.accessToken,
+    userId: loginBody.id,
+  };
+}
+
 export function setup() {
   const users = [];
   for (let i = 1; i <= loadVus; i++) {
-    const loginPayload = JSON.stringify({
-      email: buildEmail(i),
-      password,
-      userType: "USER",
-    });
-
-    const loginRes = http.post(`${baseUrl}/api/login`, loginPayload, {
-      headers: { "Content-Type": "application/json" },
-    });
-
-    if (loginRes.status === 200) {
-      const loginBody = loginRes.json();
-      users.push({
-        token: loginBody.accessToken,
-        userId: loginBody.id,
-      });
-    } else {
-      console.error(`Login failed for user ${i}: ${loginRes.status} ${loginRes.body}`);
+    const email = buildEmail(i);
+    const auth = loginUser(email);
+    if (!auth) {
+      console.error(`Login failed for user ${email}`);
+      continue;
     }
+    users.push(auth);
   }
+
   return users;
 }
 

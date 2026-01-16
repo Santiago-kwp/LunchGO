@@ -2,7 +2,7 @@ import { ref, computed, onBeforeUnmount } from "vue";
 import httpRequest from "@/router/httpRequest";
 
 const POLL_INTERVAL_MS = 2000;
-const ESTIMATED_TIME_PER_PERSON = 3;
+const ESTIMATED_LOGIN_SECONDS = 0.8;
 const DEFAULT_ESTIMATED_TIME = 5;
 
 export const useLoginQueue = () => {
@@ -31,11 +31,22 @@ export const useLoginQueue = () => {
 
   const updateWaitState = (status) => {
     const count = Number(status?.waitingCount ?? 0);
+    const capacity = Number(status?.capacity ?? 0);
     waitingCount.value = Number.isFinite(count) ? count : 0;
-    estimatedWaitTime.value =
-      waitingCount.value > 0
-        ? waitingCount.value * ESTIMATED_TIME_PER_PERSON
-        : DEFAULT_ESTIMATED_TIME;
+
+    if (waitingCount.value <= 0) {
+      estimatedWaitTime.value = DEFAULT_ESTIMATED_TIME;
+      return;
+    }
+
+    const effectiveCapacity =
+      Number.isFinite(capacity) && capacity > 0 ? capacity : 1;
+    const estimatedSeconds =
+      (waitingCount.value / effectiveCapacity) * ESTIMATED_LOGIN_SECONDS;
+    estimatedWaitTime.value = Math.max(
+      DEFAULT_ESTIMATED_TIME,
+      Math.round(estimatedSeconds)
+    );
   };
 
   const clearPolling = () => {

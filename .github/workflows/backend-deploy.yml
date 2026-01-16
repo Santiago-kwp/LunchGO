@@ -80,6 +80,9 @@ jobs:
               docker run --env-file /opt/lunchgo/.env \
                 -v /opt/lunchgo/fonts:/app/fonts:ro \
                 -e LOG_PATH=/var/log/lunchgo \
+                -e LOGIN_QUEUE_ENABLED=true \
+                -e LOGIN_QUEUE_CAPACITY=10 \
+                -e LOGIN_QUEUE_TOKEN_TTL_MS=120000 \
                 -e TZ=Asia/Seoul \
                 -e JAVA_TOOL_OPTIONS=-Duser.timezone=Asia/Seoul \
                 -v /opt/scouter/scouter/agent.java:/app/scouter/agent.java:ro \
