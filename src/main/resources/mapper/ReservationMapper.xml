@@ -245,11 +245,13 @@
         ORDER BY r.created_at DESC
     </select>
 
-    <insert id="insertReservationMenuItem">
+    <insert id="insertReservationMenuItems">
         INSERT INTO reservation_menu_items
             (reservation_id, menu_id, menu_name, unit_price, quantity, line_amount)
         VALUES
-            (#{reservationId}, #{menuId}, #{menuName}, #{unitPrice}, #{quantity}, #{lineAmount})
+        <foreach collection="items" item="item" separator=",">
+            (#{reservationId}, #{item.menuId}, #{item.menuName}, #{item.unitPrice}, #{item.quantity}, #{item.lineAmount})
+        </foreach>
     </insert>
 
     <select id="selectBusinessReservationListByDate"

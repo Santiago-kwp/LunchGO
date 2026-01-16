@@ -2,6 +2,7 @@ package com.example.LunchGo.reservation.mapper;
 
 import com.example.LunchGo.reservation.domain.Reservation;
 import com.example.LunchGo.reservation.domain.ReservationSlot;
+import com.example.LunchGo.reservation.dto.MenuSnapshot;
 import com.example.LunchGo.reservation.mapper.row.ReservationCreateRow;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -67,13 +68,9 @@ public interface ReservationMapper {
             @Param("slotDate") java.time.LocalDate slotDate
     );
 
-    int insertReservationMenuItem(
+    int insertReservationMenuItems(
             @Param("reservationId") Long reservationId,
-            @Param("menuId") Long menuId,
-            @Param("menuName") String menuName,
-            @Param("unitPrice") Integer unitPrice,
-            @Param("quantity") Integer quantity,
-            @Param("lineAmount") Integer lineAmount
+            @Param("items") List<MenuSnapshot> items
     );
     List<ReservationMenuItemRow> selectReservationMenuItems(@Param("reservationId") Long reservationId);
 

@@ -95,16 +95,7 @@ public class ReservationServiceImpl implements ReservationService {
 
         // reservation_menu_items 저장 (예약 PK 생긴 다음에)
         if (ReservationType.PREORDER_PREPAY.equals(request.getReservationType()) && menuSnapshots != null && !menuSnapshots.isEmpty()) {
-            for (MenuSnapshot s : menuSnapshots) {
-                reservationMapper.insertReservationMenuItem(
-                        reservation.getReservationId(),
-                        s.getMenuId(),
-                        s.getMenuName(),
-                        s.getUnitPrice(),
-                        s.getQuantity(),
-                        s.getLineAmount()
-                );
-            }
+            reservationMapper.insertReservationMenuItems(reservation.getReservationId(), menuSnapshots);
         }
 
         String code = generateReservationCode(LocalDate.now(), reservation.getReservationId());
