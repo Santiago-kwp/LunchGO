@@ -1,5 +1,6 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
+import { Trend } from "k6/metrics";
 
 const baseUrl = __ENV.BASE_URL || "http://10.0.2.6:8080";
 const emailPrefix = __ENV.EMAIL_PREFIX || "loadtest.user";
@@ -14,6 +15,10 @@ const useLoginQueue =
   String(__ENV.USE_LOGIN_QUEUE || "") === "1";
 const queuePollIntervalMs = Number(__ENV.LOGIN_QUEUE_POLL_MS || 1000);
 const queueMaxWaitMs = Number(__ENV.LOGIN_QUEUE_MAX_WAIT_MS || 60000);
+
+const queueWaitMsTrend = new Trend("queue_wait_ms");
+const loginFlowMsTrend = new Trend("login_flow_ms");
+const loginReqMsTrend = new Trend("login_req_ms");
 
 export const options = {
   scenarios: {
@@ -85,8 +90,10 @@ function waitForLoginTurn() {
 }
 
 export default function () {
+  const flowStart = Date.now();
   let queueToken = null;
   if (useLoginQueue) {
+    const queueStart = Date.now();
     const queueResult = waitForLoginTurn();
     if (!queueResult.ok) {
       const reason = queueResult.reason || "unknown";
@@ -104,6 +111,9 @@ export default function () {
     check({ reason: queueResult.reason }, {
       "queue allowed": (r) => r.reason === "allowed",
     });
+    queueWaitMsTrend.add(Date.now() - queueStart);
+  } else {
+    queueWaitMsTrend.add(0);
   }
 
   const payload = {
@@ -117,9 +127,12 @@ export default function () {
 
   const loginPayload = JSON.stringify(payload);
 
+  const loginStart = Date.now();
   const res = http.post(`${baseUrl}/api/login`, loginPayload, {
     headers: { "Content-Type": "application/json" },
   });
+  loginReqMsTrend.add(Date.now() - loginStart);
+  loginFlowMsTrend.add(Date.now() - flowStart);
 
   check(res, {
     "login status 200": (r) => r.status === 200,
@@ -147,7 +160,56 @@ export function handleSummary(data) {
     queue_status_failed_rate: pickRate("queue status failed"),
   };
 
+  const metrics = data.metrics || {};
+  const duration = metrics.http_req_duration?.values || {};
+  const failed = metrics.http_req_failed?.values || {};
+  const iterations = metrics.iterations?.values || {};
+  const dropped = metrics.dropped_iterations?.values || {};
+  const httpReqs = metrics.http_reqs?.values || {};
+  const queueWait = metrics.queue_wait_ms?.values || {};
+  const loginFlow = metrics.login_flow_ms?.values || {};
+  const loginReq = metrics.login_req_ms?.values || {};
+
+  const formatNumber = (value, digits = 2) => {
+    if (!Number.isFinite(value)) return "n/a";
+    return value.toFixed(digits);
+  };
+
+  const summaryLines = [
+    "TOTAL RESULTS (custom)",
+    `http_req_duration: avg=${formatNumber(duration.avg)}ms min=${formatNumber(
+      duration.min
+    )}ms med=${formatNumber(duration.med)}ms max=${formatNumber(
+      duration.max
+    )}ms p(90)=${formatNumber(duration["p(90)"])}ms p(95)=${formatNumber(
+      duration["p(95)"]
+    )}ms`,
+    `http_req_failed: rate=${formatNumber(failed.rate, 4)}`,
+    `queue_wait_ms: avg=${formatNumber(queueWait.avg)}ms p(95)=${formatNumber(
+      queueWait["p(95)"]
+    )}ms`,
+    `login_flow_ms: avg=${formatNumber(loginFlow.avg)}ms p(95)=${formatNumber(
+      loginFlow["p(95)"]
+    )}ms`,
+    `login_req_ms: avg=${formatNumber(loginReq.avg)}ms p(95)=${formatNumber(
+      loginReq["p(95)"]
+    )}ms`,
+    `iterations: count=${formatNumber(iterations.count, 0)} rate=${formatNumber(
+      iterations.rate
+    )}/s`,
+    `dropped_iterations: count=${formatNumber(
+      dropped.count,
+      0
+    )} rate=${formatNumber(dropped.rate)}/s`,
+    `http_reqs: count=${formatNumber(httpReqs.count, 0)} rate=${formatNumber(
+      httpReqs.rate
+    )}/s`,
+    "",
+    "QUEUE SUMMARY",
+    JSON.stringify(summary, null, 2),
+  ];
+
   return {
-    stdout: `${JSON.stringify(summary, null, 2)}\n`,
+    stdout: `${summaryLines.join("\n")}\n`,
   };
 }
