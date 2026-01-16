@@ -63,6 +63,14 @@ public class RestaurantStatsService {
     private static final String REDIS_CACHE_KEY_PREFIX = "ai_insights:restaurant:";
     private static final long CACHE_TTL_HOURS = 24;
     private static final long CACHE_TTL_MILLIS = CACHE_TTL_HOURS * 60 * 60 * 1000;
+    private static final Color COLOR_PRIMARY = new Color(30, 58, 95);
+    private static final Color COLOR_ACCENT = new Color(255, 107, 74);
+    private static final Color COLOR_ACCENT_LIGHT = new Color(255, 196, 184);
+    private static final Color COLOR_BG = new Color(248, 249, 250);
+    private static final Color COLOR_CARD_BG = new Color(255, 255, 255);
+    private static final Color COLOR_BORDER = new Color(233, 236, 239);
+    private static final Color COLOR_TEXT = new Color(33, 37, 41);
+    private static final Color COLOR_MUTED = new Color(108, 117, 125);
 
     public byte[] generateWeeklyStatsPdf(Long restaurantId) {
         try {
@@ -715,9 +723,22 @@ private byte[] buildPdf(
             PDPageContentStream content = null;
             try {
                 content = new PDPageContentStream(document, page);
+                drawPageBackground(content, mediaBox);
                 cursor.setContent(content);
                 cursor.setY(drawHeader(content, font, mediaBox, margin, cursor.getY(), restaurantId, start, end));
-                cursor.setY(cursor.getY() - 8);
+                cursor.setY(cursor.getY() - 12);
+                cursor.setY(
+                    drawSummaryCards(
+                        content,
+                        font,
+                        margin,
+                        contentWidth,
+                        cursor.getY(),
+                        reservations.size(),
+                        dailyStats.size()
+                    )
+                );
+                cursor.setY(cursor.getY() - 4);
                 cursor.setY(drawMarkdownSection(cursor, font, aiSummary, contentWidth, 14));
             } finally {
                 if (cursor.getContent() != null) {
@@ -730,6 +751,12 @@ private byte[] buildPdf(
         } catch (IOException e) {
             throw new IllegalStateException("Failed to generate PDF", e);
         }
+    }
+
+    private static void drawPageBackground(PDPageContentStream content, PDRectangle mediaBox) throws IOException {
+        content.setNonStrokingColor(COLOR_BG);
+        content.addRect(0, 0, mediaBox.getWidth(), mediaBox.getHeight());
+        content.fill();
     }
 
     private List<String> wrapText(String text, PDType0Font font, int fontSize, float maxWidth) throws IOException {
@@ -780,25 +807,43 @@ private byte[] buildPdf(
         LocalDate start,
         LocalDate end
     ) throws IOException {
-        float headerHeight = 70f;
-        content.setNonStrokingColor(new Color(245, 248, 255));
-        content.addRect(0, y - headerHeight + 12, mediaBox.getWidth(), headerHeight);
+        float headerHeight = 86f;
+        float headerBottom = y - headerHeight + 12;
+
+        content.setNonStrokingColor(COLOR_CARD_BG);
+        content.addRect(0, headerBottom, mediaBox.getWidth(), headerHeight);
+        content.fill();
+        content.setStrokingColor(COLOR_BORDER);
+        content.moveTo(0, headerBottom);
+        content.lineTo(mediaBox.getWidth(), headerBottom);
+        content.stroke();
+
+        content.setNonStrokingColor(COLOR_ACCENT);
+        content.addRect(margin, y - 40, 48, 4);
         content.fill();
 
         content.beginText();
-        content.setNonStrokingColor(Color.BLACK);
+        content.setNonStrokingColor(COLOR_PRIMARY);
         content.setFont(font, 18);
-        content.newLineAtOffset(margin, y - 28);
+        content.newLineAtOffset(margin, y - 30);
         content.showText("주간 식당 통계 리포트");
         content.endText();
 
         content.beginText();
+        content.setNonStrokingColor(COLOR_MUTED);
         content.setFont(font, 12);
-        content.newLineAtOffset(margin, y - 50);
+        content.newLineAtOffset(margin, y - 54);
         content.showText("기간: " + start + " ~ " + end);
         content.endText();
 
-        return y - headerHeight;
+        String meta = "식당 ID: " + restaurantId;
+        float metaWidth = getTextWidth(font, 10, meta);
+        content.beginText();
+        content.setNonStrokingColor(COLOR_MUTED);
+        content.setFont(font, 10);
+        content.newLineAtOffset(mediaBox.getWidth() - margin - metaWidth, y - 30);
+        content.endText();
+        return headerBottom - 8;
     }
 
     private float drawSummaryCards(
@@ -815,29 +860,38 @@ private byte[] buildPdf(
         float cardWidth = (contentWidth - gap) / 2f;
         float cardY = y - cardHeight - 8;
 
-        drawCard(content, margin, cardY, cardWidth, cardHeight, new Color(255, 246, 235));
-        drawCard(content, margin + cardWidth + gap, cardY, cardWidth, cardHeight, new Color(235, 248, 240));
+        drawCard(content, margin, cardY, cardWidth, cardHeight, COLOR_CARD_BG);
+        drawCard(content, margin + cardWidth + gap, cardY, cardWidth, cardHeight, COLOR_CARD_BG);
+        content.setNonStrokingColor(COLOR_ACCENT);
+        content.addRect(margin, cardY + cardHeight - 4, cardWidth, 4);
+        content.fill();
+        content.setNonStrokingColor(COLOR_ACCENT_LIGHT);
+        content.addRect(margin + cardWidth + gap, cardY + cardHeight - 4, cardWidth, 4);
+        content.fill();
 
         content.beginText();
-        content.setNonStrokingColor(Color.BLACK);
-        content.setFont(font, 11);
+        content.setNonStrokingColor(COLOR_MUTED);
+        content.setFont(font, 10);
         content.newLineAtOffset(margin + 12, cardY + 30);
         content.showText("예약 건수");
         content.newLineAtOffset(0, -16);
-        content.setFont(font, 14);
+        content.setNonStrokingColor(COLOR_PRIMARY);
+        content.setFont(font, 16);
         content.showText(String.valueOf(reservationCount));
         content.endText();
 
         content.beginText();
-        content.setFont(font, 11);
+        content.setNonStrokingColor(COLOR_MUTED);
+        content.setFont(font, 10);
         content.newLineAtOffset(margin + cardWidth + gap + 12, cardY + 30);
         content.showText("일자별 통계 행 수");
         content.newLineAtOffset(0, -16);
-        content.setFont(font, 14);
+        content.setNonStrokingColor(COLOR_PRIMARY);
+        content.setFont(font, 16);
         content.showText(String.valueOf(statsCount));
         content.endText();
 
-        return cardY - 18;
+        return cardY - 16;
     }
 
     private void drawCard(
@@ -851,7 +905,7 @@ private byte[] buildPdf(
         content.setNonStrokingColor(fill);
         content.addRect(x, y, width, height);
         content.fill();
-        content.setStrokingColor(new Color(220, 220, 220));
+        content.setStrokingColor(COLOR_BORDER);
         content.addRect(x, y, width, height);
         content.stroke();
     }
@@ -863,13 +917,17 @@ private byte[] buildPdf(
         float y,
         String title
     ) throws IOException {
-        content.setNonStrokingColor(new Color(30, 58, 95));
-        content.beginText();
-        content.setFont(font, 13);
-        content.newLineAtOffset(margin, y);
-        content.showText(title);
-        content.endText();
-        return y - 18;
+        content.setNonStrokingColor(COLOR_ACCENT);
+        content.addRect(margin, y - 3, 18, 3);
+        content.fill();
+
+        drawBoldText(content, font, 13, margin + 26, y - 1, title, COLOR_PRIMARY);
+
+        content.setStrokingColor(COLOR_BORDER);
+        content.moveTo(margin, y - 12);
+        content.lineTo(margin + 260, y - 12);
+        content.stroke();
+        return y - 22;
     }
 
     private float drawParagraph(
@@ -885,7 +943,7 @@ private byte[] buildPdf(
             cursor.ensureSpace(lineHeight);
             PDPageContentStream content = cursor.getContent();
             content.beginText();
-            content.setNonStrokingColor(Color.BLACK);
+            content.setNonStrokingColor(COLOR_TEXT);
             content.setFont(font, fontSize);
             content.newLineAtOffset(cursor.getMargin(), cursor.getY());
             content.showText(line);
@@ -909,7 +967,7 @@ private byte[] buildPdf(
                 cursor.ensureSpace(lineHeight);
                 PDPageContentStream content = cursor.getContent();
                 content.beginText();
-                content.setNonStrokingColor(Color.BLACK);
+                content.setNonStrokingColor(COLOR_TEXT);
                 content.setFont(font, fontSize);
                 content.newLineAtOffset(cursor.getMargin(), cursor.getY());
                 content.showText(line);
@@ -947,15 +1005,17 @@ private byte[] buildPdf(
             }
 
             if (line.startsWith("### ")) {
-                drawParagraph(cursor, font, stripMarkdown(line.substring(4)), maxWidth, 12, 16);
+                cursor.setY(drawSubheading(cursor, font, stripMarkdown(line.substring(4))));
                 continue;
             }
             if (line.startsWith("## ")) {
-                drawParagraph(cursor, font, stripMarkdown(line.substring(3)), maxWidth, 13, 18);
+                cursor.ensureSpace(22);
+                cursor.setY(drawSectionTitle(cursor.getContent(), font, cursor.getMargin(), cursor.getY(), stripMarkdown(line.substring(3))));
                 continue;
             }
             if (line.startsWith("# ")) {
-                drawParagraph(cursor, font, stripMarkdown(line.substring(2)), maxWidth, 14, 20);
+                cursor.ensureSpace(24);
+                cursor.setY(drawSectionTitle(cursor.getContent(), font, cursor.getMargin(), cursor.getY(), stripMarkdown(line.substring(2))));
                 continue;
             }
 
@@ -967,6 +1027,51 @@ private byte[] buildPdf(
             drawParagraph(cursor, font, stripMarkdown(line), maxWidth, 11, lineHeight);
         }
         return cursor.getY();
+    }
+
+    private float drawSubheading(
+        PdfCursor cursor,
+        PDType0Font font,
+        String text
+    ) throws IOException {
+        int fontSize = 12;
+        int lineHeight = 18;
+        cursor.ensureSpace(lineHeight);
+        drawBoldText(
+            cursor.getContent(),
+            font,
+            fontSize,
+            cursor.getMargin(),
+            cursor.getY(),
+            text,
+            COLOR_PRIMARY
+        );
+        cursor.addY(-lineHeight);
+        return cursor.getY();
+    }
+
+    private void drawBoldText(
+        PDPageContentStream content,
+        PDType0Font font,
+        int fontSize,
+        float x,
+        float y,
+        String text,
+        Color color
+    ) throws IOException {
+        content.beginText();
+        content.setNonStrokingColor(color);
+        content.setFont(font, fontSize);
+        content.newLineAtOffset(x, y);
+        content.showText(text);
+        content.endText();
+
+        content.beginText();
+        content.setNonStrokingColor(color);
+        content.setFont(font, fontSize);
+        content.newLineAtOffset(x + 0.35f, y);
+        content.showText(text);
+        content.endText();
     }
 
     private String stripMarkdown(String text) {
@@ -1233,6 +1338,7 @@ private byte[] buildPdf(
             PDRectangle mediaBox = page.getMediaBox();
             y = mediaBox.getHeight() - margin;
             content = new PDPageContentStream(document, page);
+            RestaurantStatsService.drawPageBackground(content, mediaBox);
         }
     }
 }
