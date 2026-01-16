@@ -2169,10 +2169,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div
-        class="relative overflow-hidden"
-        :class="weatherThemeStyle ? `rounded-3xl ${weatherThemeStyle.wrapperClass}` : ''"
-      >
+      <div class="relative overflow-hidden rounded-3xl">
         <div class="px-4 pt-5 pb-0 shrink-0 bg-[#f8f9fa] -mb-px">
           <div
               v-if="!isLoggedIn"
@@ -2296,7 +2293,7 @@ onBeforeUnmount(() => {
           />
 
           <HomePagination
-              :show="!cafeteriaRecommendations.length && !isTrendingSort && totalPages > 1"
+              :show="!cafeteriaRecommendations.length && !isTrendingSort && (selectedRecommendation === RECOMMEND_WEATHER || totalPages > 1)"
               :pageNumbers="pageNumbers"
               :currentPage="currentPage"
               :canGoPrevious="canGoPrevious"
