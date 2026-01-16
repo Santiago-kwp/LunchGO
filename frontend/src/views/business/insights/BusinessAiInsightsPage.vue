@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import httpRequest from "@/router/httpRequest";
 import BusinessSidebar from "@/components/ui/BusinessSideBar.vue";
 import BusinessHeader from "@/components/ui/BusinessHeader.vue";
+import { useAccountStore } from "@/stores/account";
 import { Line, Bar } from "vue-chartjs";
 import {
   Chart as ChartJS,
@@ -29,6 +30,27 @@ ChartJS.register(
 const route = useRoute();
 const router = useRouter();
 const restaurantId = ref(Number(route.query.restaurantId || 0));
+
+const accountStore = useAccountStore();
+
+const getStoredMember = () => {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem("member");
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+};
+
+const member = computed(() => accountStore.member || getStoredMember());
+
+const userRole = computed(() => {
+  if (member.value?.role === "ROLE_OWNER") return "owner";
+  if (member.value?.role === "ROLE_STAFF") return "staff";
+  return "";
+});
 
 const insight = ref(null);
 const isLoading = ref(false);
@@ -104,6 +126,48 @@ const loadInsights = async () => {
 
 const downloadWeeklyPdf = () => {
   window.print();
+};
+
+const isWeeklyReportLoading = ref(false);
+
+const downloadWeeklyReport = async () => {
+  const rid = await ensureRestaurantId();
+  if (!rid) return alert("권한이 없습니다.");
+
+  const token = localStorage.getItem("accessToken");
+  if (!token) {
+    window.alert("로그인이 필요합니다.");
+    return;
+  }
+
+  if (userRole.value === "ROLE_STAFF")
+    return alert("사업자만 요약서 확인이 가능합니다.");
+
+  if (isWeeklyReportLoading.value) return;
+  isWeeklyReportLoading.value = true;
+
+  try {
+    const response = await httpRequest.get(
+      `/api/business/restaurants/${rid}/stats/weekly.pdf`,
+      null,
+      { responseType: "blob" }
+    );
+
+    const blob = response.data;
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `LunchGo-weekly-stats-${rid}.pdf`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    const status = error?.response?.status ?? "unknown";
+    window.alert(`문제가 발생했습니다. code: ${status}`);
+  } finally {
+    isWeeklyReportLoading.value = false;
+  }
 };
 
 onMounted(loadInsights);
@@ -567,6 +631,26 @@ const cleanSummaryBody = (body) => {
                 ⏰ AI 인사이트는 매일 자정에 한 번 업데이트됩니다.
               </p>
             </div>
+            <button
+              type="button"
+              @click="downloadWeeklyReport"
+              :disabled="isWeeklyReportLoading"
+              :class="[
+                'px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-[#6366F1] via-[#EC4899] to-[#F97316] transition-opacity',
+                isWeeklyReportLoading
+                  ? 'opacity-70 cursor-not-allowed'
+                  : 'hover:opacity-90 cursor-pointer',
+              ]"
+            >
+              <span
+                v-if="isWeeklyReportLoading"
+                class="inline-flex items-center gap-2"
+              >
+                <span class="loading-spinner"></span>
+                AI 요약 생성 중...
+              </span>
+              <span v-else>AI 요약 분석서 PDF 다운로드</span>
+            </button>
           </div>
 
           <div
@@ -990,6 +1074,15 @@ const cleanSummaryBody = (body) => {
   border: 6px solid rgba(255, 107, 74, 0.2);
   border-top-color: #ff6b4a;
   animation: spin 1s linear infinite;
+}
+
+.loading-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  animation: spin 0.8s linear infinite;
 }
 
 .insight-loading-text {
