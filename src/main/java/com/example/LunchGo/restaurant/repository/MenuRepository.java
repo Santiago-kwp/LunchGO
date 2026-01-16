@@ -17,6 +17,8 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
 
     Optional<Menu> findByMenuIdAndRestaurantIdAndIsDeletedFalse(Long menuId, Long restaurantId);
 
+    List<Menu> findAllByMenuIdInAndRestaurantIdAndIsDeletedFalse(List<Long> menuIds, Long restaurantId);
+
     // 참고: `updateMenu` 메서드는 제거되었습니다. 이제 메뉴 업데이트는 `MenuService.updateMenusForRestaurant`에서
     // JPA의 변경 감지(dirty checking) 메커니즘을 통해 처리됩니다. `isDeleted = false` 조건 검사는
     // `findAllByRestaurantIdAndIsDeletedFalse`를 통한 초기 조회 시 암묵적으로 처리됩니다.

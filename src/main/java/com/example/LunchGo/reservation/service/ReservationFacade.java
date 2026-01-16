@@ -12,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
@@ -20,6 +22,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -54,6 +58,23 @@ public class ReservationFacade {
         List<MenuSnapshot> menuSnapshots = new ArrayList<>();
         Integer precalculatedPrepaySum = null;
         if (ReservationType.PREORDER_PREPAY.equals(request.getReservationType())) {
+            // N+1 쿼리 방지를 위해 메뉴 ID 목록을 먼저 추출
+            List<Long> menuIds = request.getMenuItems().stream()
+                    .map(ReservationCreateRequest.MenuItem::getMenuId)
+                    .collect(Collectors.toList());
+
+            // IN 절을 사용해 한 번의 쿼리로 모든 메뉴 정보를 조회
+            List<Menu> foundMenus = menuRepository.findAllByMenuIdInAndRestaurantIdAndIsDeletedFalse(menuIds, request.getRestaurantId());
+
+            // 조회된 메뉴를 Map으로 변환하여 빠른 조회를 지원
+            Map<Long, Menu> menuMap = foundMenus.stream()
+                    .collect(Collectors.toMap(Menu::getMenuId, menu -> menu));
+
+            // 요청된 모든 메뉴가 실제로 조회되었는지 검증
+            if (menuMap.size() != menuIds.size()) {
+                throw new IllegalArgumentException("One or more menus not found or do not belong to the restaurant.");
+            }
+
             int sum = 0;
             for (ReservationCreateRequest.MenuItem mi : request.getMenuItems()) {
                 if (mi == null || mi.getMenuId() == null) {
@@ -63,10 +84,8 @@ public class ReservationFacade {
                     throw new IllegalArgumentException("quantity must be positive");
                 }
 
-                // 메뉴 정보 조회 (ServiceImpl에서 이동)
-                Menu menu = menuRepository
-                        .findByMenuIdAndRestaurantIdAndIsDeletedFalse(mi.getMenuId(), request.getRestaurantId())
-                        .orElseThrow(() -> new IllegalArgumentException("menu not found: " + mi.getMenuId()));
+                // Map에서 메뉴 정보를 가져옴
+                Menu menu = menuMap.get(mi.getMenuId());
 
                 int unitPrice = menu.getPrice() == null ? 0 : menu.getPrice();
                 int qty = mi.getQuantity();
@@ -96,18 +115,19 @@ public class ReservationFacade {
                 precalculatedDepositAmount
         );
 
-        // 3. 후처리 단계: 락 해제 후 실행될 로직 (ServiceImpl에서 이동)
-        //    메인 트랜잭션이 커밋된 후에 수행되어도 무방한 작업을 처리합니다.
-        //    (예: Redis 저장, 알림 발송 등 - 현재는 Redis 저장만 존재)
-
-        // redis에 응답대기로 방문 확정 관련 상태 넣어놓기 (ServiceImpl에서 이동)
-        LocalDateTime slotDateTime = LocalDateTime.of(request.getSlotDate(), request.getSlotTime());
-        long ttlMillis = Duration.between(LocalDateTime.now(), slotDateTime).toMillis();
-        if (ttlMillis < 0) {
-            // 이 상황은 이미 validate에서 걸러지거나, 시간적으로 불가능한 경우이나 방어 코드
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reservation slot time is in the past.");
-        }
-        redisUtil.setDataExpire(String.valueOf(response.getReservationId()), VisitStatus.PENDING.name(), ttlMillis);
+        // 3. 후처리 단계: 트랜잭션 커밋 후 실행될 로직
+        // TransactionSynchronizationManager를 사용하여 트랜잭션이 성공적으로 커밋된 후에 Redis 작업을 실행합니다.
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                // redis에 응답대기로 방문 확정 관련 상태 넣어놓기
+                LocalDateTime slotDateTime = LocalDateTime.of(request.getSlotDate(), request.getSlotTime());
+                long ttlMillis = Duration.between(LocalDateTime.now(), slotDateTime).toMillis();
+                if (ttlMillis > 0) {
+                    redisUtil.setDataExpire(String.valueOf(response.getReservationId()), VisitStatus.PENDING.name(), ttlMillis);
+                }
+            }
+        });
 
         return response;
     }

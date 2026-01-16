@@ -1,16 +1,14 @@
 package com.example.LunchGo.reservation.dto;
 
 import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
 
-@Data
-@NoArgsConstructor
+@Getter
 @AllArgsConstructor
 public class MenuSnapshot {
-    private Long menuId;
-    private String menuName;
-    private Integer unitPrice;
-    private Integer quantity;
-    private Integer lineAmount;
+    private final Long menuId;
+    private final String menuName;
+    private final Integer unitPrice;
+    private final Integer quantity;
+    private final Integer lineAmount;
 }
