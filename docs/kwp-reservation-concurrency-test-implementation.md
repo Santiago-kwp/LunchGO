@@ -248,6 +248,7 @@ docker run --rm -i grafana/k6 run - \
 | T04 | Baseline A (로그인 개선) | per-vu-iterations | VU=10 / 1회 | R=6, 2026-01-16 11:00 | 4 | checks 100%, http_req_failed 20% (4xx 포함) | 418.57 | 0% (5xx) | 0 | k6 avg 240.84ms |
 | T05 | Baseline A (락 TTL 복구) | per-vu-iterations | VU=10 / 1회 | R=6, 2026-01-16 11:00 | 4 | checks 100%, http_req_failed 20% (4xx 포함) | 359.04 | 0% (5xx) | 0 | k6 avg 272.54ms |
 | T06 | Baseline A (분산락/AOP 적용) | per-vu-iterations | VU=100 / 1회 | R=7, 2026-01-16 11:00 | 4 | checks 100%, http_req_failed 45.5% (4xx 포함) | 3690 | 미집계 | 0 | k6 avg 1.86s |
+| T07 | Idempotence (큐 비활성) | per-vu-iterations | VU=2000 / 3회 | R=117, 2026-01-17 11:00 | 4 | checks 100%, http_req_failed 60% (4xx 포함) | 3710 | 0% (5xx) | 0 | 13.6s 완료 |
 
 ## 데드락 대응 후 1회 예약 테스트 결과 (락 TTL 3s → 5s 복구)
 - 변경 사항: 중복 예약 처리 방지용 Redis 락 유효시간을 3초에서 5초로 원상복구.
@@ -258,6 +259,21 @@ docker run --rm -i grafana/k6 run - \
   - checks_succeeded 100% (20/20)
   - http_req_failed 20.00% (4/20, 4xx 포함)
   - http_req_duration avg 272.54ms / p90 357.52ms / p95 359.04ms / max 369.78ms
+
+## 예약 중복(idempotence) 테스트 결과 (큐 비활성)
+- 실행 환경: bastion에서 Docker k6 실행
+- 시나리오: per-vu-iterations, 2000 VU, 사용자당 3회 예약
+- 파라미터: `RESTAURANT_ID=117`, `SLOT_DATE=2026-01-17`, `SLOT_TIME=11:00`, `PARTY_SIZE=4`, `RESERVATION_TYPE=RESERVATION_DEPOSIT`
+- 설정: `LOAD_DURATION=3m`, `USE_LOGIN_QUEUE=false`, `SETUP_TIMEOUT=30m`
+- k6 결과 요약:
+  - checks_succeeded 100% (14,000/14,000)
+  - http_req_failed 60.00% (4xx 포함, idempotence 실패 응답 포함)
+  - http_req_duration avg 1.68s / p90 3.51s / p95 3.71s / max 5.16s
+  - expected_response avg 34.94ms / p90 68.57ms / p95 70.51ms
+  - iterations 6,000 완료, dropped_iterations 0, 완료 시간 약 13.6s
+- 비고:
+  - 사전 로그인(setup) 단계에서 약 2분 20초 소요됨
+  - `http_req_failed`는 4xx가 포함되어 경고로 표시됨 (정상 차단 응답 포함)
   - iteration_duration avg 546.87ms / p95 586.88ms
 - Scouter 원본: `scouter/k6-load-test-once_260112_ttl5.csv`
 - Scouter 분석:
