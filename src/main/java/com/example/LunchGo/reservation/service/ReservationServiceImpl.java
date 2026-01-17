@@ -8,12 +8,16 @@ import com.example.LunchGo.reservation.dto.ReservationCreateResponse;
 import com.example.LunchGo.reservation.exception.DuplicateReservationException;
 import com.example.LunchGo.reservation.mapper.ReservationMapper;
 import com.example.LunchGo.reservation.mapper.row.ReservationCreateRow;
+import com.example.LunchGo.common.util.RedisUtil;
 import lombok.RequiredArgsConstructor;
 import org.apache.ibatis.exceptions.PersistenceException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -28,6 +32,7 @@ public class ReservationServiceImpl implements ReservationService {
     
     private final ReservationMapper reservationMapper;
     private final ReservationSlotService reservationSlotService;
+    private final RedisUtil redisUtil; // 후처리 로직을 위해 RedisUtil 주입
 
     @Override
     @Deprecated
@@ -104,6 +109,22 @@ public class ReservationServiceImpl implements ReservationService {
         if (row == null) {
             throw new IllegalStateException("created reservation not found");
         }
+
+        // 후처리: 트랜잭션 커밋 후 Redis에 방문 상태 TTL 설정
+        // 이 로직은 DB 트랜잭션 성공이 보장된 후에 실행되어야 데이터 정합성이 맞음.
+        // @Transactional 범위 내에서 TransactionSynchronizationManager를 사용하면
+        // 트랜잭션 커밋 직후에 콜백(afterCommit)을 실행할 수 있음.
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                // redis에 응답대기로 방문 확정 관련 상태 넣어놓기
+                LocalDateTime slotDateTime = LocalDateTime.of(request.getSlotDate(), request.getSlotTime());
+                long ttlMillis = Duration.between(LocalDateTime.now(), slotDateTime).toMillis();
+                if (ttlMillis > 0) {
+                    redisUtil.setDataExpire(String.valueOf(row.getReservationId()), VisitStatus.PENDING.name(), ttlMillis);
+                }
+            }
+        });
 
         return new ReservationCreateResponse(
                 row.getReservationId(),

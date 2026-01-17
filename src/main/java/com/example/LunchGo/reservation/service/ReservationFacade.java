@@ -140,20 +140,7 @@ public class ReservationFacade {
                 precalculatedDepositAmount
         );
 
-        // 3. 후처리 단계: 트랜잭션 커밋 후 실행될 로직
-        // TransactionSynchronizationManager를 사용하여 트랜잭션이 성공적으로 커밋된 후에 Redis 작업을 실행합니다.
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                // redis에 응답대기로 방문 확정 관련 상태 넣어놓기
-                LocalDateTime slotDateTime = LocalDateTime.of(request.getSlotDate(), request.getSlotTime());
-                long ttlMillis = Duration.between(LocalDateTime.now(), slotDateTime).toMillis();
-                if (ttlMillis > 0) {
-                    redisUtil.setDataExpire(String.valueOf(response.getReservationId()), VisitStatus.PENDING.name(), ttlMillis);
-                }
-            }
-        });
-
+        // 3. 후처리 단계: 트랜잭션 커밋 후 실행될 로직은 ReservationServiceImpl로 이동됨.
         return response;
     }
 
