@@ -97,7 +97,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/chatbot/**").hasAuthority("ROLE_USER")
 
                         .requestMatchers(HttpMethod.POST, "/api/reservations/*/payments").hasAuthority("ROLE_USER")
-                        .requestMatchers(HttpMethod.PATCH, "/api/reservations/*/complete").hasAuthority("ROLE_OWNER")
+                        .requestMatchers(HttpMethod.PATCH, "/api/reservations/*/complete").hasAnyAuthority("ROLE_OWNER", "ROLE_STAFF")
                         .requestMatchers(HttpMethod.POST, "/api/payments/portone/complete").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.POST, "/api/payments/portone/fail").hasAuthority("ROLE_USER")
                         .requestMatchers(HttpMethod.POST, "/api/payments/portone/requested").hasAuthority("ROLE_USER")
