@@ -51,7 +51,6 @@ public class ReservationFacade {
      * @param request 예약 생성 요청 DTO
      * @return 예약 생성 응답 DTO
      */
-    @Transactional // Facade 전체 로직에 대한 트랜잭션 관리
     public ReservationCreateResponse createReservation(ReservationCreateRequest request) {
         // 1. 전처리 단계: 락이 필요 없는 로직 (ReservationServiceImpl에서 이동)
         //    핵심 락이 걸리기 전에 최대한 많은 작업을 처리하여 락 점유 시간을 단축합니다.

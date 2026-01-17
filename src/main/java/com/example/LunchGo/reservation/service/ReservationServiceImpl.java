@@ -39,7 +39,7 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     @Transactional
     @DistributedLock(
-            lockKey = "'reservation_process_lock:restaurant:' + #request.restaurantId",
+            lockKey = "'reservation_process_lock:restaurant:' + #request.restaurantId + ':slot:' + #request.slotDate + ':' + #request.slotTime",
             userLockKey = "'reservation_lock:' + #request.userId + ':' + #request.restaurantId + ':' + #request.slotDate + ':' + #request.slotTime",
             userLockTime = 5000L
     )
