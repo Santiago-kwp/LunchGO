@@ -66,7 +66,18 @@ public class DistributedLockAop {
             // 대기열 진입: 카운트 증가
             redisUtil.increment(waitingCountKey, 1L);
 
-            boolean available = rLock.tryLock(distributedLock.waitTime(), distributedLock.leaseTime(), distributedLock.timeUnit());
+            boolean available;
+            if (distributedLock.leaseTime() == -1L) {
+                // leaseTime이 -1L이면 Redisson Watchdog 사용
+                // Watchdog은 락을 획득한 스레드가 살아있는 동안 락 만료 시간을 자동으로 연장함.
+                // Redisson의 기본 Watchdog 타임아웃은 30초이며, 10초마다 갱신 시도.
+                // (참고: Watchdog은 락을 연장해주지만, 비즈니스 로직 및 트랜잭션 완료 후 finally 블록에서
+                // rLock.unlock()을 통해 명시적으로 해제되므로 불필요하게 락이 유지되지 않음.)
+                available = rLock.tryLock(distributedLock.waitTime(), distributedLock.timeUnit());
+            } else {
+                // leaseTime이 명시된 경우 해당 시간만큼만 락 점유
+                available = rLock.tryLock(distributedLock.waitTime(), distributedLock.leaseTime(), distributedLock.timeUnit());
+            }
             
             if (!available) {
                 // 대기열 진입 실패 시 (타임아웃)

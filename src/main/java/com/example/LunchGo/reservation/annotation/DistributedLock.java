@@ -31,8 +31,11 @@ public @interface DistributedLock {
 
     /**
      * 식당 락 점유 시간 (Redisson)
+     * Watchdog을 사용하려면 이 값을 -1로 설정하거나 비워둬야 합니다.
+     * Watchdog은 락을 점유한 스레드가 살아있는 동안 자동으로 락 만료 시간을 연장하여,
+     * 트랜잭션이 길어지더라도 락이 조기 해제되는 것을 방지하는 가장 안전한 방법입니다.
      */
-    long leaseTime() default 5L;
+    long leaseTime() default -1L;
 
     /**
      * 개인 락 점유 시간 (Lettuce)
