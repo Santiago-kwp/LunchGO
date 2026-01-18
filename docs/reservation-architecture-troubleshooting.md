@@ -5,25 +5,25 @@
 ## 초기 예약 대기열 구현의 문제점
 
 - 예약 생성에 관한 서비스 로직 내부에 예약 대기열 로직이 추가되면서 예약 생성 트랜잭션의 작업 범위가 증가
-    - ReservationServiceImpl의 create 메서드 내부에 중복 예약 방지 및 예약 대기열 락 설정용 try-catch-finally문까지 포함하면서 코드 길이 증가
-    - create 메서드 구현부의 분량이 늘어나면서 코드의 가독성을 해치고, 동시성 제어 로직과 예약 생성 로직이 뒤섞이면서 유지보수가 어려워짐
+  - ReservationServiceImpl의 create 메서드 내부에 중복 예약 방지 및 예약 대기열 락 설정용 try-catch-finally문까지 포함하면서 코드 길이 증가
+  - create 메서드 구현부의 분량이 늘어나면서 코드의 가독성을 해치고, 동시성 제어 로직과 예약 생성 로직이 뒤섞이면서 유지보수가 어려워짐
 - 서버를 안정시키기 위해 프론트의 예약 대기열에서 재시도 간격을 랜덤화할 시, 예약의 공정성이 훼손될 수 있다는 문제 발생
-    - 서버 안정성 우선시
-        - 프론트에서 예약 대기 시 락 획득 순서 확인용 재시도 간격을 2~4초로 랜덤화 -> 특정 시점에 락 획득 재시도 작업이 집중되지 않도록 분산
-        - 대기 중인 사용자들 간 재시도 시간 랜덤화 + 네트워크 속도 차이로 인해 본래 예약 순서가 뒤바뀔 가능성 존재 -> 선착순 예약 보장 불가
-    - 선착순 예약 방침을 유지할 시
-        - 예약 생성 트랜잭션 진행 도중 락을 획득하기 때문에 락 대기 시간으로 인해 서버에 가해지는 부하가 증가
+  - 서버 안정성 우선시
+    - 프론트에서 예약 대기 시 락 획득 순서 확인용 재시도 간격을 2~4초로 랜덤화 -> 특정 시점에 락 획득 재시도 작업이 집중되지 않도록 분산
+    - 대기 중인 사용자들 간 재시도 시간 랜덤화 + 네트워크 속도 차이로 인해 본래 예약 순서가 뒤바뀔 가능성 존재 -> 선착순 예약 보장 불가
+  - 선착순 예약 방침을 유지할 시
+    - 예약 생성 트랜잭션 진행 도중 락을 획득하기 때문에 락 대기 시간으로 인해 서버에 가해지는 부하가 증가
 
 ---
 
 ## 문제의 주요 원인: 락 설정 시점의 문제
 
 - 예약 생성 트랜잭션 내부에 예약 대기열 로직을 포함시킨 것이 문제의 주요 원인
-    - 기존 예약 생성 로직: 예약 생성 트랜잭션 시작(DB 커넥션 수립) -> 예약 대기열 진입(락 획득/대기)
-    - 위와 같이 진행할 경우 이미 DB 커넥션을 확보한 상태에서 락 획득을 위해 대기 -> 커넥션 낭비를 유발
-        - 동시에 DB의 커넥션 개수보다 더 많은 예약 요청이 들어올 경우, DB 커넥션이 고갈되는 문제를 유발
-    - 프론트의 재시도 로직 랜덤화로 인한 예약 순서 변경 문제도 결국 기존 구조를 유지하면서 서버의 부하를 최소화하는 과정에서 발생한 문제
-    - 부가적으로, 예약 생성 트랜잭션 내부에 예약 대기열 로직을 포함시키면서 트랜잭션의 길이도 증가하는 문제도 유발
+  - 기존 예약 생성 로직: 예약 생성 트랜잭션 시작(DB 커넥션 수립) -> 예약 대기열 진입(락 획득/대기)
+  - 위와 같이 진행할 경우 이미 DB 커넥션을 확보한 상태에서 락 획득을 위해 대기 -> 커넥션 낭비를 유발
+    - 동시에 DB의 커넥션 개수보다 더 많은 예약 요청이 들어올 경우, DB 커넥션이 고갈되는 문제를 유발
+  - 프론트의 재시도 로직 랜덤화로 인한 예약 순서 변경 문제도 결국 기존 구조를 유지하면서 서버의 부하를 최소화하는 과정에서 발생한 문제
+  - 부가적으로, 예약 생성 트랜잭션 내부에 예약 대기열 로직을 포함시키면서 트랜잭션의 길이도 증가하는 문제도 유발
 
 ---
 
@@ -113,7 +113,7 @@ public class DistributedLockAop {
         // SpEL 파싱하여 키 생성
         String lockKey = (String) CustomSpringELParser.getDynamicValue(
                 signature.getParameterNames(), joinPoint.getArgs(), distributedLock.lockKey());
-        
+
         String userLockKey = null;
         if (StringUtils.hasText(distributedLock.userLockKey())) {
             userLockKey = (String) CustomSpringELParser.getDynamicValue(
@@ -148,14 +148,14 @@ public class DistributedLockAop {
                 // leaseTime이 명시된 경우 해당 시간만큼만 락 점유
                 available = rLock.tryLock(distributedLock.waitTime(), distributedLock.leaseTime(), distributedLock.timeUnit());
             }
-            
+
             if (!available) {
                 // 대기열 진입 실패 시 (타임아웃)
                 // 개인 락 해제하여 재시도 허용
                 if (userLockKey != null) {
                     redisUtil.deleteData(userLockKey);
                 }
-                
+
                 // 현재 대기 인원 조회
                 long currentWaitingCount = redisUtil.getCount(waitingCountKey);
                 throw new WaitingReservationException("접속자가 많아 대기 중입니다. 잠시 후 자동으로 재시도합니다.", currentWaitingCount);
@@ -178,7 +178,7 @@ public class DistributedLockAop {
             }
             // 작업 종료(성공/실패/포기) 후 대기열 이탈: 카운트 감소
             redisUtil.decrement(waitingCountKey, 1L);
-            
+
             // 개인 락은 성공 시 해제하지 않음 (TTL 유지)
             // 단, 예외가 발생해서 여기까지 왔다면(catch 블록을 거치지 않은 런타임 예외 등) 해제해야 할 수도 있지만,
             // 현재 로직상 성공 시에는 유지하는 것이 정책이므로 그대로 둠.
@@ -246,7 +246,7 @@ public @interface DistributedLock {
     @Transactional
     /**
      * 분산 락(AOP)을 사용하여 예약을 안전하게 생성합니다.(동시성 락 처리 관련 코드는 DistributedLockAop 클래스에서 확인 가능)
-     * 
+     *
      * [이중 락 구조]
      * 1. userLockKey: 동일 유저의 5초 내 중복 요청(따닥)을 즉시 차단 (Fail-Fast)
      * 2. lockKey: 해당 식당의 전체 예약 처리를 순차적으로 제어하여 DB 부하 방지 및 데이터 정합성 보장 (Waiting Queue)
@@ -385,24 +385,24 @@ public @interface DistributedLock {
 
 ### 원인
 
-- 예약 생성 시 락을 획득한 상태에서 진행해야 할 작업의 범위가 넓었던 것이 주요 원인 
+- 예약 생성 시 락을 획득한 상태에서 진행해야 할 작업의 범위가 넓었던 것이 주요 원인
   - 예약 생성 트랜잭션 내부에 락을 적용할 필요가 없는 예약 생성 로직까지 포함
   - 사용자 1명이 락 획득 후 예약 신청을 진행하는 동안, 다른 사용자들은 락을 획득할 때까지 대기
   - 즉, 락을 획득한 후 예약 생성 트랜잭션에서 처리해야 할 작업이 많아지면 다른 사용자들의 대기시간도 증가하는 문제를 유발
 
 ### 해결 방안 - 락 적용 구간의 단축
 
-- 락을 획득하기 위한 대기시간을 줄이기 위해, 신규 예약 생성 시, 락을 획득한 상태로 진행해야 할 구간을 단축시키는 방향으로 개선  
+- 락을 획득하기 위한 대기시간을 줄이기 위해, 신규 예약 생성 시, 락을 획득한 상태로 진행해야 할 구간을 단축시키는 방향으로 개선
 - 예약 생성에 관한 서비스 로직 중 락을 걸고 진행해야 할 작업과 그렇지 않은 작업들을 구분하고, 락을 걸 필요가 없는 작업들만 기존 예약 트랜잭션에서 분리
   - 락 필수: 예약할 시간대에 해당하는 예약 슬롯 조회(비관적 락 획득), 중복 예약 사전 검증, 신규 예약 등록, 선주문/선결제 메뉴 등록, 방문상태 ttl 설정
-  - 락 불필요: 잔여석 사전 검증, 예약금 및 선주문/선결제 금액 계산 등 
+  - 락 불필요: 잔여석 사전 검증, 예약금 및 선주문/선결제 금액 계산 등
     - 신규 예약 신청 전 전처리 작업들에 해당
 - 예약 생성 로직 중 락을 걸 구간을 단축하고 동시 처리량을 늘리기 위해 Facade 패턴을 활용
   - ReservationFacade 클래스의 `createReservation` 메서드
     - 예약 생성 시, 락을 걸 필요가 없는 모든 사전 작업을 담당
     - 다소 시간이 걸리지만 동시성 제어가 불필요한 작업들을 락 획득 이전에 미리 처리하여, 락을 적용하고 실행해야 하는 구간을 단축
   - ReservationServiceImpl 클래스의 `createReservationLocked` 메서드
-    - 예약 생성 시, 반드시 락이 필요한 핵심 작업을 수행 
+    - 예약 생성 시, 반드시 락이 필요한 핵심 작업을 수행
     - 예약 생성 로직의 임계 영역에 해당
 
 ### 구현 코드
@@ -526,7 +526,6 @@ public @interface DistributedLock {
 ```
 
 </details>
-
 
 <details>
 
@@ -652,16 +651,16 @@ sequenceDiagram
     participant DB as Database
 
     Client->>Facade: 1. 예약 요청 (Request)
-    
+
     activate Facade
     Facade->>Facade: 2. 전처리 (검증 등)
-    
+
     Note over Facade, LockAop: 3. 핵심 로직 호출 (Facade -> Service)
 
     %% AOP: Lock Acquisition
     Facade->>LockAop: 메서드 진입 가로채기
     activate LockAop
-    
+
     LockAop->>Redis: 4. tryLock (락 획득 시도)
     activate Redis
     Redis-->>LockAop: 락 획득 성공 (True)
@@ -671,14 +670,14 @@ sequenceDiagram
     LockAop->>TxMgr: 5. 트랜잭션 시작 요청
     activate TxMgr
     TxMgr->>DB: DB Transaction Begin
-    
+
     %% Business Logic
     TxMgr->>Service: 6. 비즈니스 로직 실행
     activate Service
-    
+
     Service->>DB: 조회 및 상태 변경 (INSERT/UPDATE)
     DB-->>Service: 결과 반환
-    
+
     Service-->>TxMgr: 로직 완료
     deactivate Service
 
@@ -701,4 +700,3 @@ sequenceDiagram
     Facade-->>Client: 9. 응답 (Response)
     deactivate Facade
 ```
-
