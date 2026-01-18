@@ -824,7 +824,8 @@ private byte[] buildPdf(
                     )
                 );
                 cursor.setY(cursor.getY() - 4);
-                cursor.setY(drawMarkdownSection(cursor, font, aiSummary, contentWidth, 14));
+                String safeSummary = sanitizeForPdf(aiSummary);
+                cursor.setY(drawMarkdownSection(cursor, font, safeSummary, contentWidth, 14));
             } finally {
                 if (cursor.getContent() != null) {
                     cursor.getContent().close();
@@ -842,6 +843,14 @@ private byte[] buildPdf(
         content.setNonStrokingColor(COLOR_BG);
         content.addRect(0, 0, mediaBox.getWidth(), mediaBox.getHeight());
         content.fill();
+    }
+
+    private static String sanitizeForPdf(String s) {
+        if (s == null) {
+            return "";
+        }
+        // Remove surrogate pairs (most emoji) to avoid PDF glyph errors.
+        return s.replaceAll("[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]", "");
     }
 
     private List<String> wrapText(String text, PDType0Font font, int fontSize, float maxWidth) throws IOException {
