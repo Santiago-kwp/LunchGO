@@ -407,6 +407,8 @@ public @interface DistributedLock {
 
 ### 구현 코드
 
+[refactor(reservation): 예약 생성 로직 facade 패턴 적용 #526](https://github.com/SSG9-FINAL-LunchGO/LunchGO/pull/526)
+
 <details>
 
 <summary>ReservationFacade 클래스 내 createReservation() 메서드</summary>
