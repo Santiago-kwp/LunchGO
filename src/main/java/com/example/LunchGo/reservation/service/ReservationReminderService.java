@@ -39,8 +39,8 @@ public class ReservationReminderService {
             int marked = reservationMapper.tryMarkReminderSent(t.getReservationId(), token);
             if (marked != 1) continue;
 
-            String visitUrl = publicBaseUrl + "/reminders/visit?token=" + enc(token);
-            String cancelUrl = publicBaseUrl + "/reminders/cancel?token=" + enc(token);
+            String visitUrl  = publicBaseUrl + "/reminder-visit.html?token=" + enc(token);
+            String cancelUrl = publicBaseUrl + "/reminder-cancel.html?token=" + enc(token);
 
             LocalDateTime slot = LocalDateTime.of(t.getSlotDate(), t.getSlotTime());
             String when = slot.format(DT);
