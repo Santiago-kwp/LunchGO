@@ -849,15 +849,34 @@ private byte[] buildPdf(
         if (s == null) {
             return "";
         }
-        // Remove surrogate pairs (most emoji) to avoid PDF glyph errors.
-        return s.replaceAll("[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]", "");
+        StringBuilder sanitized = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); ) {
+            int codePoint = s.codePointAt(i);
+            i += Character.charCount(codePoint);
+            // Drop any surrogate remnants, supplemental code points, joiners, or symbol emojis.
+            if (codePoint >= 0xD800 && codePoint <= 0xDFFF) {
+                continue;
+            }
+            if (codePoint > 0xFFFF) {
+                continue;
+            }
+            if (codePoint == 0xFE0F || codePoint == 0xFE0E || codePoint == 0x200D) {
+                continue;
+            }
+            if (Character.getType(codePoint) == Character.OTHER_SYMBOL) {
+                continue;
+            }
+            sanitized.appendCodePoint(codePoint);
+        }
+        return sanitized.toString();
     }
 
     private List<String> wrapText(String text, PDType0Font font, int fontSize, float maxWidth) throws IOException {
-        if (text == null || text.isBlank()) {
+        String safeText = sanitizeForPdf(text);
+        if (safeText.isBlank()) {
             return List.of("");
         }
-        String[] rawLines = text.replace("\r", "").split("\n");
+        String[] rawLines = safeText.replace("\r", "").split("\n");
         java.util.ArrayList<String> lines = new java.util.ArrayList<>();
         for (String raw : rawLines) {
             String line = raw.trim();
@@ -920,14 +939,14 @@ private byte[] buildPdf(
         content.setNonStrokingColor(COLOR_PRIMARY);
         content.setFont(font, 18);
         content.newLineAtOffset(margin, y - 30);
-        content.showText("주간 식당 통계 리포트");
+        showTextSafe(content, "주간 식당 통계 리포트");
         content.endText();
 
         content.beginText();
         content.setNonStrokingColor(COLOR_MUTED);
         content.setFont(font, 12);
         content.newLineAtOffset(margin, y - 54);
-        content.showText("기간: " + start + " ~ " + end);
+        showTextSafe(content, "기간: " + start + " ~ " + end);
         content.endText();
 
         String meta = "식당 ID: " + restaurantId;
@@ -967,22 +986,22 @@ private byte[] buildPdf(
         content.setNonStrokingColor(COLOR_MUTED);
         content.setFont(font, 10);
         content.newLineAtOffset(margin + 12, cardY + 30);
-        content.showText("예약 건수");
+        showTextSafe(content, "예약 건수");
         content.newLineAtOffset(0, -16);
         content.setNonStrokingColor(COLOR_PRIMARY);
         content.setFont(font, 16);
-        content.showText(String.valueOf(reservationCount));
+        showTextSafe(content, String.valueOf(reservationCount));
         content.endText();
 
         content.beginText();
         content.setNonStrokingColor(COLOR_MUTED);
         content.setFont(font, 10);
         content.newLineAtOffset(margin + cardWidth + gap + 12, cardY + 30);
-        content.showText("일자별 통계 행 수");
+        showTextSafe(content, "일자별 통계 행 수");
         content.newLineAtOffset(0, -16);
         content.setNonStrokingColor(COLOR_PRIMARY);
         content.setFont(font, 16);
-        content.showText(String.valueOf(statsCount));
+        showTextSafe(content, String.valueOf(statsCount));
         content.endText();
 
         return cardY - 16;
@@ -1040,7 +1059,7 @@ private byte[] buildPdf(
             content.setNonStrokingColor(COLOR_TEXT);
             content.setFont(font, fontSize);
             content.newLineAtOffset(cursor.getMargin(), cursor.getY());
-            content.showText(line);
+            showTextSafe(content, line);
             content.endText();
             cursor.addY(-lineHeight);
         }
@@ -1064,7 +1083,7 @@ private byte[] buildPdf(
                 content.setNonStrokingColor(COLOR_TEXT);
                 content.setFont(font, fontSize);
                 content.newLineAtOffset(cursor.getMargin(), cursor.getY());
-                content.showText(line);
+                showTextSafe(content, line);
                 content.endText();
                 cursor.addY(-lineHeight);
             }
@@ -1157,15 +1176,19 @@ private byte[] buildPdf(
         content.setNonStrokingColor(color);
         content.setFont(font, fontSize);
         content.newLineAtOffset(x, y);
-        content.showText(text);
+        showTextSafe(content, text);
         content.endText();
 
         content.beginText();
         content.setNonStrokingColor(color);
         content.setFont(font, fontSize);
         content.newLineAtOffset(x + 0.35f, y);
-        content.showText(text);
+        showTextSafe(content, text);
         content.endText();
+    }
+
+    private void showTextSafe(PDPageContentStream content, String text) throws IOException {
+        content.showText(sanitizeForPdf(text));
     }
 
     private String stripMarkdown(String text) {
@@ -1249,7 +1272,8 @@ private byte[] buildPdf(
     }
 
     private float getTextWidth(PDType0Font font, int fontSize, String text) throws IOException {
-        return font.getStringWidth(text) / 1000f * fontSize;
+        String safeText = sanitizeForPdf(text);
+        return font.getStringWidth(safeText) / 1000f * fontSize;
     }
 
     /**
