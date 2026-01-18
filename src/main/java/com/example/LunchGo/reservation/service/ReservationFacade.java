@@ -44,9 +44,8 @@ public class ReservationFacade {
     private final RedisUtil redisUtil; // 후처리: Redis 저장용
 
     /**
-     * Facade 패턴의 새로운 예약 생성 진입점.
-     * 예약 생성의 전체적인 흐름을 관리하며, 락이 필요 없는 로직은 여기서 처리하고
-     * 락이 필요한 핵심 로직은 ReservationServiceImpl에 위임합니다.
+     * Facade 패턴의 새로운 예약 생성 진입점. 예약 생성의 전체적인 흐름을 관리하며, 락이 필요 없는 로직은 여기서 처리하고 락이 필요한 핵심 로직은 ReservationServiceImpl에
+     * 위임합니다.
      *
      * @param request 예약 생성 요청 DTO
      * @return 예약 생성 응답 DTO
@@ -64,7 +63,8 @@ public class ReservationFacade {
                 .orElse(DEFAULT_MAX_CAPACITY); // 기본값 DEFAULT_MAX_CAPACITY (ReservationFacade 내부에 정의)
 
         // 2. Redis 키 정의
-        String redisSeatKey = RedisUtil.generateSeatKey(request.getRestaurantId(), request.getSlotDate(), request.getSlotTime());
+        String redisSeatKey = RedisUtil.generateSeatKey(request.getRestaurantId(), request.getSlotDate(),
+                request.getSlotTime());
 
         // 3. SETNX를 사용한 원자적 초기화 (키가 없을 때만 실행)
         // TTL은 24시간으로 넉넉하게 설정
@@ -79,74 +79,83 @@ public class ReservationFacade {
             throw new SlotCapacityExceededException("잔여석이 부족합니다. (Redis 사전 검증)");
         }
 
-        // 선주문/선결제 메뉴 처리 및 금액 계산 (ServiceImpl에서 이동)
-        List<MenuSnapshot> menuSnapshots = new ArrayList<>();
-        Integer precalculatedPrepaySum = null;
-        if (ReservationType.PREORDER_PREPAY.equals(request.getReservationType())) {
-            // N+1 쿼리 방지를 위해 메뉴 ID 목록을 먼저 추출
-            List<Long> menuIds = request.getMenuItems().stream()
-                    .map(ReservationCreateRequest.MenuItem::getMenuId)
-                    .collect(Collectors.toList());
+        try {
+            // 선주문/선결제 메뉴 처리 및 금액 계산 (ServiceImpl에서 이동)
+            List<MenuSnapshot> menuSnapshots = new ArrayList<>();
+            Integer precalculatedPrepaySum = null;
+            if (ReservationType.PREORDER_PREPAY.equals(request.getReservationType())) {
+                // N+1 쿼리 방지를 위해 메뉴 ID 목록을 먼저 추출
+                List<Long> menuIds = request.getMenuItems().stream()
+                        .map(ReservationCreateRequest.MenuItem::getMenuId)
+                        .collect(Collectors.toList());
 
-            // IN 절을 사용해 한 번의 쿼리로 모든 메뉴 정보를 조회
-            List<Menu> foundMenus = menuRepository.findAllByMenuIdInAndRestaurantIdAndIsDeletedFalse(menuIds, request.getRestaurantId());
+                // IN 절을 사용해 한 번의 쿼리로 모든 메뉴 정보를 조회
+                List<Menu> foundMenus = menuRepository.findAllByMenuIdInAndRestaurantIdAndIsDeletedFalse(menuIds,
+                        request.getRestaurantId());
 
-            // 조회된 메뉴를 Map으로 변환하여 빠른 조회를 지원
-            Map<Long, Menu> menuMap = foundMenus.stream()
-                    .collect(Collectors.toMap(Menu::getMenuId, menu -> menu));
+                // 조회된 메뉴를 Map으로 변환하여 빠른 조회를 지원
+                Map<Long, Menu> menuMap = foundMenus.stream()
+                        .collect(Collectors.toMap(Menu::getMenuId, menu -> menu));
 
-            // 요청된 모든 메뉴가 실제로 조회되었는지 검증
-            if (menuMap.size() != menuIds.size()) {
-                throw new IllegalArgumentException("One or more menus not found or do not belong to the restaurant.");
-            }
-
-            int sum = 0;
-            for (ReservationCreateRequest.MenuItem mi : request.getMenuItems()) {
-                if (mi == null || mi.getMenuId() == null) {
-                    throw new IllegalArgumentException("menuId is required");
-                }
-                if (mi.getQuantity() == null || mi.getQuantity() <= 0) {
-                    throw new IllegalArgumentException("quantity must be positive");
+                // 요청된 모든 메뉴가 실제로 조회되었는지 검증
+                if (menuMap.size() != menuIds.size()) {
+                    throw new IllegalArgumentException(
+                            "One or more menus not found or do not belong to the restaurant.");
                 }
 
-                // Map에서 메뉴 정보를 가져옴
-                Menu menu = menuMap.get(mi.getMenuId());
+                int sum = 0;
+                for (ReservationCreateRequest.MenuItem mi : request.getMenuItems()) {
+                    if (mi == null || mi.getMenuId() == null) {
+                        throw new IllegalArgumentException("menuId is required");
+                    }
+                    if (mi.getQuantity() == null || mi.getQuantity() <= 0) {
+                        throw new IllegalArgumentException("quantity must be positive");
+                    }
 
-                int unitPrice = menu.getPrice() == null ? 0 : menu.getPrice();
-                int qty = mi.getQuantity();
-                int lineAmount = unitPrice * qty;
-                sum += lineAmount;
+                    // Map에서 메뉴 정보를 가져옴
+                    Menu menu = menuMap.get(mi.getMenuId());
 
-                menuSnapshots.add(new MenuSnapshot(menu.getMenuId(), menu.getName(), unitPrice, qty, lineAmount));
+                    int unitPrice = menu.getPrice() == null ? 0 : menu.getPrice();
+                    int qty = mi.getQuantity();
+                    int lineAmount = unitPrice * qty;
+                    sum += lineAmount;
+
+                    menuSnapshots.add(new MenuSnapshot(menu.getMenuId(), menu.getName(), unitPrice, qty, lineAmount));
+                }
+                precalculatedPrepaySum = sum;
             }
-            precalculatedPrepaySum = sum;
+
+            // 예약금 계산 (ServiceImpl에서 이동)
+            Integer precalculatedDepositAmount = null;
+            if (ReservationType.RESERVATION_DEPOSIT.equals(request.getReservationType())) {
+                int perPerson = request.getPartySize() >= DEPOSIT_LARGE_THRESHOLD
+                        ? DEPOSIT_PER_PERSON_LARGE
+                        : DEPOSIT_PER_PERSON_DEFAULT;
+                precalculatedDepositAmount = perPerson * request.getPartySize();
+            }
+
+            // 2. 핵심 로직 호출 단계: 락이 필요한 로직은 ServiceImpl에 위임
+            //    락이 걸린 ServiceImpl의 메서드를 호출하여, 동시성 제어가 필요한 DB 작업을 수행합니다.
+            ReservationCreateResponse response = reservationService.createReservationLocked(
+                    request,
+                    precalculatedPrepaySum,
+                    menuSnapshots,
+                    precalculatedDepositAmount
+            );
+
+            // 3. 후처리 단계: 트랜잭션 커밋 후 실행될 로직은 ReservationServiceImpl로 이동됨.
+            return response;
+        } catch (Exception e) {
+            // 핵심 로직 실패 시, 미리 감소시킨 Redis 좌석 수를 원상 복구 (보상 트랜잭션)
+            redisUtil.increment(redisSeatKey, request.getPartySize());
+            // 원래 예외를 다시 던져서 클라이언트에게 실패를 알림
+            throw e;
         }
-
-        // 예약금 계산 (ServiceImpl에서 이동)
-        Integer precalculatedDepositAmount = null;
-        if (ReservationType.RESERVATION_DEPOSIT.equals(request.getReservationType())) {
-            int perPerson = request.getPartySize() >= DEPOSIT_LARGE_THRESHOLD
-                    ? DEPOSIT_PER_PERSON_LARGE
-                    : DEPOSIT_PER_PERSON_DEFAULT;
-            precalculatedDepositAmount = perPerson * request.getPartySize();
-        }
-
-        // 2. 핵심 로직 호출 단계: 락이 필요한 로직은 ServiceImpl에 위임
-        //    락이 걸린 ServiceImpl의 메서드를 호출하여, 동시성 제어가 필요한 DB 작업을 수행합니다.
-        ReservationCreateResponse response = reservationService.createReservationLocked(
-                request,
-                precalculatedPrepaySum,
-                menuSnapshots,
-                precalculatedDepositAmount
-        );
-
-        // 3. 후처리 단계: 트랜잭션 커밋 후 실행될 로직은 ReservationServiceImpl로 이동됨.
-        return response;
     }
 
     /**
-     * 예약 요청 유효성 검증 메서드. (ServiceImpl에서 이동)
-     * 락이 걸리기 전에 호출되어 기본적인 요청 데이터의 유효성을 확인합니다.
+     * 예약 요청 유효성 검증 메서드. (ServiceImpl에서 이동) 락이 걸리기 전에 호출되어 기본적인 요청 데이터의 유효성을 확인합니다.
+     *
      * @param request 예약 생성 요청 DTO
      */
     private static void validate(ReservationCreateRequest request) {
