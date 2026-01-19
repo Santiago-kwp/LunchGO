@@ -64,19 +64,15 @@ public class ReservationFacade {
                 request.getSlotTime());
 
         if (!redisUtil.existData(redisSeatKey)) {
-            try {
-                // Just-in-Time Redis Counter Initialization & Pre-Check
-                // 2. 이 슬롯의 최대 정원을 DB에서 조회 (락 없이)
-                Integer maxCapacity = restaurantRepository.findReservationLimitByRestaurantId(request.getRestaurantId())
-                        .orElse(DEFAULT_MAX_CAPACITY); // 기본값 DEFAULT_MAX_CAPACITY (ReservationFacade 내부에 정의)
+            // Just-in-Time Redis Counter Initialization & Pre-Check
+            // 2. 이 슬롯의 최대 정원을 DB에서 조회 (락 없이)
+            Integer maxCapacity = restaurantRepository.findReservationLimitByRestaurantId(request.getRestaurantId())
+                    .orElse(DEFAULT_MAX_CAPACITY); // 기본값 DEFAULT_MAX_CAPACITY (ReservationFacade 내부에 정의)
 
-                // 3. SETNX를 사용한 원자적 초기화 (키가 없을 때만 실행)
-                // TTL은 24시간으로 넉넉하게 설정
-                redisUtil.setIfAbsent(redisSeatKey, String.valueOf(maxCapacity), REDIS_SEAT_KEY_TTL_MILLIS);
-                log.info("예약 슬롯 데이터 캐싱: {}", redisSeatKey);
-            } catch (Exception e) {
-                // DB 조회나 Redis 연결 실패 시의 예외 처리 (로그 등)
-            }
+            // 3. SETNX를 사용한 원자적 초기화 (키가 없을 때만 실행)
+            // TTL은 24시간으로 넉넉하게 설정
+            redisUtil.setIfAbsent(redisSeatKey, String.valueOf(maxCapacity), REDIS_SEAT_KEY_TTL_MILLIS);
+            log.info("예약 슬롯 데이터 캐싱: {}", redisSeatKey);
         }
 
         // 4. Redis 좌석 사전 검증 (빠른 Fail-Fast)
