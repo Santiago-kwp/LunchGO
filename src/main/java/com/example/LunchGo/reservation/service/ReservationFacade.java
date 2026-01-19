@@ -11,6 +11,7 @@ import com.example.LunchGo.restaurant.repository.MenuRepository;
 import com.example.LunchGo.reservation.exception.SlotCapacityExceededException;
 import com.example.LunchGo.restaurant.repository.RestaurantRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReservationFacade {
@@ -57,18 +59,21 @@ public class ReservationFacade {
         // 요청 유효성 검증 (ServiceImpl에서 이동)
         validate(request);
 
-        // Just-in-Time Redis Counter Initialization & Pre-Check
-        // 1. 이 슬롯의 최대 정원을 DB에서 조회 (락 없이)
-        Integer maxCapacity = restaurantRepository.findReservationLimitByRestaurantId(request.getRestaurantId())
-                .orElse(DEFAULT_MAX_CAPACITY); // 기본값 DEFAULT_MAX_CAPACITY (ReservationFacade 내부에 정의)
-
-        // 2. Redis 키 정의
+        // 1. Redis 키 정의
         String redisSeatKey = RedisUtil.generateSeatKey(request.getRestaurantId(), request.getSlotDate(),
                 request.getSlotTime());
 
-        // 3. SETNX를 사용한 원자적 초기화 (키가 없을 때만 실행)
-        // TTL은 24시간으로 넉넉하게 설정
-        redisUtil.setIfAbsent(redisSeatKey, String.valueOf(maxCapacity), REDIS_SEAT_KEY_TTL_MILLIS);
+        if (!redisUtil.existData(redisSeatKey)) {
+            // Just-in-Time Redis Counter Initialization & Pre-Check
+            // 2. 이 슬롯의 최대 정원을 DB에서 조회 (락 없이)
+            Integer maxCapacity = restaurantRepository.findReservationLimitByRestaurantId(request.getRestaurantId())
+                    .orElse(DEFAULT_MAX_CAPACITY); // 기본값 DEFAULT_MAX_CAPACITY (ReservationFacade 내부에 정의)
+
+            // 3. SETNX를 사용한 원자적 초기화 (키가 없을 때만 실행)
+            // TTL은 24시간으로 넉넉하게 설정
+            redisUtil.setIfAbsent(redisSeatKey, String.valueOf(maxCapacity), REDIS_SEAT_KEY_TTL_MILLIS);
+            log.info("예약 슬롯 데이터 캐싱: {}", redisSeatKey);
+        }
 
         // 4. Redis 좌석 사전 검증 (빠른 Fail-Fast)
         Long remainingSeats = redisUtil.decrement(redisSeatKey, request.getPartySize());
