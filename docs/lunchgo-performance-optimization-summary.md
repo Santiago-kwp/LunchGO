@@ -1,6 +1,6 @@
 # LunchGO 성능 최적화 정리
 
-본 문서는 `docs/*improvement.md`, `docs/*optimization.md`, `docs/*implemntation.md`를 기반으로
+본 문서는 `docs/*improvement.md`, `docs/*optimization.md`, `docs/*implementation.md`를 기반으로
 LunchGO에서 수행한 성능 최적화 작업을 계층별로 정리한 초안이다.
 각 항목은 적용 내용, 기대 효과, 측정 지표를 포함하며, 출처 문서를 명시한다.
 
