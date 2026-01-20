@@ -9,30 +9,55 @@ System-Architecture 문서의 3-Tier 구성을 기준으로 한다.
 ```mermaid
 flowchart LR
   User[User Browser]
+  Admin[Ops PC]
+  LocalTunnel[SSH Tunnel]
+  Slack[Slack]
   OS[Object Storage]
 
   subgraph VPC[NCP VPC]
-    subgraph PublicSubnet[Public Subnet]
+    subgraph PublicSubnet[Public Subnet - Bastion]
       Nginx[Nginx Gateway]
+      Prometheus[Prometheus]
+      Grafana[Grafana]
     end
     subgraph PrivateSubnet[Private Subnet]
       WAS[Spring Boot WAS]
-      MySQL[MySQL Container]
-      Redis[Redis Container]
+      MySQL[(MySQL)]
+      Redis[(Redis)]
+      MySQLExporter[MySQL Exporter]
+      RedisExporter[Redis Exporter]
+      ScouterServer[Scouter Collector]
+      ScouterWeb[Scouter Webapp]
       NAT[NAT Gateway]
     end
   end
 
   User -->|Static assets| OS
   User -->|API requests| Nginx
+  Admin -->|Scouter UI /scouter| Nginx
+  Admin -->|SSH -L 6100/6180/6188| LocalTunnel
+  LocalTunnel -->|Forward 6100/6180/6188| ScouterServer
   Nginx -->|Proxy /api| WAS
+  Nginx -->|Proxy /scouter| ScouterWeb
   WAS --> MySQL
   WAS --> Redis
   WAS -->|Outbound| NAT
+
+  Prometheus -->|Scrape 9104| MySQLExporter
+  Prometheus -->|Scrape 9121| RedisExporter
+  MySQLExporter --> MySQL
+  RedisExporter --> Redis
+  Grafana -->|Query| Prometheus
+
+  WAS -->|APM Agent 6100| ScouterServer
+  ScouterWeb --> ScouterServer
+  Admin -->|3000/9090| Grafana
+  Admin -->|3000/9090| Prometheus
+  ScouterServer -->|Alert Webhook| Slack
 ```
 
 - 프론트엔드: Object Storage 정적 웹 호스팅
-- 게이트웨이: Public Subnet의 Nginx (Reverse Proxy + SSL + Bastion)
+- 게이트웨이: Public Subnet의 Nginx (Reverse Proxy + CORS preflight + gzip/keepalive, 현재 SSL 미적용)
 - 백엔드: Private Subnet의 Spring Boot WAS
 - 데이터: Private Subnet의 MySQL/Redis 컨테이너
 - 외부 통신: NAT Gateway 통해 Outbound 허용
@@ -40,7 +65,7 @@ flowchart LR
 ## 배포 대상 컴포넌트
 - 프론트엔드(Vue): `npm run build` 결과물(Object Storage 업로드)
 - 백엔드(Spring Boot): Docker 컨테이너
-- Nginx Gateway: Reverse Proxy 설정 + SSL
+- Nginx Gateway: Reverse Proxy 설정 (CORS preflight, gzip, keepalive, /scouter) + SSL 미적용 상태
 - Cloud DB(MySQL), Redis
 
 ## 코드/설정 변경 필요 항목
@@ -58,8 +83,8 @@ registry.addMapping("/**")
     .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
 ```
 
-API 베이스 URL (임시)
-- `http://101.79.9.218`
+API 베이스 URL (현재)
+- `http://101.79.9.218` (Nginx Public IP)
 
 ### 2) 프로덕션 환경 설정 분리
 DB/Redis/Object Storage 등 외부 의존성은 환경 변수 또는 prod 프로필로 분리한다.
@@ -78,45 +103,86 @@ Nginx가 SSL을 종료하므로, Spring Boot가 프록시 헤더를 인식해야
 - 필요한 경우 `X-Forwarded-*` 헤더 처리
 
 ### 3-1) Nginx CORS 프리플라이트 처리(운영 안정성)
-운영 환경에서 프론트는 Object Storage 정적 호스팅, API는 Nginx를 통해 `/api`로 프록시되므로
-Nginx에서 `OPTIONS` 프리플라이트를 처리하면 백엔드 부하를 줄이고 장애 시에도 CORS 응답을 안정적으로 보장할 수 있다.
+운영 환경에서 프론트는 Object Storage 정적 호스팅, API는 Nginx를 통해 `/api/`로 프록시된다.
+프리플라이트(`OPTIONS`)는 Nginx에서 처리해 백엔드 부하를 줄이고, 장애 시에도 CORS 응답을 안정적으로 보장한다.
 
-- 적용 파일(예시): `/root/nginx-default.conf` (bastion host, bind mount)
-- 허용 Origin은 현재 서비스 도메인으로 제한
-- 프리플라이트는 `204`로 종료, 실제 요청은 백엔드로 프록시
+- 적용 파일: `/root/nginx-default.conf` (bastion host, bind mount)
+- 허용 Origin은 서비스 도메인만 allowlist로 제한
+- 프리플라이트는 `204`로 종료하고, 실제 요청은 백엔드로 프록시
+- `/api/`의 실제 응답에는 CORS 헤더를 붙이지 않아 중복 헤더를 방지 (백엔드 CORS 설정을 사용)
 
-예시 설정:
+현재 설정 예시:
 ```nginx
-    # CORS 허용 Origin 제한
-    set $cors_origin "";
-    if ($http_origin ~* "^https?://lunchgo-test-bucket\\.s3-website\\.kr\\.object\\.ncloudstorage\\.com$") {
-        set $cors_origin $http_origin;
+map $http_origin $cors_origin {
+  default "";
+  "~^https?://lunchgo\\.s3-website\\.kr\\.object\\.ncloudstorage\\.com$" $http_origin;
+}
+
+upstream backend {
+  server 10.0.2.6:8080;
+  keepalive 64;
+}
+
+upstream scouter_backend {
+  server 10.0.2.6:6180;
+  keepalive 16;
+}
+
+gzip on;
+gzip_comp_level 4;
+gzip_min_length 1024;
+gzip_types application/json text/plain text/css application/javascript;
+gzip_vary on;
+
+server {
+  listen 80;
+  server_name localhost;
+
+  location /api/ {
+    client_max_body_size 10m;
+
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_connect_timeout 2s;
+    proxy_send_timeout 30s;
+    proxy_read_timeout 30s;
+
+    proxy_pass http://backend;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # OPTIONS는 허용하지 않아 preflight 전용 location으로 위임
+    limit_except GET POST PUT PATCH DELETE HEAD {
+      deny all;
     }
+  }
 
-    location /api/ {
-        client_max_body_size 10m;
-        # preflight
-        if ($request_method = OPTIONS) {
-            add_header Access-Control-Allow-Origin $cors_origin always;
-            add_header Access-Control-Allow-Credentials "true" always;
-            add_header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Authorization, Content-Type, X-Requested-With" always;
-            add_header Content-Length 0;
-            return 204;
-        }
+  error_page 403 = @cors_preflight;
+  location @cors_preflight {
+    add_header Access-Control-Allow-Origin $cors_origin always;
+    add_header Access-Control-Allow-Credentials "true" always;
+    add_header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" always;
+    add_header Access-Control-Allow-Headers "Authorization, Content-Type, X-Requested-With" always;
+    add_header Access-Control-Max-Age 86400 always;
+    add_header Vary Origin always;
+    add_header Content-Length 0;
+    return 204;
+  }
 
-        add_header Access-Control-Allow-Origin $cors_origin always;
-        add_header Access-Control-Allow-Credentials "true" always;
-        add_header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" always;
-        add_header Access-Control-Allow-Headers "Authorization, Content-Type, X-Requested-With" always;
-
-        proxy_pass http://10.0.2.6:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+  location /scouter/ {
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_pass http://scouter_backend/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
 ```
+
 
 ### 3-2) 이미지 업로드 용량 제한(운영)
 Nginx 기본 `client_max_body_size`가 1m인 경우, 업로드가 413으로 차단되고 브라우저는 CORS 에러로 보일 수 있다.
@@ -346,7 +412,7 @@ DB/Redis 사설 엔드포인트
 
 ### 도메인/SSL
 - 도메인 DNS가 Nginx 공인 IP로 향하는지 확인
-- SSL 인증서 적용 (Nginx)
+- SSL 인증서 적용 (현재 미적용, 필요 시 Nginx 또는 LB에서 종료)
 
 운영 환경 값
 - Bastion/Nginx 인스턴스: `ssg-team1-bastion-host`
