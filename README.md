@@ -214,8 +214,8 @@ graph LR
 
   WAS -->|APM Agent 6100| ScouterServer
   ScouterWeb --> ScouterServer
-  Admin -->|3000/9090| Grafana
-  Admin -->|3000/9090| Prometheus
+  Admin -->|Bastion Public IP:3000| Grafana
+  Admin -->|Bastion Public IP:9090| Prometheus
   ScouterServer -->|Alert Webhook| Slack
 
   classDef client fill:#E3F2FD,stroke:#1E88E5,color:#0D47A1
