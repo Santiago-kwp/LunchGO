@@ -45,6 +45,7 @@ body {
   transform: translateX(40px);
   transition: opacity 0.4s ease, transform 0.4s ease;
   pointer-events: none;
+  overflow: hidden;
 }
 
 .slide.active {
@@ -54,9 +55,9 @@ body {
 }
 
 .slide-inner {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+  /* height: 100%; Removed to allow intrinsic height calculation */
+  display: grid; /* Changed from flex to grid */
+  grid-template-rows: auto 1fr; /* Header takes auto height, scrollable content takes remaining */
   gap: 24px;
 }
 
@@ -154,11 +155,11 @@ h2 {
 }
 
 .slide.compact .slide-inner {
-  gap: 16px;
+  gap: 8px;
 }
 
 .slide.compact .chart-block {
-  padding: 14px 16px;
+  padding: 14px 16px 8px 16px;
 }
 
 .slide.compact .block-title {
@@ -171,6 +172,11 @@ h2 {
 
 .slide.compact .grid {
   gap: 12px;
+}
+
+.slide.compact .grid > .chart-block {
+  /* No overflow-y here, handled by parent */
+  /* No padding-right here */
 }
 
 .slide.compact h2 {
@@ -317,7 +323,7 @@ h2 {
   display: grid;
   grid-template-columns: 1.4fr 0.8fr;
   gap: 16px;
-  align-items: stretch;
+  align-items: start; /* Changed from stretch to start */
 }
 
 .latency-meta {
@@ -428,7 +434,18 @@ h2 {
 
 .bar-fill.login-flow { background: var(--accent-2); }
 .bar-fill.queue-wait { background: var(--accent-4); }
+
 .bar-fill.login-req { background: var(--accent-3); }
+
+.scrollable-content-area {
+  /* flex: 1; REMOVED as parent is now grid */
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 8px; /* For scrollbar */
+  display: flex;
+  flex-direction: column;
+  gap: 16px; /* Match slide-inner gap for children */
+}
 
 .grid {
   display: grid;

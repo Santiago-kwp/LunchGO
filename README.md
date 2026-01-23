@@ -1,11 +1,17 @@
 # 런치고 - 직장인 회식 맞춤 식당 추천 및 예약 플랫폼
 
-> 한줄 소개: 직장인 회식/점심 예약, 선주문/선결제, 맞춤 추천을 한 흐름으로 연결한 플랫폼.
+> 한줄 소개: 직장인의 회식/점심 예약, 선주문/선결제, 맞춤 추천을 한 흐름으로 연결하고, 식당 사업자에겐 직장인 데이터 맞춤 AI 솔루션을 제공하는 플랫폼.
 
 ## 프로젝트 소개
+
 - 직장인 팀 회식/점심 예약 과정을 간소화하고, 개인/팀 취향 기반 추천을 제공한다.
 - 선주문/선결제로 대기 시간을 줄이고, 방문 확인/리마인더로 노쇼를 완화한다.
 - 구내식당 메뉴, 예산, 날씨 등 업무 환경 데이터를 반영해 식당을 제안한다.
+- 직장인의 취향과 구내식당 데이터 등 고객의 숨은 니즈를 반영한 데이터를 사업자에게 AI로 최적화하여 제공한다.
+
+## 프로젝트 일정
+
+![image](/docs/images/lunchgo-project-schedule.png)
 
 <details>
 <summary>프로젝트 기획 내용</summary>
@@ -114,10 +120,31 @@
 ### 3. 노쇼 방어
 
 예약금 제도로 식당 매출 보호
+
+</details>
+
+<details>
+<summary>벤치마킹 및 설문조사</summary>
+
+### 기존 예약 플랫폼 분석 및 한계점
+
+| 플랫폼          | 주요 특징                               | 직장인 사용 시 한계점 (Pain Point)                                                                                                                                                               |
+| :-------------- | :-------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **네이버 예약** | 범용성/검색 연동<br>가장 방대한 DB 보유 | • **필터링의 한계**: '법인카드 한도', '팀원 알러지', '구내식당 메뉴 회피' 등 직장인 특화 조건 검색 불가<br>• **커뮤니케이션 비용**: 팀원 의견 취합 및 메뉴 선정 과정은 별도 메신저로 해결해야 함 |
+| **캐치테이블**  | 파인다이닝/데이트<br>실시간 예약 특화   | • **높은 가격대/분위기 편중**: 데이트나 미식 위주, 가벼운 '팀 점심'이나 '회식' 장소로는 부적합한 경우가 많음<br>• **예산 불일치**: 회사 내규(식대)에 맞는 식당을 찾기 어려움                     |
+| **테이블링**    | 줄서기/웨이팅<br>현장 대기 최소화       | • **점심시간 압박**: '줄서기'는 가능하지만, 조리 시간을 포함한 전체 식사 시간을 보장하지 못함<br>• **사전 계획 불가**: 회식처럼 미리 룸을 잡거나 메뉴를 확정해야 하는 상황에 부적합              |
+
+### 설문조사 결과
+
+![image](/docs/images/survery-summary1.png)
+![image](/docs/images/survery-summary2.png)
+
 </details>
 
 ## 기술 스택
+
 ### 프론트엔드
+
 ![Vue.js](https://img.shields.io/badge/Vue.js-3.5.25-4FC08D?logo=vue.js&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-5.2.0-646CFF?logo=vite&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.1.18-06B6D4?logo=tailwindcss&logoColor=white)
@@ -126,6 +153,7 @@
 ![Axios](https://img.shields.io/badge/Axios-1.4.0-5A29E4?logo=axios&logoColor=white)
 
 ### 백엔드
+
 ![Java](https://img.shields.io/badge/Java-21-007396?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5.8-6DB33F?logo=springboot&logoColor=white)
 ![Spring Data JPA](https://img.shields.io/badge/Spring_Data_JPA-3.5.8-6DB33F?logo=spring&logoColor=white)
@@ -133,10 +161,12 @@
 ![Gradle](https://img.shields.io/badge/Gradle-8.14.3-02303A?logo=gradle&logoColor=white)
 
 ### 데이터베이스
+
 ![MySQL](https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)
 
 ### 인프라
+
 ![Naver Cloud](https://img.shields.io/badge/Naver_Cloud-03C75A?logo=naver&logoColor=white)
 ![Nginx](https://img.shields.io/badge/Nginx-009639?logo=nginx&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
@@ -146,6 +176,7 @@
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?logo=githubactions&logoColor=white)
 
 ### 외부 APIs
+
 ![Kakao Map](https://img.shields.io/badge/Kakao_Map-FFCD00?logo=kakao&logoColor=black)
 ![Kakao Mobility](https://img.shields.io/badge/Kakao_Mobility-FFCD00?logo=kakao&logoColor=black)
 ![Kakao Geocoding](https://img.shields.io/badge/Kakao_Geocoding-FFCD00?logo=kakao&logoColor=black)
@@ -169,6 +200,9 @@
 - `Daum Postcode`: 주소 검색/자동 완성
 
 ## 시스템 아키텍처
+
+![system-arch-image](/docs/images/lunchgo-system-architecture.png)
+
 ```mermaid
 graph LR
   User["User Browser"]
@@ -234,6 +268,7 @@ graph LR
 ```
 
 ## 핵심 기능
+
 1. 🍽️ 직장인 회식 맞춤 검색 및 선주문/선결제 예약 및 리마인더
    - 거리, 식당 분위기, 기피 재료 등 강력한 필터 검색 제공
    - 착석 즉시 식사를 위한 선주문/선결제 예약 및 방문 확인/리마인더
@@ -252,6 +287,7 @@ graph LR
    - 주간 TODO 리스트를 통한 실행 액션 유도
 
 ## 팀 구성
+
 - 박기웅 (팀장): 추천(구내식당, 트렌드)/리뷰/동시성/서버 관리 및 모니터링 툴 연동, 일정관리
 - 김다혜: 예약 생성, 조회/환불/리마인더, 동시성 제어 스터디장
 - 강우혁: 식당정보관리/필터 기반 검색/지도/추천(날씨), 예약취소, Notion 관리
@@ -259,8 +295,11 @@ graph LR
 - 전예원: 로그인/회원가입/회원관리/추천(예산, 취향 맞춤)/챗봇/AI insights, Git Master
 
 ## 협업 방식
+
 ### 1) GitHub Projects 기반 주간 버전 관리
-- ( 사진 추가 )
+
+![image](/docs/images/github_weekly_works.png)
+
 - 일요일 22시 기준으로 프로젝트 버전을 업그레이드하고 주간 작업량을 점검
 - 분석
   - 초기 단계: 화면/UX 중심 개발로 작업량 증가
@@ -272,7 +311,9 @@ graph LR
 - 약 5주 개발 단계에서 구조적 완성도 우선 전략을 유지해 협업 효율과 계획 수립을 안정화
 
 ### 2) GitHub Wiki + Notion 문서화
-- ( 사진 추가 )
+
+![image](/docs/images/lunchgo-notion-git-wiki.png)
+
 - 목적
   - 기획 문서 및 데일리 스크럼 정리
   - 서비스 개발에 필요한 아키텍처 적용 문서 정리
@@ -287,6 +328,7 @@ graph LR
   - GitHub Wiki: https://github.com/SSG9-FINAL-LunchGO/LunchGO/wiki
 
 ## 프로젝트 구조
+
 ```
 /LunchGO/
 ├── frontend/   # Vue 프론트엔드
@@ -298,19 +340,53 @@ graph LR
 ```
 
 ## 깃 브랜치 전략
+
 - `main`: 프로덕션 브랜치
 - `dev`: 개발 메인 브랜치
 - `feat/*`: 기능 개발 브랜치
 - `design/*`: 디자인 작업 브랜치
 - 커밋 메시지 규칙(Husky/commitlint): `type(scope): subject` (Conventional Commits)
 
+## ERD
+
+![image](docs/images/lunchgo-erd.png)
+
+### 📋 ERD 테이블 색상 분류
+
+- 🟧 **주황**: 식당 정보/구내식당
+- 🟨 **노랑**: 회원 관리
+- 🟦 **파랑**: 재무/통계
+- 🧊 **하늘**: 태그/검색
+- 🟩 **초록**: 리뷰
+- 🟪 **보라**: 예약
+
 ## 동시성 제어 전략
+
+![image](docs/images/reservation-creation-sequence-diagram.png)
+
+![image](docs/images/reservation-concurrency-control-diagram.png)
+
 - Redis `SETNX` 기반 짧은 락으로 중복 예약 요청을 사전 차단 (`docs/reservation-idempotence-troubleshooting.md`)
 - DB 비관적 락(FOR UPDATE)로 예약 슬롯 정원 동시성 제어 (`docs/reservation-seat-calculation-troubleshooting.md`)
 - 조건부 unique 인덱스로 예약 멱등성/재예약 허용을 동시에 보장 (`docs/reservation-idempotence-troubleshooting.md`)
 - 예약 생성 전 분산 락 AOP 적용과 락 구간 축소 (`docs/reservation-architecture-troubleshooting.md`)
 
+## AI 인사이트 구현
+
+![image](docs/images/ai-insight-service-sequence-diagram.png)
+
+![image](docs/images/ai-insight-prediction-pipeline.png)
+
+![image](docs/images/ai-insights-summary.png)
+
+![image](docs/images/ai-insights-weekly-stats-prediction.png)
+
+![image](docs/images/ai-insight-integration-todolist.png)
+
 ## 성능 최적화
+
+![image](docs/images/lunchgo-performance-optimization.png)
+
 - 네트워크/웹
   - Nginx keepalive, gzip, preflight 분리, proxy timeout (`docs/nginx-conf-improvement.md`)
 - 애플리케이션
@@ -322,5 +398,34 @@ graph LR
   - (`docs/lunchgo-performance-optimization-summary.md`)
 
 ## 부하 테스트 결과
+
+- 1,000명 동시 접속 처리 평균 : 49s, 최대 : 95s
+  - Queue capacity=12로, 12명씩 동시에 로그인 연산을 처리
+  - poll=1.5s 마다 클라이언트가 서버에 차례를 물음
+- 이론상 총 시간 ≈ (N / capacity) X (login 처리시간 + 평균 폴링 지연) = 83.3 큐 X (286ms + 750ms) = 84s < 실제 95s
+
 - 로그인 부하 테스트: Queue OFF avg 743ms/p95 880ms → ON avg 28~38ms/p95 72~132ms (`docs/login-loadtest-summary.md`)
-- 예약 부하 테스트: 추가 예정 (담당자 진행 중)
+
+![image](docs/images/login-loadtest-result1.png)
+
+![image](docs/images/login-loadtest-result2.png)
+
+![image](docs/images/login-loadtest-1000-oneshot.png)
+
+- 예약 부하 테스트 결과
+
+시나리오 구성
+
+- 사용자 수 및 제한시간: VU 2000, 30s
+- 식당의 예약 정원: 40명
+- 예약 날짜 및 시간대 : 2026-01-17 오전 11:00
+- 예약금 결제 방식, 예약 건당 인원수는 4명
+- 총 예약 인원은 예약 정원 초과 불가 → 10건만 접수 가능
+- 각 사용자마다 동일 예약 요청을 3회씩 전송 (총 6,000건의 요청)
+
+결과
+
+- 성공 응답 : 0.07s 내 총 10건만 접수됨
+- 실패 응답 : 최대 1.17s 내 응답 받음
+
+![image](docs/images/reservation-loadtest-p95.png)

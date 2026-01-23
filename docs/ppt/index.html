@@ -31,7 +31,7 @@
         </div>
       </section>
 
-      <section class="slide" data-slide>
+      <section class="slide compact" data-slide>
         <div class="slide-inner">
           <header class="slide-header">
             <div>
@@ -44,28 +44,43 @@
             </div>
           </header>
 
-          <div class="chart-block">
-            <div class="block-title">Latency (ms)</div>
-            <div class="legend">
-              <span class="legend-item"><i class="dot login-flow"></i>login_flow</span>
-              <span class="legend-item"><i class="dot queue-wait"></i>queue_wait</span>
-              <span class="legend-item"><i class="dot login-req"></i>login_req</span>
-            </div>
-            <div class="latency-layout">
-              <div id="latency-chart" class="latency-chart"></div>
-              <aside id="latency-meta" class="latency-meta"></aside>
+          <div class="scrollable-content-area">
+            <div class="chart-block">
+              <div class="block-title">Latency (ms)</div>
+              <div class="legend">
+                <span class="legend-item"><i class="dot login-flow"></i>login_flow</span>
+                <span class="legend-item"><i class="dot queue-wait"></i>queue_wait</span>
+                <span class="legend-item"><i class="dot login-req"></i>login_req</span>
+              </div>
+              <div class="latency-layout">
+                <div id="latency-chart" class="latency-chart"></div>
+                <aside id="latency-meta" class="latency-meta"></aside>
+              </div>
             </div>
           </div>
+        </div>
+      </section>
 
-          <div class="grid">
-            <div class="chart-block">
-              <div class="block-title">Iterations / sec</div>
-              <div id="iter-chart" class="iter-chart"></div>
+      <section class="slide compact" data-slide>
+        <div class="slide-inner">
+          <header class="slide-header">
+            <div>
+              <div class="eyebrow">Login Load Test · Summary</div>
+              <h2>로그인 부하 테스트 · 요약</h2>
             </div>
-            <div class="chart-block">
-              <div class="block-title">CPU 관찰</div>
-              <div id="cpu-chart" class="cpu-chart"></div>
-              <div class="note">범위 표시는 관찰 구간 평균 범위</div>
+          </header>
+
+          <div class="scrollable-content-area">
+            <div class="grid scrollable-grid">
+              <div class="chart-block">
+                <div class="block-title">Iterations / sec</div>
+                <div id="iter-chart" class="iter-chart"></div>
+              </div>
+              <div class="chart-block">
+                <div class="block-title">CPU 관찰</div>
+                <div id="cpu-chart" class="cpu-chart"></div>
+                <div class="note">범위 표시는 관찰 구간 평균 범위</div>
+              </div>
             </div>
           </div>
         </div>

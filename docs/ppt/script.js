@@ -70,6 +70,17 @@ const loginScenarios = [
     login_req: { avg: 90.33, p95: 173.0 },
     cpu: { min: 55, max: 65, note: '55~65%' },
   },
+  {
+    id: '3-3차',
+    queue: 'ON',
+    capacity: 12,
+    poll: 1000,
+    iterations: 18.21,
+    login_flow: { avg: 1093.64, p95: 1287.0 },
+    queue_wait: { avg: 1001.82, p95: 1011.0 },
+    login_req: { avg: 91.79, p95: 293.8 },
+    cpu: { min: 68, max: 72, note: '70% 평균' },
+  },
 ];
 
 const reservationScenarioSet1 = [
@@ -295,9 +306,13 @@ function renderRangeChart(data, container, labelBuilder, rangeBuilder) {
     note.textContent = rangeData.note;
 
     track.appendChild(range);
+
+    const vizWrapper = document.createElement('div');
+    vizWrapper.appendChild(track);
+    vizWrapper.appendChild(note);
+
     row.appendChild(label);
-    row.appendChild(track);
-    row.appendChild(note);
+    row.appendChild(vizWrapper);
 
     container.appendChild(row);
   });
