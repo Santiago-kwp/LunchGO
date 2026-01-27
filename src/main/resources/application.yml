@@ -42,3 +42,26 @@ login:
 logging:
   level:
     org.hibernate.SQL: off
+
+server:
+  tomcat:
+    # 1. 동시 사용 가능한 스레드 수 (기본값 200)
+    threads:
+      max: 400
+      min-spare: 100
+    # 2. 스레드가 꽉 찼을 때 tomcat 서버 내부의 대기열에서 대기할 수 있는 요청의 수
+    # 이 수치가 작으면 OS가 요청을 거절하여 'dial timeout'이 발생
+    accept-count: 1000
+
+    # 3. 연결 유지(Keep-Alive) 설정 (소켓 고갈 방지 핵심)
+    # 하나의 소켓으로 여러 번의 예약 요청을 처리하게 하여 TIME_WAIT 발생 빈도를 낮춤
+    keep-alive-timeout: 60000 # 60초
+    max-keep-alive-requests: 200
+
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 30 # 기본값 10에서 확장
+      # 빠른 실패(Fail-Fast)"를 통한 스레드 고갈 방지 -> 커넥션을 얻지 못한 스레드를 빨리 반환하여 다른 작업을 수행할 때 활용
+      # timeout은 3초로 설정: Redisson 분산 락의 waitTime이 2초이므로, 여유시간 1초를 추가
+      connection-timeout: 3000

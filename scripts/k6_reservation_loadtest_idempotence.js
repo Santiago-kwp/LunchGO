@@ -1,13 +1,13 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
 
-const baseUrl = __ENV.BASE_URL || "http://10.0.2.6:8080";
+const baseUrl = __ENV.BASE_URL || "http://127.0.0.1:8080";
 const emailPrefix = __ENV.EMAIL_PREFIX || "loadtest.user";
 const emailDomain = __ENV.EMAIL_DOMAIN || "example.com";
 const password = __ENV.PASSWORD || "Passw0rd!123";
 const useLoginQueue =
-  String(__ENV.USE_LOGIN_QUEUE || "").toLowerCase() === "true" ||
-  String(__ENV.USE_LOGIN_QUEUE || "") === "1";
+    String(__ENV.USE_LOGIN_QUEUE || "").toLowerCase() === "true" ||
+    String(__ENV.USE_LOGIN_QUEUE || "") === "1";
 const queuePollIntervalMs = Number(__ENV.LOGIN_QUEUE_POLL_MS || 1000);
 const queueMaxWaitMs = Number(__ENV.LOGIN_QUEUE_MAX_WAIT_MS || 60000);
 const setupTimeout = __ENV.SETUP_TIMEOUT || "30m";
@@ -64,7 +64,7 @@ function waitForLoginTurn() {
   while (Date.now() - startTime < queueMaxWaitMs) {
     sleep(queuePollIntervalMs / 1000);
     const statusRes = http.get(
-      `${baseUrl}/api/login/queue?token=${encodeURIComponent(queueToken)}`
+        `${baseUrl}/api/login/queue?token=${encodeURIComponent(queueToken)}`
     );
     if (statusRes.status !== 200) {
       return { ok: false, queueToken, reason: "status_failed" };
@@ -87,7 +87,7 @@ function loginUser(email) {
     const queueResult = waitForLoginTurn();
     if (!queueResult.ok) {
       console.error(
-        `Queue failed for user ${email}: ${queueResult.reason || "unknown"}`
+          `Queue failed for user ${email}: ${queueResult.reason || "unknown"}`
       );
       return null;
     }
@@ -146,6 +146,12 @@ export default function (users) {
   const iter = __ITER;
   const user = users[vu - 1];
 
+  // 첫 번째 요청(중요한 요청) 전에 VU 번호에 비례해 아주 미세한 대기 시간 부여
+  // 500명 기준 최대 0.5초 내외로 분산됨
+  if (iter === 0) {
+    sleep(Math.random() * 0.5);
+  }
+
   if (!user) {
     console.error(`VU ${vu} has no user data.`);
     return;
@@ -168,9 +174,12 @@ export default function (users) {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
+    timeout: '10s', // 30초나 기다리지 않고 10초 만에 실패 처리하여 지표 왜곡 방지
   });
 
   check(reserveRes, {
+    // 통신 자체가 실패(status 0)한 경우를 대비해 상태 코드 존재 확인 추가
+    "is not timed out": (r) => r.status !== 0,
     // 첫 번째 요청은 성공(2xx)해야 하지만, 다른 유저와의 경합으로 실패(4xx)할 수 있음
     "first request is 2xx or 4xx": (r) => iter === 0 ? (r.status >= 200 && r.status < 500) : true,
     // 두 번째 이후의 요청은 반드시 중복으로 인해 실패(4xx)해야 함
