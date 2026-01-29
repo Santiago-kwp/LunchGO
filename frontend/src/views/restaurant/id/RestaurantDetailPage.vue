@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
-import { RouterLink, useRoute } from 'vue-router'; // Import useRoute to get dynamic params
+import { ref, computed, onMounted, watch } from 'vue';
+import { RouterLink, useRoute } from 'vue-router';
 import {
   ArrowLeft,
   MapPin,
@@ -17,38 +17,38 @@ import {
 } from 'lucide-vue-next';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
-import FavoriteStarButton from "@/components/ui/FavoriteStarButton.vue";
-import { useFavorites } from "@/composables/useFavorites";
-import { loadKakaoMaps, geocodeAddress } from '@/utils/kakao';
+import FavoriteStarButton from '@/components/ui/FavoriteStarButton.vue';
+import { useFavorites } from '@/composables/useFavorites';
+import { useRestaurantDetailMap } from '@/composables/useRestaurantDetailMap';
+import { useImageGallery, useImageModal } from '@/composables/useImageGallery';
+import { geocodeAddress } from '@/utils/kakao';
 import {
   formatRouteDistance,
   formatRouteDurationMinutes,
+  formatDate,
 } from '@/utils/formatters';
-import { formatReviewTag } from "@/utils/reviewTagEmojis";
-import { normalizeImageUrl, normalizeImageUrls } from "@/utils/image";
+import { formatReviewTag } from '@/utils/reviewTagEmojis';
+import { normalizeImageUrl, normalizeImageUrls } from '@/utils/image';
 import { useAccountStore } from '@/stores/account';
-import httpRequest from "@/router/httpRequest.js";
-import axios from "axios";
+import httpRequest from '@/router/httpRequest.js';
 
 const accountStore = useAccountStore();
 const isLoggedIn = computed(() => accountStore.loggedIn);
 const { fetchFavorites, clearFavorites, userId } = useFavorites();
 
 const route = useRoute();
-const restaurantId = route.params.id || 1; // Default to '1' if id is not available
+const restaurantId = route.params.id || 1;
 const loginRedirectPath = computed(
   () =>
     `/login?next=${encodeURIComponent(
       `/restaurant/${restaurantId}/booking?select=1`
     )}`
 );
+
 const restaurantInfo = ref(null);
 const isLoading = ref(true);
 const error = ref(null);
 
-const currentImageIndex = ref(0);
-
-// 기본 이미지 갤러리 설정
 const defaultGallery = [
   { url: '/modern-korean-restaurant-interior.jpg', alt: '식당 메인 이미지' },
   { url: '/elegant-dining-room-setup.jpg', alt: '식당 내부 전경' },
@@ -58,6 +58,8 @@ const defaultGallery = [
 
 const restaurantImages = ref(defaultGallery);
 const representativeMenus = ref([]);
+const representativeReviews = ref([]);
+const restaurantReviewSummary = ref(null);
 
 const restaurantName = computed(() => restaurantInfo.value?.name || '식당명');
 
@@ -70,6 +72,7 @@ const ratingDisplay = computed(() => {
 const reviewCountDisplay = computed(
   () => restaurantReviewSummary.value?.reviewCount ?? restaurantInfo.value?.reviews ?? 0,
 );
+
 const addressDisplay = computed(
   () => restaurantInfo.value?.address || '주소 정보가 곧 업데이트됩니다.',
 );
@@ -90,66 +93,55 @@ const highlightTags = computed(() => {
     .join(', ');
 });
 
-const handlePrevImage = () => {
-  currentImageIndex.value =
-    (currentImageIndex.value - 1 + restaurantImages.value.length) %
-    restaurantImages.value.length;
+// Image Gallery Composable
+const {
+  currentImageIndex,
+  handlePrevImage,
+  handleNextImage,
+} = useImageGallery(restaurantImages);
+
+// Image Modal Composable
+const {
+  isImageModalOpen,
+  modalImageUrl,
+  modalImageIndex,
+  modalImages,
+  openImageModal,
+  closeImageModal,
+  handleModalPrevImage,
+  handleModalNextImage,
+} = useImageModal();
+
+// Fetch company address for route calculation
+const fetchCompanyAddress = async () => {
+  const id = userId.value;
+  if (!id) return null;
+  try {
+    const response = await httpRequest.get(`/api/info/user/${id}`);
+    return response.data?.companyAddress || null;
+  } catch {
+    return null;
+  }
 };
 
-const handleNextImage = () => {
-  currentImageIndex.value = (currentImageIndex.value + 1) % restaurantImages.value.length;
-};
-
-const detailMapContainer = ref(null);
-let detailMapInstance = null;
-let detailMarker = null;
-const detailKakaoMapsApi = ref(null);
-const detailRoutePolyline = ref(null);
-const detailRouteOriginMarker = ref(null);
-const routeInfo = ref(null);
-const routeError = ref('');
-const isRouteLoading = ref(false);
-const detailMapDistanceSteps = Object.freeze([
-  { label: '100m', level: 2 },
-  { label: '250m', level: 3 },
-  { label: '500m', level: 4 },
-  { label: '1km', level: 5 },
-  { label: '2km', level: 6 },
-  { label: '3km', level: 7 },
-]);
-const detailDefaultMapDistanceIndex = detailMapDistanceSteps.findIndex(
-  (step) => step.label === '500m',
-);
-const detailMapDistanceStepIndex = ref(
-  detailDefaultMapDistanceIndex === -1 ? 0 : detailDefaultMapDistanceIndex,
-);
-const detailCurrentDistanceLabel = computed(
-  () =>
-    detailMapDistanceSteps[detailMapDistanceStepIndex.value]?.label ??
-    detailMapDistanceSteps[0].label,
-);
-const detailDistanceSliderFill = computed(() => {
-  if (detailMapDistanceSteps.length <= 1) return 0;
-  return (
-    ((detailMapDistanceSteps.length - 1 - detailMapDistanceStepIndex.value) /
-      (detailMapDistanceSteps.length - 1)) *
-    100
-  );
+// Map Composable
+const {
+  detailMapContainer,
+  routeInfo,
+  routeError,
+  isRouteLoading,
+  detailCurrentDistanceLabel,
+  detailDistanceSliderFill,
+  changeDetailMapDistance,
+  handleCheckRoute: mapHandleCheckRoute,
+} = useRestaurantDetailMap({
+  restaurantInfo,
+  restaurantName,
+  fetchCompanyAddress,
+  isLoggedIn,
 });
 
-const formatRouteDuration = formatRouteDurationMinutes;
-
-const representativeReviews = ref([]);
-const restaurantReviewSummary = ref(null);
-
-const formatDate = (dateString) => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}.${month}.${day}`;
-};
+const handleCheckRoute = () => mapHandleCheckRoute(httpRequest);
 
 const mapReviewItem = (item) => ({
   id: item.reviewId,
@@ -169,135 +161,6 @@ const mapReviewItem = (item) => ({
   blindReason: item.blindReason || '관리자에 의해 블라인드 처리된 리뷰입니다.',
 });
 
-// 이미지 확대 모달 상태
-const isImageModalOpen = ref(false);
-const modalImageUrl = ref('');
-const modalImageIndex = ref(0);
-const modalImages = ref([]);
-
-const openImageModal = (images, index) => {
-  modalImages.value = images.map((img) => (typeof img === 'object' ? img.url : img));
-  modalImageIndex.value = index;
-  modalImageUrl.value = modalImages.value[index];
-  isImageModalOpen.value = true;
-};
-
-watch(
-  () => userId.value,
-  (nextUserId) => {
-    if (!nextUserId) {
-      clearFavorites();
-      return;
-    }
-    fetchFavorites(nextUserId);
-  },
-  { immediate: true }
-);
-
-const fetchRestaurantDetail = async () => {
-  isLoading.value = true;
-  error.value = null;
-  try {
-    const response = await httpRequest.get(`/api/restaurants/${restaurantId}`);
-    const details = response.data;
-
-    // API 응답과 geocode 결과를 조합하여 restaurantInfo 구성
-    const coords = await geocodeAddress(details.roadAddress);
-
-    restaurantInfo.value = {
-      id: details.restaurantId,
-      name: details.name,
-      phone: details.phone,
-      address: `${details.roadAddress} ${details.detailAddress || ''}`.trim(),
-      hours: `${details.openTime} - ${details.closeTime}`,
-      capacity: `최대 ${details.reservationLimit}인`,
-      preorderAvailable: details.preorderAvailable,
-      tagline: details.description,
-      tags: details.tags,
-      coords: coords,
-      // API 응답에 rating과 reviews가 없으므로 review 요약 정보로 대체
-      rating: restaurantReviewSummary.value?.avgRating || 0,
-      reviews: restaurantReviewSummary.value?.reviewCount || 0,
-    };
-
-    // 메뉴 정보 설정
-    if (details.menus?.length) {
-      representativeMenus.value = details.menus
-        .filter((menu) => menu.category.code === 'MAIN') // 'MAIN' 카테고리만 필터링
-        .slice(0, 3) // 처음 3개만 선택
-        .map((menu) => ({
-          ...menu,
-          price: `${menu.price.toLocaleString()}원`, // 숫자 가격을 문자열로 변환
-          imageUrl: normalizeImageUrl(menu.imageUrl),
-        }));
-    } else {
-      representativeMenus.value = [];
-    }
-
-    // 이미지 갤러리 설정
-    if (details.images?.length) {
-      restaurantImages.value = details.images.map((img, index) => ({
-        url: normalizeImageUrl(img.imageUrl),
-        alt: `${details.name} 이미지 ${index + 1}`,
-      }));
-    } else {
-      restaurantImages.value = defaultGallery;
-    }
-  } catch (err) {
-    console.error('식당 상세 정보를 불러오는 데 실패했.l습니다:', err);
-    error.value = '데이터를 불러올 수 없습니다.';
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-const fetchCompanyAddress = async () => {
-  const id = userId.value;
-  if (!id) return null;
-  try {
-    const response = await httpRequest.get(`/api/info/user/${id}`);
-    return response.data?.companyAddress || null;
-  } catch (error) {
-    return null;
-  }
-};
-
-const loadRepresentativeReviews = async () => {
-  try {
-    const response = await axios.get(`/api/restaurants/${restaurantId}/reviews`, {
-      params: {
-        page: 1,
-        size: 3,
-        sort: 'RECOMMEND',
-      },
-    });
-    const data = response.data?.data ?? response.data;
-    restaurantReviewSummary.value = data?.summary ?? null;
-    representativeReviews.value = (data?.items || []).slice(0, 3).map(mapReviewItem);
-  } catch (error) {
-    console.error('리뷰 데이터를 불러오지 못했습니다:', error);
-    representativeReviews.value = [];
-  }
-};
-
-// 모달 닫기
-const closeImageModal = () => {
-  isImageModalOpen.value = false;
-};
-
-// 모달에서 이전/다음 이미지
-const handleModalPrevImage = () => {
-  modalImageIndex.value =
-    (modalImageIndex.value - 1 + modalImages.value.length) % modalImages.value.length;
-  modalImageUrl.value = modalImages.value[modalImageIndex.value];
-};
-
-const handleModalNextImage = () => {
-  modalImageIndex.value = (modalImageIndex.value + 1) % modalImages.value.length;
-  modalImageUrl.value = modalImages.value[modalImageIndex.value];
-};
-
-// 리뷰 텍스트 더보기/접기 토글 함수
 const toggleReviewExpand = (review) => {
   review.isExpanded = !review.isExpanded;
 };
@@ -337,213 +200,100 @@ const setupDragScroll = (element) => {
   });
 };
 
-const initializeDetailMap = async () => {
-  if (!detailMapContainer.value || !restaurantInfo.value?.coords) {
-    console.warn('지도 컨테이너 또는 좌표 정보가 없어 지도를 초기화할 수 없습니다.');
-    return;
-  }
+const fetchRestaurantDetail = async () => {
+  isLoading.value = true;
+  error.value = null;
   try {
-    const kakaoMaps = await loadKakaoMaps();
-    detailKakaoMapsApi.value = kakaoMaps;
-    const center = new kakaoMaps.LatLng(
-      restaurantInfo.value.coords.lat,
-      restaurantInfo.value.coords.lng,
-    );
-    const markerSvg =
-      "data:image/svg+xml;utf8," +
-      "<svg xmlns='http://www.w3.org/2000/svg' width='32' height='46' viewBox='0 0 32 46'>" +
-      "<path d='M16 1C8.8 1 3 6.8 3 14c0 9.3 13 30 13 30s13-20.7 13-30C29 6.8 23.2 1 16 1z' fill='%23ff6b4a' stroke='white' stroke-width='2'/>" +
-      "<circle cx='16' cy='14' r='5' fill='white'/>" +
-      "</svg>";
-    const markerImage = new kakaoMaps.MarkerImage(
-      markerSvg,
-      new kakaoMaps.Size(32, 46),
-      { offset: new kakaoMaps.Point(16, 46) },
-    );
-    detailMapInstance = new kakaoMaps.Map(detailMapContainer.value, {
-      center,
-      level: detailLevelForDistance(detailMapDistanceStepIndex.value),
-    });
-    detailMapInstance.setZoomable(false);
-    detailMarker = new kakaoMaps.Marker({
-      position: center,
-      title: restaurantName.value,
-      image: markerImage,
-    });
-    detailMarker.setMap(detailMapInstance);
-    applyDetailMapZoom();
-  } catch (error) {
-    console.error('식당 위치 지도를 불러오지 못했습니다.', error);
-  }
-};
+    const response = await httpRequest.get(`/api/restaurants/${restaurantId}`);
+    const details = response.data;
 
-const clearDetailRoute = () => {
-  if (detailRoutePolyline.value) {
-    detailRoutePolyline.value.setMap(null);
-    detailRoutePolyline.value = null;
-  }
-  if (detailRouteOriginMarker.value) {
-    detailRouteOriginMarker.value.setMap(null);
-    detailRouteOriginMarker.value = null;
-  }
-};
+    const coords = await geocodeAddress(details.roadAddress);
 
-const drawDetailRoute = (pathPoints = []) => {
-  if (!detailMapInstance || !detailKakaoMapsApi.value) return;
-  clearDetailRoute();
-  if (!Array.isArray(pathPoints) || !pathPoints.length) return;
-
-  const kakaoMaps = detailKakaoMapsApi.value;
-  const path = pathPoints
-    .filter((point) => Number.isFinite(point?.lat) && Number.isFinite(point?.lng))
-    .map((point) => new kakaoMaps.LatLng(point.lat, point.lng));
-  if (path.length < 2) return;
-
-  detailRoutePolyline.value = new kakaoMaps.Polyline({
-    path,
-    strokeWeight: 6,
-    strokeColor: '#d9480f',
-    strokeOpacity: 0.95,
-    strokeStyle: 'solid',
-  });
-  detailRoutePolyline.value.setMap(detailMapInstance);
-
-  const bounds = new kakaoMaps.LatLngBounds();
-  path.forEach((point) => bounds.extend(point));
-  detailMapInstance.setBounds(bounds, 20, 20, 20, 20);
-};
-
-const renderRouteOriginMarker = (coords) => {
-  if (!detailMapInstance || !detailKakaoMapsApi.value) return;
-  const kakaoMaps = detailKakaoMapsApi.value;
-  const markerSvg =
-    "data:image/svg+xml;utf8," +
-    "<svg xmlns='http://www.w3.org/2000/svg' width='32' height='46' viewBox='0 0 32 46'>" +
-    "<path d='M16 1C8.8 1 3 6.8 3 14c0 9.3 13 30 13 30s13-20.7 13-30C29 6.8 23.2 1 16 1z' fill='%231e3a5f' stroke='white' stroke-width='2'/>" +
-    "<circle cx='16' cy='14' r='5' fill='white'/>" +
-    '</svg>';
-  const markerImage = new kakaoMaps.MarkerImage(
-    markerSvg,
-    new kakaoMaps.Size(32, 46),
-    { offset: new kakaoMaps.Point(16, 46) },
-  );
-  if (detailRouteOriginMarker.value) {
-    detailRouteOriginMarker.value.setMap(null);
-  }
-  detailRouteOriginMarker.value = new kakaoMaps.Marker({
-    position: new kakaoMaps.LatLng(coords.lat, coords.lng),
-    title: '회사',
-    image: markerImage,
-  });
-  detailRouteOriginMarker.value.setMap(detailMapInstance);
-};
-
-const handleCheckRoute = async () => {
-  if (!restaurantInfo.value?.coords) {
-    routeError.value = '식당 위치를 확인할 수 없습니다.';
-    return;
-  }
-  if (!isLoggedIn.value) {
-    routeError.value = '로그인 후 경로를 확인할 수 있습니다.';
-    return;
-  }
-
-  isRouteLoading.value = true;
-  routeError.value = '';
-  routeInfo.value = null;
-
-  try {
-    if (!detailMapInstance && detailMapContainer.value) {
-      await nextTick();
-      await initializeDetailMap();
-    }
-    const companyAddress = await fetchCompanyAddress();
-    if (!companyAddress) {
-      routeError.value = '회사 주소를 등록해 주세요.';
-      return;
-    }
-    const originCoords = await geocodeAddress(companyAddress);
-    if (!originCoords) {
-      routeError.value = '회사 위치를 확인할 수 없습니다.';
-      return;
-    }
-    const destinationCoords = restaurantInfo.value.coords;
-    const response = await httpRequest.post('/api/map/route', {
-      origin: { lat: originCoords.lat, lng: originCoords.lng },
-      destination: { lat: destinationCoords.lat, lng: destinationCoords.lng },
-    });
-    const data = response?.data || {};
-    if (Array.isArray(data.path) && data.path.length) {
-      drawDetailRoute(data.path);
-    }
-    renderRouteOriginMarker(originCoords);
-    routeInfo.value = {
-      distanceMeters: data.distanceMeters ?? null,
-      durationSeconds: data.durationSeconds ?? null,
+    restaurantInfo.value = {
+      id: details.restaurantId,
+      name: details.name,
+      phone: details.phone,
+      address: `${details.roadAddress} ${details.detailAddress || ''}`.trim(),
+      hours: `${details.openTime} - ${details.closeTime}`,
+      capacity: `최대 ${details.reservationLimit}인`,
+      preorderAvailable: details.preorderAvailable,
+      tagline: details.description,
+      tags: details.tags,
+      coords: coords,
+      rating: restaurantReviewSummary.value?.avgRating || 0,
+      reviews: restaurantReviewSummary.value?.reviewCount || 0,
     };
-  } catch (error) {
-    routeError.value = '경로를 불러오지 못했습니다.';
+
+    if (details.menus?.length) {
+      representativeMenus.value = details.menus
+        .filter((menu) => menu.category.code === 'MAIN')
+        .slice(0, 3)
+        .map((menu) => ({
+          ...menu,
+          price: `${menu.price.toLocaleString()}원`,
+          imageUrl: normalizeImageUrl(menu.imageUrl),
+        }));
+    } else {
+      representativeMenus.value = [];
+    }
+
+    if (details.images?.length) {
+      restaurantImages.value = details.images.map((img, index) => ({
+        url: normalizeImageUrl(img.imageUrl),
+        alt: `${details.name} 이미지 ${index + 1}`,
+      }));
+    } else {
+      restaurantImages.value = defaultGallery;
+    }
+  } catch (err) {
+    console.error('식당 상세 정보를 불러오는 데 실패했습니다:', err);
+    error.value = '데이터를 불러올 수 없습니다.';
   } finally {
-    isRouteLoading.value = false;
+    isLoading.value = false;
   }
 };
 
-const detailLevelForDistance = (stepIndex) => {
-  const step = detailMapDistanceSteps[stepIndex] ?? detailMapDistanceSteps[0];
-  return step.level;
+const loadRepresentativeReviews = async () => {
+  try {
+    const response = await httpRequest.get(`/api/restaurants/${restaurantId}/reviews`, {
+      params: {
+        page: 1,
+        size: 3,
+        sort: 'RECOMMEND',
+      },
+    });
+    const data = response.data?.data ?? response.data;
+    restaurantReviewSummary.value = data?.summary ?? null;
+    representativeReviews.value = (data?.items || []).slice(0, 3).map(mapReviewItem);
+  } catch (err) {
+    console.error('리뷰 데이터를 불러오지 못했습니다:', err);
+    representativeReviews.value = [];
+  }
 };
 
-const applyDetailMapZoom = () => {
-  if (!detailMapInstance) return;
-  detailMapInstance.setLevel(detailLevelForDistance(detailMapDistanceStepIndex.value), {
-    animate: { duration: 300 },
-  });
-};
-
-const changeDetailMapDistance = (delta) => {
-  const next = Math.min(
-    detailMapDistanceSteps.length - 1,
-    Math.max(0, detailMapDistanceStepIndex.value + delta),
-  );
-  detailMapDistanceStepIndex.value = next;
-};
+watch(
+  () => userId.value,
+  (nextUserId) => {
+    if (!nextUserId) {
+      clearFavorites();
+      return;
+    }
+    fetchFavorites(nextUserId);
+  },
+  { immediate: true }
+);
 
 onMounted(async () => {
   if (typeof window !== 'undefined') {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
-  // 리뷰 데이터와 식당 상세 정보를 병렬로 로드
   await Promise.all([loadRepresentativeReviews(), fetchRestaurantDetail()]);
 
-  // 드래그 스크롤 기능 설정
   const scrollContainers = document.querySelectorAll('.review-image-scroll');
   scrollContainers.forEach((container) => {
     setupDragScroll(container);
   });
-});
-
-onBeforeUnmount(() => {
-  if (detailMarker) {
-    detailMarker.setMap(null);
-  }
-  clearDetailRoute();
-  detailMarker = null;
-  detailMapInstance = null;
-});
-
-watch(restaurantInfo, async (newValue) => {
-  if (newValue && newValue.coords) {
-    await nextTick();
-    clearDetailRoute();
-    routeInfo.value = null;
-    routeError.value = '';
-    initializeDetailMap();
-  }
-});
-
-watch(detailMapDistanceStepIndex, () => {
-  applyDetailMapZoom();
 });
 </script>
 
@@ -577,6 +327,7 @@ watch(detailMapDistanceStepIndex, () => {
 
       <!-- Restaurant Content -->
       <template v-if="!isLoading && restaurantInfo">
+        <!-- Image Gallery -->
         <div
           class="relative w-full h-64 bg-gradient-to-br from-orange-400 to-pink-400 overflow-hidden"
         >
@@ -586,7 +337,6 @@ watch(detailMapDistanceStepIndex, () => {
             class="w-full h-full object-cover"
           />
 
-          <!-- Left Arrow -->
           <button
             @click="handlePrevImage"
             class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow-lg transition-all"
@@ -595,7 +345,6 @@ watch(detailMapDistanceStepIndex, () => {
             <ChevronLeft class="w-5 h-5 text-[#1e3a5f]" />
           </button>
 
-          <!-- Right Arrow -->
           <button
             @click="handleNextImage"
             class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow-lg transition-all"
@@ -604,7 +353,6 @@ watch(detailMapDistanceStepIndex, () => {
             <ChevronRight class="w-5 h-5 text-[#1e3a5f]" />
           </button>
 
-          <!-- Image Indicators -->
           <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
             <button
               v-for="(_, idx) in restaurantImages"
@@ -681,6 +429,7 @@ watch(detailMapDistanceStepIndex, () => {
           </div>
         </div>
 
+        <!-- Map Section -->
         <div class="px-4 py-5 bg-white border-b border-[#e9ecef]">
           <div class="flex items-center gap-3 mb-3">
             <h3 class="text-lg font-semibold text-[#1e3a5f]">위치 안내</h3>
@@ -701,7 +450,7 @@ watch(detailMapDistanceStepIndex, () => {
                 class="text-xs font-semibold text-[#1e3a5f] whitespace-nowrap"
               >
                 거리 {{ formatRouteDistance(routeInfo.distanceMeters) }} · 예상
-                {{ formatRouteDuration(routeInfo.durationSeconds) }}
+                {{ formatRouteDurationMinutes(routeInfo.durationSeconds) }}
               </span>
               <span v-else-if="routeError" class="text-xs text-[#e03131]">
                 {{ routeError }}
@@ -841,7 +590,7 @@ watch(detailMapDistanceStepIndex, () => {
                   <span class="text-xs text-gray-700">{{ review.date }}</span>
                 </div>
 
-                <!-- 리뷰 이미지 갤러리 (스크롤 방식) -->
+                <!-- Review Images Gallery -->
                 <div
                   v-if="
                     !review.isBlinded && review.images && review.images.length > 0
@@ -870,7 +619,6 @@ watch(detailMapDistanceStepIndex, () => {
                           :alt="`리뷰 이미지 ${idx + 1}`"
                           class="w-full h-full object-cover pointer-events-none"
                         />
-                        <!-- 이미지 카운터 -->
                         <div
                           class="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full"
                         >
@@ -881,13 +629,12 @@ watch(detailMapDistanceStepIndex, () => {
                   </div>
                 </div>
 
-                <!-- 리뷰 내용 -->
+                <!-- Review Content -->
                 <div v-if="!review.isBlinded">
                   <p class="text-sm text-gray-700 leading-relaxed mb-2">
                     {{ truncateText(review.content, review.isExpanded) }}
                   </p>
 
-                  <!-- 더보기/접기 버튼 -->
                   <button
                     v-if="shouldShowExpandButton(review.content)"
                     @click.prevent="toggleReviewExpand(review)"
@@ -896,7 +643,6 @@ watch(detailMapDistanceStepIndex, () => {
                     {{ review.isExpanded ? '접기' : '더보기' }}
                   </button>
 
-                  <!-- 태그 -->
                   <RouterLink
                     :to="`/restaurant/${restaurantId}/reviews/${review.id}`"
                     class="block"
@@ -996,14 +742,13 @@ watch(detailMapDistanceStepIndex, () => {
       </div>
     </div>
 
-    <!-- 이미지 확대 모달 -->
+    <!-- Image Modal -->
     <div
       v-if="isImageModalOpen"
       class="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
       @click="closeImageModal"
     >
       <div class="relative w-full h-full flex items-center justify-center">
-        <!-- 닫기 버튼 -->
         <button
           @click.stop="closeImageModal"
           class="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors z-10"
@@ -1012,7 +757,6 @@ watch(detailMapDistanceStepIndex, () => {
           <X class="w-6 h-6 text-white" />
         </button>
 
-        <!-- 이미지 -->
         <div class="relative max-w-[90vw] max-h-[90vh]" @click.stop>
           <img
             :src="modalImageUrl || '/placeholder.svg'"
@@ -1020,9 +764,7 @@ watch(detailMapDistanceStepIndex, () => {
             class="max-w-full max-h-[90vh] object-contain rounded-lg"
           />
 
-          <!-- 이미지가 2개 이상일 때만 화살표 표시 -->
           <template v-if="modalImages.length > 1">
-            <!-- 왼쪽 화살표 -->
             <button
               @click.stop="handleModalPrevImage"
               class="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/30 hover:bg-white/50 flex items-center justify-center transition-colors"
@@ -1031,7 +773,6 @@ watch(detailMapDistanceStepIndex, () => {
               <ChevronLeft class="w-6 h-6 text-white" />
             </button>
 
-            <!-- 오른쪽 화살표 -->
             <button
               @click.stop="handleModalNextImage"
               class="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/30 hover:bg-white/50 flex items-center justify-center transition-colors"
@@ -1040,7 +781,6 @@ watch(detailMapDistanceStepIndex, () => {
               <ChevronRight class="w-6 h-6 text-white" />
             </button>
 
-            <!-- 이미지 카운터 -->
             <div
               class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-4 py-2 rounded-full"
             >
@@ -1054,7 +794,6 @@ watch(detailMapDistanceStepIndex, () => {
 </template>
 
 <style scoped>
-/* 스크롤바 숨기기 */
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -1064,12 +803,10 @@ watch(detailMapDistanceStepIndex, () => {
   display: none;
 }
 
-/* 스크롤 스냅 부드럽게 */
 .snap-x {
   scroll-behavior: smooth;
 }
 
-/* 마우스 드래그 시 텍스트 선택 방지 */
 .review-image-scroll {
   user-select: none;
   -webkit-user-select: none;
@@ -1077,7 +814,6 @@ watch(detailMapDistanceStepIndex, () => {
   -ms-user-select: none;
 }
 
-/* 이미지 드래그 방지 */
 .review-image-scroll img {
   pointer-events: none;
   -webkit-user-drag: none;
