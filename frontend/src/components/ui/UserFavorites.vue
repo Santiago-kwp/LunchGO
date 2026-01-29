@@ -4,6 +4,7 @@ import { RouterLink, useRouter } from 'vue-router';
 import { Star, Bell, Link2, UserPlus, RefreshCw } from 'lucide-vue-next';
 import FavoriteHeart from '@/components/ui/FavoriteHeart.vue';
 import { useBookmarkShare } from '@/composables/useBookmarkShare';
+import { normalizeImageUrl } from '@/utils/image';
 
 // 타입 정의
 interface Restaurant {
@@ -111,7 +112,7 @@ const fetchFavorites = async () => {
       promotionAgree: Boolean(item.promotionAgree),
       isFavorite: true,
       isPublic: Boolean(item.isPublic),
-      imageUrl: item.imageUrl || null,
+      imageUrl: normalizeImageUrl(item.imageUrl, null),
       rating: Number(item.rating || 0),
       reviewCount: Number(item.reviewCount || 0),
     }));
@@ -299,7 +300,7 @@ const handleOpenSharedFolder = async (counterpartId: number) => {
       name: item.name,
       roadAddress: item.roadAddress,
       detailAddress: item.detailAddress,
-      imageUrl: item.imageUrl || null,
+      imageUrl: normalizeImageUrl(item.imageUrl, null),
       rating: Number(item.rating || 0),
       reviewCount: Number(item.reviewCount || 0),
     }));

@@ -7,14 +7,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @Getter
 @Setter
-@ConfigurationProperties(prefix = "ncp.object-storage")
-public class ObjectStorageProperties {
-    private String endpoint;
-    private String region;
-    private String bucket;
-    private boolean publicRead;
-    private String accessKey;
-    private String secretKey;
+@ConfigurationProperties(prefix = "image.storage")
+public class LocalImageStorageProperties {
+    private String baseDir;
+    private String baseUrl;
     private long maxSizeBytes;
     private List<String> allowedContentTypes;
 }

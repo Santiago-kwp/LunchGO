@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { ArrowLeft } from 'lucide-vue-next';
 import axios from 'axios';
+import { normalizeImageUrl } from '@/utils/image';
 import Card from '@/components/ui/Card.vue';
 import Button from '@/components/ui/Button.vue';
 
@@ -18,7 +19,10 @@ const fetchMenus = async () => {
   error.value = null;
   try {
     const response = await axios.get(`/api/restaurants/${restaurantId}/menus`);
-    menus.value = response.data || [];
+    menus.value = (response.data || []).map(menu => ({
+      ...menu,
+      imageUrl: normalizeImageUrl(menu.imageUrl, null),
+    }));
   } catch (err) {
     console.error('메뉴 정보를 불러오는 데 실패했습니다:', err);
     error.value = '메뉴 정보를 불러오는 데 실패했습니다. 다시 시도해 주세요.';

@@ -5,6 +5,7 @@ import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 import { ArrowLeft } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import RestaurantMenuList from '@/components/ui/RestaurantMenuList.vue';
+import { normalizeImageUrl } from "@/utils/image";
 import httpRequest from "@/router/httpRequest.js";
 
 const props = defineProps({
@@ -38,7 +39,7 @@ const menuCategories = computed(() => {
           name: menu.name,
           price: menu.price ? `${menu.price.toLocaleString()}원` : '가격정보 없음',
           description: menu.description,
-          image: menu.imageUrl || '/placeholder.svg',
+          image: normalizeImageUrl(menu.imageUrl),
         });
       }
     });

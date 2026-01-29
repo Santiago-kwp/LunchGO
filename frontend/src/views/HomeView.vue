@@ -23,6 +23,7 @@ import AppFooter from "@/components/ui/AppFooter.vue";
 import BottomNav from "@/components/ui/BottomNav.vue";
 import { RouterLink, useRouter } from "vue-router"; // Import Vue RouterLink
 import { geocodeAddress } from "@/utils/kakao";
+import { normalizeImageUrl } from "@/utils/image";
 import { restaurants as restaurantData, loadRestaurants } from "@/data/restaurants";
 import AppHeader from "@/components/ui/AppHeader.vue";
 import HomeSearchBar from "@/components/ui/HomeSearchBar.vue";
@@ -959,7 +960,7 @@ const trendingCards = computed(() => {
       id: String(restaurant.restaurantId),
       name: restaurant.name || fallback?.name || "",
       address: addressParts || fallback?.address || "",
-      image: restaurant.imageUrl || fallback?.image || "/placeholder.svg",
+      image: normalizeImageUrl(restaurant.imageUrl, fallback?.image || "/placeholder.svg"),
       rating: restaurant.rating ?? fallback?.rating ?? null,
       reviews: restaurant.reviewCount ?? restaurant.reviews ?? fallback?.reviews ?? 0,
       price: restaurant.price ?? fallback?.price ?? "가격 정보 없음",
@@ -1368,8 +1369,9 @@ const fetchRestaurantImage = async (restaurantId) => {
     const response = await axios.get(
         `/api/business/restaurants/${restaurantId}/images`
     );
-    const imageUrl = response.data?.[0]?.imageUrl;
-    if (imageUrl) {
+    const rawImageUrl = response.data?.[0]?.imageUrl;
+    if (rawImageUrl) {
+      const imageUrl = normalizeImageUrl(rawImageUrl, null);
       restaurantImageCache.set(key, imageUrl);
       restaurantImageOverrides.value = {
         ...restaurantImageOverrides.value,

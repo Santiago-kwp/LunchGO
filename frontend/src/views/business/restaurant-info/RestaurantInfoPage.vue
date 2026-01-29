@@ -4,6 +4,7 @@ import { RouterLink, useRouter } from 'vue-router'; // useRouter import 추가
 import BusinessSidebar from '@/components/ui/BusinessSideBar.vue';
 import BusinessHeader from '@/components/ui/BusinessHeader.vue';
 import { useRestaurantStore } from '@/stores/restaurant'; // Pinia 스토어 임포트
+import { normalizeImageUrl } from "@/utils/image";
 
 // Pinia 스토어 초기화
 const store = useRestaurantStore();
@@ -44,9 +45,9 @@ const closedDaysAsStrings = computed(() => {
 // 대표 이미지 URL
 const mainImageUrl = computed(() => {
   if (!store.restaurantInfo || !store.restaurantInfo.images || store.restaurantInfo.images.length === 0) {
-    return '/placeholder.svg'; // 기본 이미지
+    return '/placeholder.svg';
   }
-  return store.restaurantInfo.images[0].imageUrl;
+  return normalizeImageUrl(store.restaurantInfo.images[0].imageUrl);
 });
 
 // 5. 라이프사이클 훅

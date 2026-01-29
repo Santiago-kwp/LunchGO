@@ -1,41 +1,33 @@
 package com.example.LunchGo.image.service;
 
-import com.example.LunchGo.image.config.ObjectStorageProperties;
+import com.example.LunchGo.image.config.LocalImageStorageProperties;
 import com.example.LunchGo.image.dto.ImageUploadResponse;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.ObjectCannedACL;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
-import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
-import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 
 @Service
 @RequiredArgsConstructor
-public class ObjectStorageService {
+public class LocalImageStorageService {
 
     private static final DateTimeFormatter YEAR_FORMAT = DateTimeFormatter.ofPattern("yyyy");
     private static final DateTimeFormatter MONTH_FORMAT = DateTimeFormatter.ofPattern("MM");
-    private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("dd");
 
-    private final S3Client s3Client;
-    private final S3Presigner s3Presigner;
-    private final ObjectStorageProperties properties;
+    private final LocalImageStorageProperties properties;
 
     public ImageUploadResponse upload(String domain, MultipartFile file) {
         validateUpload(file);
@@ -44,28 +36,18 @@ public class ObjectStorageService {
         String extension = resolveExtension(file, contentType);
         String key = buildKey(domain, extension);
 
-        PutObjectRequest.Builder requestBuilder = PutObjectRequest.builder()
-            .bucket(properties.getBucket())
-            .key(key)
-            .contentType(contentType);
-
-        if (isPublicDomain(domain) && properties.isPublicRead()) {
-            requestBuilder.acl(ObjectCannedACL.PUBLIC_READ);
-        }
+        Path targetPath = Paths.get(properties.getBaseDir(), key);
 
         try {
-            s3Client.putObject(
-                requestBuilder.build(),
-                RequestBody.fromInputStream(file.getInputStream(), file.getSize())
-            );
+            Files.createDirectories(targetPath.getParent());
+            try (InputStream inputStream = file.getInputStream()) {
+                Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (IOException e) {
             throw new IllegalStateException("failed to upload file", e);
         }
 
-        String fileUrl = null;
-        if (isPublicDomain(domain)) {
-            fileUrl = buildPublicUrlInternal(key);
-        }
+        String fileUrl = properties.getBaseUrl() + "/" + key;
         return new ImageUploadResponse(fileUrl, key, contentType, file.getSize());
     }
 
@@ -77,60 +59,59 @@ public class ObjectStorageService {
         validateFile(file, contentType);
     }
 
-    public String createPresignedUrl(String key, Duration duration) {
-        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-            .bucket(properties.getBucket())
-            .key(key)
-            .build();
-
-        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-            .signatureDuration(duration)
-            .getObjectRequest(getObjectRequest)
-            .build();
-
-        PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
-        return presignedRequest.url().toString();
-    }
-
     public void deleteObject(String key) {
         if (key == null || key.isBlank()) {
             return;
         }
-        s3Client.deleteObject(DeleteObjectRequest.builder()
-            .bucket(properties.getBucket())
-            .key(key)
-            .build());
+        String normalizedKey = normalizeKey(key);
+        if (normalizedKey == null) {
+            return;
+        }
+        Path targetPath = Paths.get(properties.getBaseDir(), normalizedKey);
+        try {
+            Files.deleteIfExists(targetPath);
+        } catch (IOException e) {
+            // Log but don't throw - deletion failure shouldn't break the flow
+        }
+    }
+
+    public String normalizeKey(String storedValue) {
+        if (storedValue == null || storedValue.isBlank()) {
+            return null;
+        }
+        String baseUrl = properties.getBaseUrl();
+        if (baseUrl != null && storedValue.startsWith(baseUrl + "/")) {
+            return storedValue.substring(baseUrl.length() + 1);
+        }
+        if (storedValue.startsWith("/images/")) {
+            return storedValue.substring("/images/".length());
+        }
+        return storedValue;
+    }
+
+    public String buildPublicUrl(String key) {
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        String normalizedKey = normalizeKey(key);
+        return properties.getBaseUrl() + "/" + normalizedKey;
     }
 
     private String buildKey(String domain, String extension) {
         LocalDate today = LocalDate.now();
         String year = YEAR_FORMAT.format(today);
         String month = MONTH_FORMAT.format(today);
-        String day = DAY_FORMAT.format(today);
         String uuid = UUID.randomUUID().toString();
 
         return switch (domain.toLowerCase(Locale.ROOT)) {
             case "reviews" -> String.format("reviews/%s/%s/%s.%s", year, month, uuid, extension);
             case "receipts" -> String.format("receipts/%s/%s/%s.%s", year, month, uuid, extension);
-            case "cafeteria" -> String.format("cafeteria/%s/%s/%s/%s.%s", year, month, day, uuid, extension);
+            case "cafeteria" -> String.format("cafeteria/%s/%s/%s.%s", year, month, uuid, extension);
             case "restaurants" -> String.format("restaurants/%s/%s/%s.%s", year, month, uuid, extension);
             case "menus" -> String.format("menus/%s/%s/%s.%s", year, month, uuid, extension);
-            case "profile" -> String.format("profile/%s/%s/%s/%s.%s", year, month, day, uuid, extension);
+            case "profile" -> String.format("profile/%s/%s/%s.%s", year, month, uuid, extension);
             default -> throw new IllegalArgumentException("unsupported domain: " + domain);
         };
-    }
-
-    private boolean isPublicDomain(String domain) {
-        String normalized = domain.toLowerCase(Locale.ROOT);
-        return "reviews".equals(normalized)
-            || "cafeteria".equals(normalized)
-            || "restaurants".equals(normalized)
-            || "menus".equals(normalized)
-            || "profile".equals(normalized);
-    }
-
-    private String buildPublicUrlInternal(String key) {
-        return properties.getEndpoint() + "/" + properties.getBucket() + "/" + key;
     }
 
     private String resolveExtension(MultipartFile file, String contentType) {
@@ -180,16 +161,5 @@ public class ObjectStorageService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unsupported content type");
             }
         }
-    }
-
-    public String normalizeKey(String storedValue) {
-        if (storedValue == null || storedValue.isBlank()) {
-            return null;
-        }
-        String prefix = properties.getEndpoint() + "/" + properties.getBucket() + "/";
-        if (storedValue.startsWith(prefix)) {
-            return storedValue.substring(prefix.length());
-        }
-        return storedValue;
     }
 }

@@ -25,6 +25,7 @@ import {
   formatRouteDurationMinutes,
 } from '@/utils/formatters';
 import { formatReviewTag } from "@/utils/reviewTagEmojis";
+import { normalizeImageUrl, normalizeImageUrls } from "@/utils/image";
 import { useAccountStore } from '@/stores/account';
 import httpRequest from "@/router/httpRequest.js";
 import axios from "axios";
@@ -161,7 +162,7 @@ const mapReviewItem = (item) => ({
     ? '관리자에 의해 블라인드 처리된 리뷰입니다.'
     : item.content || '',
   tags: (item.tags || []).map((tag) => tag.name || tag),
-  images: (item.images || []).map(img => (img && !img.startsWith('http')) ? '/' + img : img),
+  images: normalizeImageUrls(item.images || []),
   currentImageIndex: 0,
   isExpanded: false,
   isBlinded: Boolean(item.isBlinded),
@@ -227,9 +228,7 @@ const fetchRestaurantDetail = async () => {
         .map((menu) => ({
           ...menu,
           price: `${menu.price.toLocaleString()}원`, // 숫자 가격을 문자열로 변환
-          imageUrl: (menu.imageUrl && !menu.imageUrl.startsWith('http'))
-              ? '/' + menu.imageUrl
-              : (menu.imageUrl || '/placeholder.svg'),
+          imageUrl: normalizeImageUrl(menu.imageUrl),
         }));
     } else {
       representativeMenus.value = [];
@@ -238,7 +237,7 @@ const fetchRestaurantDetail = async () => {
     // 이미지 갤러리 설정
     if (details.images?.length) {
       restaurantImages.value = details.images.map((img, index) => ({
-        url: img.imageUrl.startsWith('http') ? img.imageUrl : '/' + img.imageUrl,
+        url: normalizeImageUrl(img.imageUrl),
         alt: `${details.name} 이미지 ${index + 1}`,
       }));
     } else {

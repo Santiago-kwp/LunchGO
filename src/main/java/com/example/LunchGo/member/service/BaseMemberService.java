@@ -4,7 +4,7 @@ import com.example.LunchGo.account.dto.FindPwdRequest;
 import com.example.LunchGo.account.dto.OwnerJoinRequest;
 import com.example.LunchGo.account.dto.UserJoinRequest;
 import com.example.LunchGo.image.dto.ImageUploadResponse;
-import com.example.LunchGo.image.service.ObjectStorageService;
+import com.example.LunchGo.image.service.LocalImageStorageService;
 import com.example.LunchGo.member.domain.CustomRole;
 import com.example.LunchGo.member.domain.OwnerStatus;
 import com.example.LunchGo.member.domain.UserStatus;
@@ -46,7 +46,7 @@ public class BaseMemberService implements MemberService {
     private final ManagerRepository managerRepository;
     private final MemberMapper memberMapper;
     private final StaffRepository staffRepository;
-    private final ObjectStorageService objectStorageService;
+    private final LocalImageStorageService localImageStorageService;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -157,7 +157,7 @@ public class BaseMemberService implements MemberService {
     public void updateMemberInfo(Long userId, MemberUpdateInfo info, MultipartFile image) {
         String imgUrl = info.getImage();
         if(image != null && !image.isEmpty()){
-            ImageUploadResponse response = objectStorageService.upload("profile", image);
+            ImageUploadResponse response = localImageStorageService.upload("profile", image);
             imgUrl = response.getFileUrl();
         }
 
@@ -195,7 +195,7 @@ public class BaseMemberService implements MemberService {
         String imgUrl = ownerUpdateInfo.getImage();
 
         if(image != null && !image.isEmpty()){
-            ImageUploadResponse response = objectStorageService.upload("profile", image);
+            ImageUploadResponse response = localImageStorageService.upload("profile", image);
             imgUrl = response.getFileUrl();
         }
         int result = ownerRepository.updateOwner(ownerId, ownerUpdateInfo.getPhone(), imgUrl);

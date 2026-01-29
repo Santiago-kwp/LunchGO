@@ -21,7 +21,7 @@ import com.example.LunchGo.review.dto.UpdateReviewResponse;
 import com.example.LunchGo.review.dto.VisitInfo;
 import com.example.LunchGo.review.exception.ReviewDuplicateException;
 import com.example.LunchGo.review.forbidden.ForbiddenWordService;
-import com.example.LunchGo.image.service.ObjectStorageService;
+import com.example.LunchGo.image.service.LocalImageStorageService;
 import com.example.LunchGo.review.entity.Receipt;
 import com.example.LunchGo.review.entity.ReceiptItem;
 import com.example.LunchGo.review.entity.Review;
@@ -40,7 +40,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Map;
-import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -56,7 +55,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReceiptRepository receiptRepository;
     private final ReceiptItemRepository receiptItemRepository;
     private final ReviewReadMapper reviewReadMapper;
-    private final ObjectStorageService objectStorageService;
+    private final LocalImageStorageService localImageStorageService;
     private final ReviewTagRepository reviewTagRepository;
     private final ForbiddenWordService forbiddenWordService;
     private final ReviewSummaryCache reviewSummaryCache;
@@ -237,7 +236,7 @@ public class ReviewServiceImpl implements ReviewService {
 
         VisitInfo visitInfo = reviewReadMapper.selectVisitInfo(reviewId);
         if (visitInfo != null) {
-            applyReceiptImagePresign(visitInfo);
+            applyReceiptImageUrl(visitInfo);
             List<ReceiptItemResponse> items = reviewReadMapper.selectReceiptItemsByReviewId(reviewId);
             visitInfo.setMenuItems(items);
         }
@@ -265,7 +264,7 @@ public class ReviewServiceImpl implements ReviewService {
 
         VisitInfo visitInfo = reviewReadMapper.selectVisitInfo(reviewId);
         if (visitInfo != null) {
-            applyReceiptImagePresign(visitInfo);
+            applyReceiptImageUrl(visitInfo);
             List<ReceiptItemResponse> items = reviewReadMapper.selectReceiptItemsByReviewId(reviewId);
             visitInfo.setMenuItems(items);
         }
@@ -449,16 +448,16 @@ public class ReviewServiceImpl implements ReviewService {
         return mapped;
     }
 
-    private void applyReceiptImagePresign(VisitInfo visitInfo) {
+    private void applyReceiptImageUrl(VisitInfo visitInfo) {
         String storedValue = visitInfo.getReceiptImageUrl();
         if (storedValue == null || storedValue.isBlank()) {
             return;
         }
-        String key = objectStorageService.normalizeKey(storedValue);
+        String key = localImageStorageService.normalizeKey(storedValue);
         if (key == null || !key.startsWith("receipts/")) {
             return;
         }
-        String presigned = objectStorageService.createPresignedUrl(key, Duration.ofMinutes(5));
-        visitInfo.setReceiptImageUrl(presigned);
+        String publicUrl = localImageStorageService.buildPublicUrl(key);
+        visitInfo.setReceiptImageUrl(publicUrl);
     }
 }

@@ -7,7 +7,7 @@ import com.example.LunchGo.cafeteria.dto.CafeteriaOcrResponse;
 import com.example.LunchGo.cafeteria.entity.CafeteriaMenu;
 import com.example.LunchGo.cafeteria.repository.CafeteriaMenuRepository;
 import com.example.LunchGo.image.dto.ImageUploadResponse;
-import com.example.LunchGo.image.service.ObjectStorageService;
+import com.example.LunchGo.image.service.LocalImageStorageService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.DayOfWeek;
@@ -65,13 +65,13 @@ public class CafeteriaMenuService {
     );
 
     private final CafeteriaMenuRepository cafeteriaMenuRepository;
-    private final ObjectStorageService objectStorageService;
+    private final LocalImageStorageService localImageStorageService;
     private final CafeteriaOcrService cafeteriaOcrService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public CafeteriaOcrResponse recognizeMenus(Long userId, LocalDate baseDate, MultipartFile file) {
-        objectStorageService.validateUpload(file);
-        ImageUploadResponse uploadResponse = objectStorageService.upload("cafeteria", file);
+        localImageStorageService.validateUpload(file);
+        ImageUploadResponse uploadResponse = localImageStorageService.upload("cafeteria", file);
 
         CafeteriaOcrService.OcrResult ocrResult = cafeteriaOcrService.recognizeMenu(file);
         String rawText = ocrResult.rawText();
