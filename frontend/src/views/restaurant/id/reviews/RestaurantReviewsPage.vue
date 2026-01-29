@@ -12,6 +12,8 @@ import {
 import Card from "@/components/ui/Card.vue";
 import axios from "axios";
 import { formatReviewTag } from "@/utils/reviewTagEmojis";
+import { normalizeImageUrl } from "@/utils/image";
+
 
 const route = useRoute();
 const restaurantId = route.params.id || "1"; // Default ID
@@ -42,7 +44,7 @@ const mapReviewItem = (item) => ({
     ? "관리자에 의해 블라인드 처리된 리뷰입니다."
     : item.content || "",
   tags: (item.tags || []).map((tag) => tag.name || tag),
-  images: item.images || [],
+  images: (item.images || []).map(img => normalizeImageUrl(img)),
   isExpanded: false,
   isBlinded: Boolean(item.isBlinded),
   blindReason: item.blindReason || "관리자에 의해 블라인드 처리된 리뷰입니다.",

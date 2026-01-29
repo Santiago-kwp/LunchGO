@@ -4,6 +4,7 @@ import { RouterLink, useRouter } from 'vue-router';
 import httpRequest from '@/router/httpRequest';
 import { useAccountStore } from '@/stores/account';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
+import logoUrl from '@/assets/lunch-go-whitebg.png';
 
 const router = useRouter();
 const accountStore = useAccountStore();
@@ -93,7 +94,7 @@ const handleLogoutErrorConfirm = () => {
     >
       <div class="flex items-center gap-3">
         <img
-          src="/images/lunch-go-whitebg.png"
+          :src="logoUrl"
           alt="런치고"
           width="56"
           height="56"

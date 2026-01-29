@@ -10,6 +10,7 @@ import UserDormantModal from '@/components/ui/UserDormantModal.vue';
 import WaitingModal from '@/components/ui/WaitingModal.vue';
 import { useAccountStore } from '@/stores/account';
 import { useLoginQueue } from '@/composables/useLoginQueue';
+import logoUrl from '@/assets/lunch-go-whitebg.png';
 
 const router = useRouter();
 const route = useRoute();
@@ -191,7 +192,7 @@ const handleDormantUnlocked = () => {
     <main class="flex-1 max-w-[500px] mx-auto w-full px-4 py-8">
       <div class="flex flex-col items-center mb-8">
         <img
-          src="/images/lunch-go-whitebg.png"
+          :src="logoUrl"
           alt="런치고"
           width="80"
           height="80"

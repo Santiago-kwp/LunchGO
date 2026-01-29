@@ -8,6 +8,19 @@ export function normalizeImageUrl(url, fallback = '/placeholder.svg') {
   if (!url) {
     return fallback;
   }
+
+  // 1. 이미 정규화되었거나, 외부 링크(http),
+  //    또는 프론트엔드 내부 리소스(?import), Base64 데이터인 경우 그대로 반환
+  if (
+      url.startsWith('/images/') ||
+      url.startsWith('http') ||
+      url.includes('?import') ||
+      url.startsWith('data:') ||
+      url.startsWith('/src/') // 추가: Vite 소스 경로인 경우
+  ) {
+    return url;
+  }
+
   if (url.startsWith('/images/') || url.startsWith('http')) {
     return url;
   }
