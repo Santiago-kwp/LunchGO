@@ -24,7 +24,7 @@ defineProps({
     <div class="px-4 py-5 border-b border-[#e9ecef]">
       <RouterLink to="/admin/dashboard">
         <img
-          src="/images/lunch-go-whitebg.png"
+          src="/frontend/src/assets/lunch-go-whitebg.png"
           alt="LunchGo"
           class="w-auto h-10"
           width="130"

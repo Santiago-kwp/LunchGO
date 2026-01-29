@@ -13,6 +13,7 @@ import Card from "@/components/ui/Card.vue";
 import Button from "@/components/ui/Button.vue";
 import httpRequest from "@/router/httpRequest";
 import { formatReviewTag } from "@/utils/reviewTagEmojis";
+import { normalizeImageUrl } from "@/utils/image";
 
 const route = useRoute();
 const router = useRouter();
@@ -149,7 +150,7 @@ onMounted(() => {
           ? "관리자에 의해 블라인드 처리된 리뷰입니다."
           : data.content || "",
         tags: (data.tags || []).map((tag) => tag.name || tag),
-        images: data.images || [],
+        images: (data.images || []).map(img => normalizeImageUrl(img)),
         detailedContent: data.content || "",
         visitInfo: data.visitInfo
           ? {

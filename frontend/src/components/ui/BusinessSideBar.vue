@@ -36,7 +36,7 @@ const toWithRestaurantId = (path) => {
     <div class="px-6 py-5 border-b border-[#e9ecef]">
       <RouterLink :to="toWithRestaurantId('/business/dashboard')">
         <img
-            src="/images/lunch-go-whitebg.png"
+            src="/frontend/src/assets/lunch-go-whitebg.png"
             alt="LunchGo"
             class="w-auto h-12"
             width="150"
